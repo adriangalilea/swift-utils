@@ -35,11 +35,14 @@ public struct Spec: Sendable {
     public var local: [KeyCombo]
     /// System-wide (Carbon) accelerators. Empty = no system-wide reach.
     ///
-    /// SHIP THIS EMPTY unless the chord is the app's reason to exist: a
-    /// registered global STEALS its combo from EVERY app on the system
-    /// while yours runs - it cannot be "polite". The remap grid lets users
-    /// opt in deliberately; the store refuses macOS-reserved combos and the
-    /// grid marks registrations another app already owns.
+    /// The modifier doctrine: LOCALS go modifier-light (bare letters, the
+    /// app owns its own keyboard - they cannot collide with other apps;
+    /// that's where the ergonomics live). GLOBALS are where modifiers
+    /// belong: a registered global steals its combo from EVERY app on the
+    /// system while yours runs, so a default must be a deliberate, heavy
+    /// chord (⌃⌥⌘-class) unlikely to be anyone else's key. The grid warns
+    /// live on combos macOS itself uses and dims registrations another app
+    /// already owns.
     public var global: [KeyCombo]
     public init(
         title: String, symbol: String,

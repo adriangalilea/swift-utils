@@ -115,17 +115,31 @@ public struct KeymapGrid<A: ActionSet>: View {
             if !combos.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(combos, id: \.self) { combo in
-                        ComboChip(combo.display) { store.remove(combo, plane: plane, from: action) }
-                            // A global another running app owns is INERT -
-                            // say so where the binding lives.
-                            .opacity(plane == .global && store.deadGlobals.contains(combo) ? 0.4 : 1)
-                            .help(plane == .global && store.deadGlobals.contains(combo)
-                                ? String(localized: "Another app owns this system-wide right now - it won't fire", bundle: .module)
-                                : "")
+                        globalAdvisory(ComboChip(combo.display) { store.remove(combo, plane: plane, from: action) },
+                                       combo: combo, plane: plane)
                     }
                 }
                 .padding(.leading, 14)
             }
+        }
+    }
+
+    /// The global plane's live advisories, worst first: a registration
+    /// another running app owns is INERT (dimmed); a combo macOS itself
+    /// currently uses may never reach us (warning tint). Advisories, never
+    /// walls - both states are the machine's live truth, re-read on render.
+    @ViewBuilder
+    private func globalAdvisory(_ chip: ComboChip, combo: KeyCombo, plane: ComboPlane) -> some View {
+        if plane == .global, store.deadGlobals.contains(combo) {
+            chip.opacity(0.4)
+                .help(String(localized: "Another app owns this system-wide right now - it won't fire", bundle: .module))
+        } else if plane == .global, SystemHotkeys.owns(combo) {
+            chip.overlay(alignment: .topTrailing) {
+                Circle().fill(.orange).frame(width: 6, height: 6).offset(x: 2, y: -2)
+            }
+            .help(String(localized: "macOS also uses this combo system-wide right now - it may not fire", bundle: .module))
+        } else {
+            chip
         }
     }
 

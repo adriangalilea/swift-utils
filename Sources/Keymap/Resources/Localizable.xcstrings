@@ -1,16 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "%@ belongs to macOS system-wide": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ pertenece a macOS en todo el sistema"
-          }
-        }
-      }
-    },
     "%@ is already %@": {
       "localizations": {
         "es": {
@@ -137,6 +127,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Funciona mientras esta app está en primer plano"
+          }
+        }
+      }
+    },
+    "macOS also uses this combo system-wide right now - it may not fire": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS también usa este atajo en todo el sistema ahora mismo: puede que no funcione"
           }
         }
       }

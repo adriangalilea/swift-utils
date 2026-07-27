@@ -51,9 +51,6 @@ public enum AddRejection: Equatable, Sendable {
     case taken(by: String)
     /// A system-wide combo needs a real modifier (⌘, ⌥, or ⌃) to register.
     case needsModifier
-    /// macOS owns this combo system-wide (screenshots, Spotlight, …) -
-    /// registering it would fight the OS and lose.
-    case systemReserved
 
     /// The one user-facing sentence for this verdict.
     public func message(for combo: KeyCombo) -> String {
@@ -62,8 +59,6 @@ public enum AddRejection: Equatable, Sendable {
             String(localized: "\(combo.display) is already \(owner)", bundle: .module)
         case .needsModifier:
             String(localized: "System-wide shortcuts need ⌘, ⌥, or ⌃", bundle: .module)
-        case .systemReserved:
-            String(localized: "\(combo.display) belongs to macOS system-wide", bundle: .module)
         }
     }
 }
@@ -194,11 +189,9 @@ public final class KeymapStore<A: ActionSet> {
     /// modifier. nil = added. (Planes don't collide: a key may be an in-app
     /// combo for one action and a system-wide form for another.)
     public func add(_ combo: KeyCombo, plane: ComboPlane, to action: A) -> AddRejection? {
-        if plane == .global {
-            if combo.eventModifiers.isDisjoint(with: [.command, .option, .control]) {
-                return .needsModifier
-            }
-            if SystemHotkeys.owns(combo) { return .systemReserved }
+        if plane == .global,
+           combo.eventModifiers.isDisjoint(with: [.command, .option, .control]) {
+            return .needsModifier
         }
         if let owner = A.allCases.first(where: {
             $0 != action && combos(for: $0, plane).contains(combo)

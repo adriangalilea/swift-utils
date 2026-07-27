@@ -153,9 +153,12 @@ public final class GlobalHotkeys<A: ActionSet> {
     }
 }
 
-/// The combos macOS itself owns system-wide (screenshots, Spotlight, Mission
-/// Control, …), via the symbolic-hotkeys registry. The store refuses these
-/// at bind time - registering would fight the OS and lose.
+/// The combos macOS itself CURRENTLY uses system-wide (screenshots,
+/// Spotlight, Mission Control, …) via the symbolic-hotkeys registry - LIVE
+/// state: it reflects the user's own remaps and disables in System
+/// Settings. An ADVISORY, never a wall: the grid warns on these (the OS
+/// intercepts before Carbon, so the binding may never fire), but the user
+/// who moved Spotlight knows their own machine better than we do.
 enum SystemHotkeys {
     static func owns(_ combo: KeyCombo) -> Bool {
         guard let keyCode = combo.carbonKeyCode else { return false }
