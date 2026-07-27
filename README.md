@@ -4,7 +4,35 @@ Swift utilities for mac apps. The sibling of [ts-utils](https://github.com/adria
 
 ## Ink
 
-The styling atoms every product builds on: the `ink*` token ladder for dark-glass surfaces (five semantic roles, no raw values at call sites), `planeHeaderStyle`, and the micro-components - `ShortcutBadge` (the one key-cap), `ComboChip` (keycap with hover-✕ remove), `AddSlot` (the pressable ＋). No dependencies; future products (AppSettings, the credits pane) consume it without the keymap machine.
+The styling atoms every product builds on: the `ink*` fill ladder for dark-glass surfaces (five semantic roles), the radius ladder (`.inkChip/.inkRow/.inkField/.inkPanel`), the motion ladder (`.inkFlick/.inkSettle`), the spacing ladder (`.inkTight/.inkGap/.inkLane/.inkBlock`) - no raw values at call sites - plus `planeHeaderStyle` and the micro-components: `ShortcutBadge` (the one key-cap), `ComboChip` (keycap with hover-✕ remove), `AddSlot` (the pressable ＋), `CursorScrollView` (the center-locked law of navigable surfaces). No dependencies; other products consume it without the keymap machine.
+
+## Colophon
+
+The about/support Settings tab, designed once: app identity (name, version, build, icon) derived from the running bundle so it can never drift, the author byline, external links, the support ask, and an optional check-for-updates hook (Sparkle stays app-side, pass a closure).
+
+```swift
+ColophonPane(
+    author: ColophonLink("Adrian Galilea", symbol: "person", url: URL(string: "https://adriangalilea.com")!),
+    links: [ColophonLink("Website", symbol: "globe", url: URL(string: "https://untitled.garden")!)],
+    support: [ColophonLink("GitHub Sponsors", symbol: "heart", url: URL(string: "https://github.com/sponsors/adriangalilea")!)],
+    ask: String(localized: "If this app earns its keep, this is where to say so."),
+    checkForUpdates: { updater.checkForUpdates() }
+)
+```
+
+## Entitlement
+
+The premium-gate shape: every gated feature reads ONE boolean, and every non-release build can flip it. The app chooses the construction at its own release seam (a release-pipeline-only `-D` flag, never `#if DEBUG` - a Release-config dev build defines no DEBUG):
+
+```swift
+#if MYAPP_RELEASE
+let entitlement = Entitlement { realCheck() }   // sealed: StoreKit 2 / signed license
+#else
+let entitlement = Entitlement()                 // dev: persisted free ⇄ premium toggle
+#endif
+```
+
+`EntitlementDevToggle(entitlement)` is the Diagnostics-row UI; it renders nothing on a sealed instance.
 
 ## Keymap
 
