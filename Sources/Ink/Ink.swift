@@ -21,6 +21,39 @@ extension ShapeStyle where Self == Color {
     public static var inkEdge: Color { .white.opacity(0.38) }
 }
 
+/// The radius ladder - four sizes, named by WHAT wears them, so two
+/// surfaces of the same kind can never round differently.
+extension CGFloat {
+    /// Keycaps, small pills, recording chips.
+    public static let inkChip: CGFloat = 4
+    /// A cursor/hover row highlight.
+    public static let inkRow: CGFloat = 6
+    /// Fields and inner surfaces.
+    public static let inkField: CGFloat = 8
+    /// The outer shell of a floating panel/card.
+    public static let inkPanel: CGFloat = 18
+}
+
+/// The motion ladder - two speeds, no bespoke durations. Feedback that
+/// tracks the hand (hover, cursor, tips) flicks; structural change
+/// (fades, reveals) settles.
+extension Animation {
+    public static let inkFlick: Animation = .easeOut(duration: 0.12)
+    public static let inkSettle: Animation = .easeOut(duration: 0.15)
+}
+
+/// The spacing ladder - the four gaps a surface composes from.
+extension CGFloat {
+    /// Glyph-to-glyph inside one control.
+    public static let inkTight: CGFloat = 4
+    /// Sibling controls in one row.
+    public static let inkGap: CGFloat = 8
+    /// Rows within a section.
+    public static let inkLane: CGFloat = 12
+    /// Section to section.
+    public static let inkBlock: CGFloat = 16
+}
+
 extension View {
     /// A column-header label (the plane headers, any grid's column caps) -
     /// ONE style; every surface wears it, so two surfaces can never drift.
@@ -45,7 +78,7 @@ public struct ShortcutBadge: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: .inkChip))
     }
 }
 
@@ -89,7 +122,7 @@ public struct ComboChip: View {
         .buttonStyle(.plain)
         .help(String(localized: "Remove this shortcut", bundle: .module))
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(.inkFlick, value: hovering)
     }
 }
 
@@ -112,7 +145,7 @@ public struct AddSlot: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(.inkFlick, value: hovering)
     }
 }
 
@@ -140,9 +173,14 @@ public struct CursorScrollView<Cursor: Hashable, Content: View>: View {
             }
             .onChange(of: cursor) { _, target in
                 guard let target else { return }
-                withAnimation(.easeOut(duration: 0.12)) {
+                withAnimation(.inkFlick) {
                     proxy.scrollTo(target, anchor: .center)
                 }
+            }
+            // A surface that APPEARS with a live cursor centers it too - the
+            // law holds from the first frame, not the first keypress.
+            .onAppear {
+                if let cursor { proxy.scrollTo(cursor, anchor: .center) }
             }
         }
     }
