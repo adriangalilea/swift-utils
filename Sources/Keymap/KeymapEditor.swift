@@ -51,10 +51,23 @@ struct KeymapEditor<A: ActionSet>: View {
     /// Index into `visible` - the cursor ↑/↓ drive and ⏎ fires.
     @State private var selection: Int?
 
-    /// The filtered actions in display order - the one list the cursor
-    /// walks, the sections merely render it in groups.
-    private var visible: [A] {
-        sections.flatMap { $0.actions.filter(matchesQuery) }
+    /// One cursor position: an action row (fires on ⏎) or a read-only
+    /// extras row (walkable so the cursor can carry the scroll through the
+    /// whole panel - a cursor that stops above visible content strands it).
+    enum CursorItem: Hashable {
+        case action(A)
+        case extra(Int, Int)
+    }
+
+    /// EVERYTHING rendered, in display order - the one list the cursor
+    /// walks; the sections merely render it in groups.
+    private var visible: [CursorItem] {
+        sections.flatMap { $0.actions.filter(matchesQuery).map(CursorItem.action) }
+            + extras.enumerated().flatMap { sectionIndex, extra in
+                extra.rows.enumerated().compactMap { rowIndex, row in
+                    matchesQuery(row) ? CursorItem.extra(sectionIndex, rowIndex) : nil
+                }
+            }
     }
 
     /// The cursor is home (no row selected) - the input carries the visible
@@ -159,10 +172,9 @@ struct KeymapEditor<A: ActionSet>: View {
                             sectionView(section.name, actions)
                         }
                     }
-                    ForEach(Array(extras.enumerated()), id: \.offset) { _, extra in
-                        let rows = extra.rows.filter { query.isEmpty || $0.what.localizedCaseInsensitiveContains(query) }
-                        if !rows.isEmpty {
-                            staticSection(extra.name, rows)
+                    ForEach(Array(extras.enumerated()), id: \.offset) { sectionIndex, extra in
+                        if extra.rows.contains(where: matchesQuery) {
+                            staticSection(sectionIndex, extra)
                         }
                     }
                 }
@@ -171,6 +183,10 @@ struct KeymapEditor<A: ActionSet>: View {
 
     private func matchesQuery(_ action: A) -> Bool {
         query.isEmpty || action.spec.title.localizedCaseInsensitiveContains(query)
+    }
+
+    private func matchesQuery(_ row: StaticShortcut) -> Bool {
+        query.isEmpty || row.what.localizedCaseInsensitiveContains(query)
     }
 
     private func move(_ delta: Int) {
@@ -188,16 +204,16 @@ struct KeymapEditor<A: ActionSet>: View {
 
     private func fireSelection() -> Bool {
         let rows = visible
-        guard let selection, rows.indices.contains(selection) else { return false }
-        let action = rows[selection]
+        guard let selection, rows.indices.contains(selection),
+              case .action(let action) = rows[selection] else { return false }
         flash(action)
         perform?(action)
         return true
     }
 
-    private func isSelected(_ action: A) -> Bool {
+    private func isSelected(_ item: CursorItem) -> Bool {
         guard let selection, visible.indices.contains(selection) else { return false }
-        return visible[selection] == action
+        return visible[selection] == item
     }
 
     /// The one explanation of the two planes - a header instead of a
@@ -217,19 +233,29 @@ struct KeymapEditor<A: ActionSet>: View {
         .padding(.horizontal, 6)
     }
 
-    private func staticSection(_ name: String, _ rows: [StaticShortcut]) -> some View {
+    private func staticSection(_ sectionIndex: Int, _ extra: (name: String, rows: [StaticShortcut])) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(name)
+            Text(extra.name)
                 .font(.caption.smallCaps().weight(.semibold))
                 .foregroundStyle(.secondary)
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                HStack(spacing: 8) {
-                    Text(row.what)
-                    Spacer()
-                    ShortcutBadge(row.keys)
+            ForEach(Array(extra.rows.enumerated()), id: \.offset) { rowIndex, row in
+                if matchesQuery(row) {
+                    HStack(spacing: 8) {
+                        Text(row.what)
+                        Spacer()
+                        ShortcutBadge(row.keys)
+                    }
+                    .padding(.vertical, 3)
+                    .padding(.horizontal, 6)
+                    .background {
+                        if isSelected(.extra(sectionIndex, rowIndex)) {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(.inkSelection)
+                                .strokeBorder(.inkEdge, lineWidth: 1)
+                        }
+                    }
+                    .id(CursorItem.extra(sectionIndex, rowIndex))
                 }
-                .padding(.vertical, 3)
-                .padding(.horizontal, 6)
             }
         }
     }
@@ -240,7 +266,7 @@ struct KeymapEditor<A: ActionSet>: View {
                 .font(.caption.smallCaps().weight(.semibold))
                 .foregroundStyle(.secondary)
             ForEach(actions, id: \.self) { action in
-                row(action).id(action)
+                row(action).id(CursorItem.action(action))
             }
         }
     }
@@ -279,7 +305,7 @@ struct KeymapEditor<A: ActionSet>: View {
         .padding(.vertical, 3)
         .padding(.horizontal, 6)
         .background {
-            if flashed == action || isSelected(action) {
+            if flashed == action || isSelected(.action(action)) {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(.inkSelection)
                     .strokeBorder(.inkEdge, lineWidth: 1)
