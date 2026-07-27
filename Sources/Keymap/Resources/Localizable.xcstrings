@@ -91,12 +91,32 @@
         }
       }
     },
+    "System-wide - works even when this app is in the background": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En todo el sistema: funciona aunque la app esté en segundo plano"
+          }
+        }
+      }
+    },
     "System-wide shortcuts need ⌘, ⌥, or ⌃": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "Los atajos de sistema necesitan ⌘, ⌥ o ⌃"
+          }
+        }
+      }
+    },
+    "Works while this app is frontmost": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funciona mientras esta app está en primer plano"
           }
         }
       }

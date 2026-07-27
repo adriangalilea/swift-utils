@@ -20,6 +20,12 @@ public struct StaticShortcut: Sendable {
 }
 
 struct KeymapEditor<A: ActionSet>: View {
+    /// The two plane columns are FIXED so every row aligns and nothing
+    /// shifts as chips come and go; the reset slot is always reserved.
+    private static var localColumn: CGFloat { 168 }
+    private static var globalColumn: CGFloat { 148 }
+    private static var resetColumn: CGFloat { 18 }
+
     let store: KeymapStore<A>
     let sections: [ActionSection<A>]
     /// Highlight (and optionally fire) the row whose combo is pressed while
@@ -59,6 +65,7 @@ struct KeymapEditor<A: ActionSet>: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(.white.opacity(filterFocused ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 8))
+            columnHeaders
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
@@ -113,6 +120,25 @@ struct KeymapEditor<A: ActionSet>: View {
         return visible[selection] == action
     }
 
+    /// The one explanation of the two planes - a header instead of a
+    /// per-row glyph: labeled columns, tooltips carrying the long form.
+    private var columnHeaders: some View {
+        HStack(spacing: 8) {
+            Spacer()
+            Text(String(localized: "In-app", bundle: .module))
+                .frame(width: Self.localColumn, alignment: .leading)
+                .help(String(localized: "Works while this app is frontmost", bundle: .module))
+            Label(String(localized: "From any app", bundle: .module), systemImage: "globe")
+                .frame(width: Self.globalColumn, alignment: .leading)
+                .help(String(localized: "System-wide - works even when this app is in the background", bundle: .module))
+            Color.clear.frame(width: Self.resetColumn, height: 1)
+        }
+        .font(.caption2.weight(.semibold))
+        .textCase(.uppercase)
+        .foregroundStyle(.tertiary)
+        .padding(.horizontal, 6)
+    }
+
     private func staticSection(_ name: String, _ rows: [StaticShortcut]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(name)
@@ -148,17 +174,20 @@ struct KeymapEditor<A: ActionSet>: View {
                 Text(action.spec.title)
                 Spacer()
                 planeChips(action, .local)
-                Divider().frame(height: 12)
+                    .frame(width: Self.localColumn, alignment: .leading)
                 planeChips(action, .global)
-                if store.isCustomized(action) {
-                    Button {
-                        store.reset(action)
-                    } label: {
-                        Image(systemName: "arrow.uturn.backward")
-                    }
-                    .buttonStyle(.plain)
-                    .help(String(localized: "Reset to defaults", bundle: .module))
+                    .frame(width: Self.globalColumn, alignment: .leading)
+                Button {
+                    store.reset(action)
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 10))
                 }
+                .buttonStyle(.plain)
+                .frame(width: Self.resetColumn)
+                .opacity(store.isCustomized(action) ? 1 : 0)
+                .disabled(!store.isCustomized(action))
+                .help(String(localized: "Reset to defaults", bundle: .module))
             }
             if let conflict, conflict.action == action {
                 Text(conflict.message)
@@ -175,15 +204,15 @@ struct KeymapEditor<A: ActionSet>: View {
         )
     }
 
-    /// One plane's chips + its add slot. Global chips carry the globe.
+    /// One plane's chips + its add slot. ＋ leads so it stays put as chips
+    /// come and go (the settings grid's rule); the column header carries
+    /// the plane's meaning.
     @ViewBuilder
     private func planeChips(_ action: A, _ plane: ComboPlane) -> some View {
         HStack(spacing: 4) {
-            if plane == .global {
-                Image(systemName: "globe")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .help(String(localized: "System-wide", bundle: .module))
+            AddSlot {
+                conflict = nil
+                recording = (action, plane)
             }
             ForEach(store.combos(for: action, plane), id: \.self) { combo in
                 ComboChip(combo) {
@@ -196,11 +225,6 @@ struct KeymapEditor<A: ActionSet>: View {
                     if let combo, let owner = store.add(combo, plane: plane, to: action) {
                         conflict = (action, String(localized: "\(combo.display) is already \(owner)", bundle: .module))
                     }
-                }
-            } else {
-                AddSlot {
-                    conflict = nil
-                    recording = (action, plane)
                 }
             }
         }
