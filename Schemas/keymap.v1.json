@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/adriangalilea/swift-utils/main/Schemas/keymap.v1.json",
+  "title": "Keymap manifest",
+  "description": "The published face of a mac app's keyboard map: effective bindings (registry defaults + user remaps), localized at write time. Written by the Keymap library (github.com/adriangalilea/swift-utils) to ~/Library/Application Support/untitled/keymaps/<bundle-id>.json on launch and on every remap; read by the system-wide shortcut overlay to display the frontmost app's keys. Combos are display strings in macOS glyph order (\"⇧⌘K\").",
+  "type": "object",
+  "required": ["bundleID", "appName", "accent", "sections"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "bundleID": { "type": "string", "description": "The app's bundle identifier; also the manifest's filename." },
+    "appName": { "type": "string" },
+    "accent": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "description": "The app's accent color; the overlay tints per app." },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "actions"],
+        "properties": {
+          "name": { "type": "string", "description": "Display group name, localized." },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["title", "symbol", "local", "global"],
+              "properties": {
+                "title": { "type": "string", "description": "Action title, localized." },
+                "symbol": { "type": "string", "description": "SF Symbol name." },
+                "local": { "type": "array", "items": { "type": "string" }, "description": "In-app combos as display strings; first is the menu representative." },
+                "global": { "type": "array", "items": { "type": "string" }, "description": "System-wide combos as display strings." }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

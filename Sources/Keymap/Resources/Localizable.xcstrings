@@ -1,0 +1,126 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ is already %@": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ya está ocupado por %2$@"
+          }
+        }
+      }
+    },
+    "Filter actions": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrar acciones"
+          }
+        }
+      }
+    },
+    "From any app": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desde cualquier app"
+          }
+        }
+      }
+    },
+    "In-app": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En la app"
+          }
+        }
+      }
+    },
+    "Off": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No"
+          }
+        }
+      }
+    },
+    "Remove this shortcut": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar este atajo"
+          }
+        }
+      }
+    },
+    "Reset to defaults": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restablecer valores por defecto"
+          }
+        }
+      }
+    },
+    "Restore Defaults": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar valores"
+          }
+        }
+      }
+    },
+    "System-wide": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En todo el sistema"
+          }
+        }
+      }
+    },
+    "System-wide shortcuts need ⌘, ⌥, or ⌃": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los atajos de sistema necesitan ⌘, ⌥ o ⌃"
+          }
+        }
+      }
+    },
+    "press keys…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pulsa teclas…"
+          }
+        }
+      }
+    },
+    "type a key…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pulsa una tecla…"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
