@@ -40,7 +40,6 @@ struct KeymapEditor<A: ActionSet>: View {
     @State private var conflict: (action: A, message: String)?
     @State private var flashed: A?
     @State private var pressMonitor: Any?
-    @FocusState private var filterFocused: Bool
     /// Index into `visible` - the cursor ↑/↓ drive and ⏎ fires.
     @State private var selection: Int?
 
@@ -57,12 +56,26 @@ struct KeymapEditor<A: ActionSet>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // The "field" is RENDERED state, not a TextField: the panel is
+            // the one keyboard owner (its monitor), so there is no focus
+            // system in play - no first-responder races, no select-all on
+            // focus, no gap a keystroke can fall into. From the first key.
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
-                TextField(String(localized: "Filter actions", bundle: .module), text: $query)
-                    .textFieldStyle(.plain)
-                    .focused($filterFocused)
+                if query.isEmpty {
+                    Text(String(localized: "Filter actions", bundle: .module))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(query)
+                }
+                // The caret: a quiet bar, present while the cursor is home.
+                if cursorAtField {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(.inkEdge)
+                        .frame(width: 2, height: 14)
+                }
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
@@ -75,18 +88,7 @@ struct KeymapEditor<A: ActionSet>: View {
             columnHeaders
             scrollBody
         }
-        .onAppear {
-            installPressMonitor()
-            // Keyboard-first: the panel opens ready to filter.
-            filterFocused = true
-        }
-        .onChange(of: filterFocused) { _, focused in
-            // NOTHING else in the panel takes keyboard focus - if the field
-            // loses it (a click, a re-render), take it straight back. This
-            // is the keyboard grab: while the panel is up, typing can only
-            // ever mean filtering.
-            if !focused { filterFocused = true }
-        }
+        .onAppear(perform: installPressMonitor)
         .onDisappear(perform: removePressMonitor)
         .onChange(of: query) { _, newQuery in
             // Typing re-anchors the cursor: first match while filtering,
@@ -311,21 +313,25 @@ struct KeymapEditor<A: ActionSet>: View {
                 default: break
                 }
                 guard let pressed = KeyCombo(event: event) else { return false }
-                // Bare keys are TYPING, unconditionally - they never fire
-                // actions. The gate is the REAL first responder, not our
-                // focus flag: after the panel opens, AppKit takes a tick to
-                // move first responder into the field while the flag is
-                // already true, and a keystroke must never fall into that
-                // gap. In the gap (or after a focus slip) the key routes
-                // into the query BY HAND, so nothing is ever eaten.
+                // Editing verbs on the query - the panel IS the field.
+                if event.keyCode == 51 { // ⌫; ⌘⌫ clears
+                    if event.modifierFlags.contains(.command) { query = "" }
+                    else if !query.isEmpty { query.removeLast() }
+                    return true
+                }
+                if event.modifierFlags.contains(.command),
+                   event.charactersIgnoringModifiers == "v" {
+                    query += NSPasteboard.general.string(forType: .string) ?? ""
+                    return true
+                }
+                // Bare keys are TYPING, unconditionally - appended straight
+                // to the query, never fired as actions, never lost.
                 if pressed.eventModifiers.isDisjoint(with: [.command, .control, .option]) {
-                    if event.window?.firstResponder is NSTextView { return false }
-                    filterFocused = true
-                    if event.keyCode == 51 { // delete
-                        if !query.isEmpty { query.removeLast() }
-                    } else if let typed = event.characters, !typed.isEmpty,
-                              typed.allSatisfy({ !$0.isNewline && $0.asciiValue != 27 }) {
-                        query += typed
+                    if let typed = event.characters {
+                        query += String(typed.unicodeScalars.filter { scalar in
+                            !scalar.properties.isDefaultIgnorableCodePoint
+                                && scalar.value >= 0x20 && scalar.value < 0xF700
+                        }.map(Character.init))
                     }
                     return true
                 }
