@@ -83,9 +83,11 @@ Titles are declared with literal `String(localized:)` so compiler extraction (`S
 
 The library owns routing primitives; policy stays in the app: `canPerform`/`shouldRoute` decide whether an action fires right now - focus arbitration is deliberately NOT a library concept (lore's rules proved it unabstractable).
 
-## keymap-overlay
+## keymap-overlay (WIP - parked)
 
-The system-wide shortcut window: `swift run keymap-overlay` (or install the built binary as a login item). One chord - ⌃⌘/ - shows the frontmost app's published keymap as an accent-tinted glass card; the chord again, any click, or switching apps dismisses. Apps opt in simply by calling `store.publish(appName:accent:)`.
+The system-wide shortcut window: one chord - ⌃⌘/ - shows the frontmost app's published keymap as an accent-tinted glass card; the chord again, any click, or switching apps dismisses. Apps opt in by calling `store.publish(appName:accent:)`.
+
+PARKED: today only Keymap-adopting apps publish a manifest, so for everything else the chord answers with nothing - worthless until coverage exists. The interesting future is deriving cards for arbitrary apps (menu-bar accessibility trees, published App Intents) so the overlay answers everywhere; until that design happens, don't run it.
 
 ## Consuming
 
