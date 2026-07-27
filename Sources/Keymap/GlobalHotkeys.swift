@@ -7,6 +7,10 @@ import SwiftUI
 /// Carbon is ancient but remains the ONLY permission-free path macOS
 /// offers; it is quarantined to this file.
 package final class GlobalHotkey {
+    /// Whether Carbon accepted the registration - false means another app
+    /// (or the OS) owns the combo and this instance is inert.
+    package private(set) var registered = false
+
     nonisolated(unsafe) private static var nextID: UInt32 = 1
     // id → handler, the single routing table. One app-level Carbon handler
     // dispatches every press through it; instances add/remove their own
@@ -34,9 +38,12 @@ package final class GlobalHotkey {
         )
         // Another app may own this combo - that's their machine, not a bug.
         // The in-app combo still works; drop the dead routing entry so it
-        // can't leak.
+        // can't leak. The FAILURE is surfaced (GlobalHotkeys → store) so
+        // the grid can say so instead of a binding silently not firing.
         if status != noErr || hotKeyRef == nil {
             Self.handlers[id] = nil
+        } else {
+            registered = true
         }
     }
 
@@ -118,12 +125,15 @@ public final class GlobalHotkeys<A: ActionSet> {
     }
 
     private func rebuild() {
+        var dead: [KeyCombo] = []
         var rebuilt = A.allCases.flatMap { action in
             store.combos(for: action, .global).compactMap { combo -> GlobalHotkey? in
                 guard let keyCode = combo.carbonKeyCode else { return nil }
-                return GlobalHotkey(keyCode: keyCode, modifiers: combo.carbonModifiers) { [perform] in
+                let hotkey = GlobalHotkey(keyCode: keyCode, modifiers: combo.carbonModifiers) { [perform] in
                     perform(action)
                 }
+                if !hotkey.registered { dead.append(combo) }
+                return hotkey
             }
         }
         // Family combos: the live global modifier + each member key. An empty
@@ -139,6 +149,25 @@ public final class GlobalHotkeys<A: ActionSet> {
             }
         }
         registrations = rebuilt
+        store.deadGlobals = dead
+    }
+}
+
+/// The combos macOS itself owns system-wide (screenshots, Spotlight, Mission
+/// Control, …), via the symbolic-hotkeys registry. The store refuses these
+/// at bind time - registering would fight the OS and lose.
+enum SystemHotkeys {
+    static func owns(_ combo: KeyCombo) -> Bool {
+        guard let keyCode = combo.carbonKeyCode else { return false }
+        let modifiers = combo.carbonModifiers
+        var hotkeys: Unmanaged<CFArray>?
+        guard CopySymbolicHotKeys(&hotkeys) == noErr,
+              let list = hotkeys?.takeRetainedValue() as? [[String: Any]] else { return false }
+        return list.contains { entry in
+            (entry[kHISymbolicHotKeyEnabled as String] as? Bool) == true
+                && (entry[kHISymbolicHotKeyCode as String] as? Int) == Int(keyCode)
+                && (entry[kHISymbolicHotKeyModifiers as String] as? Int) == Int(modifiers)
+        }
     }
 }
 

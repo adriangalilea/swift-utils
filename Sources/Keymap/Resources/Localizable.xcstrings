@@ -1,12 +1,32 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ belongs to macOS system-wide": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ pertenece a macOS en todo el sistema"
+          }
+        }
+      }
+    },
     "%@ is already %@": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ ya está ocupado por %2$@"
+          }
+        }
+      }
+    },
+    "Another app owns this system-wide right now - it won't fire": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otra app posee este atajo en todo el sistema ahora mismo: no funcionará"
           }
         }
       }

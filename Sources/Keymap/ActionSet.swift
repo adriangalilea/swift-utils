@@ -34,6 +34,12 @@ public struct Spec: Sendable {
     /// monitor. Empty = ships unbound.
     public var local: [KeyCombo]
     /// System-wide (Carbon) accelerators. Empty = no system-wide reach.
+    ///
+    /// SHIP THIS EMPTY unless the chord is the app's reason to exist: a
+    /// registered global STEALS its combo from EVERY app on the system
+    /// while yours runs - it cannot be "polite". The remap grid lets users
+    /// opt in deliberately; the store refuses macOS-reserved combos and the
+    /// grid marks registrations another app already owns.
     public var global: [KeyCombo]
     public init(
         title: String, symbol: String,

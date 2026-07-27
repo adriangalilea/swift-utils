@@ -116,6 +116,12 @@ public struct KeymapGrid<A: ActionSet>: View {
                 HStack(spacing: 4) {
                     ForEach(combos, id: \.self) { combo in
                         ComboChip(combo.display) { store.remove(combo, plane: plane, from: action) }
+                            // A global another running app owns is INERT -
+                            // say so where the binding lives.
+                            .opacity(plane == .global && store.deadGlobals.contains(combo) ? 0.4 : 1)
+                            .help(plane == .global && store.deadGlobals.contains(combo)
+                                ? String(localized: "Another app owns this system-wide right now - it won't fire", bundle: .module)
+                                : "")
                     }
                 }
                 .padding(.leading, 14)

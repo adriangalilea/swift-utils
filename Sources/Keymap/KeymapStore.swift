@@ -51,6 +51,9 @@ public enum AddRejection: Equatable, Sendable {
     case taken(by: String)
     /// A system-wide combo needs a real modifier (⌘, ⌥, or ⌃) to register.
     case needsModifier
+    /// macOS owns this combo system-wide (screenshots, Spotlight, …) -
+    /// registering it would fight the OS and lose.
+    case systemReserved
 
     /// The one user-facing sentence for this verdict.
     public func message(for combo: KeyCombo) -> String {
@@ -59,6 +62,8 @@ public enum AddRejection: Equatable, Sendable {
             String(localized: "\(combo.display) is already \(owner)", bundle: .module)
         case .needsModifier:
             String(localized: "System-wide shortcuts need ⌘, ⌥, or ⌃", bundle: .module)
+        case .systemReserved:
+            String(localized: "\(combo.display) belongs to macOS system-wide", bundle: .module)
         }
     }
 }
@@ -189,9 +194,11 @@ public final class KeymapStore<A: ActionSet> {
     /// modifier. nil = added. (Planes don't collide: a key may be an in-app
     /// combo for one action and a system-wide form for another.)
     public func add(_ combo: KeyCombo, plane: ComboPlane, to action: A) -> AddRejection? {
-        if plane == .global,
-           combo.eventModifiers.isDisjoint(with: [.command, .option, .control]) {
-            return .needsModifier
+        if plane == .global {
+            if combo.eventModifiers.isDisjoint(with: [.command, .option, .control]) {
+                return .needsModifier
+            }
+            if SystemHotkeys.owns(combo) { return .systemReserved }
         }
         if let owner = A.allCases.first(where: {
             $0 != action && combos(for: $0, plane).contains(combo)
@@ -249,6 +256,12 @@ public final class KeymapStore<A: ActionSet> {
     /// hosts too: a host tearing down a panel window force-clears it, so a
     /// missed onDisappear can never leave every shortcut dead.
     public var keyboardCaptured = false
+
+    /// Global combos whose Carbon registration FAILED - another running app
+    /// owns them system-wide, so they will not fire. GlobalHotkeys reports
+    /// after every rebuild; the settings grid marks these so a silent dead
+    /// binding can't masquerade as working.
+    public internal(set) var deadGlobals: [KeyCombo] = []
 
     /// keyDown → action over the in-app combos. For surfaces the menu bar
     /// can't reach (nonactivating panels) and for alternate combos beyond
