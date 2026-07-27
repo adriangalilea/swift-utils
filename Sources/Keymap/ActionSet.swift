@@ -43,8 +43,8 @@ public struct Spec: Sendable {
     /// chord (⌃⌥⌘-class) unlikely to be anyone else's key. Two default
     /// shapes have earned the blessing as studio convention: SUMMON (bring
     /// the app forward from anywhere - ⌃⌥⌘+initial) and the app's single
-    /// identity verb (hollow's panic lock). Everything else is the user's
-    /// opt-in. The grid warns live on combos macOS itself uses and dims
+    /// identity verb (a security app's panic lock). Everything else is the
+    /// user's opt-in. The grid warns live on combos macOS itself uses and dims
     /// registrations another app already owns.
     public var global: [KeyCombo]
     public init(
