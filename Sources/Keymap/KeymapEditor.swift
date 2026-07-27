@@ -66,7 +66,23 @@ struct KeymapEditor<A: ActionSet>: View {
             .padding(.vertical, 7)
             .background(filterFocused ? Color.inkRaised : Color.inkRest, in: RoundedRectangle(cornerRadius: 8))
             columnHeaders
-            ScrollView {
+            scrollBody
+        }
+        .onAppear {
+            installPressMonitor()
+            // Keyboard-first: the panel opens ready to filter.
+            filterFocused = true
+        }
+        .onDisappear(perform: removePressMonitor)
+        .onChange(of: query) { _, newQuery in
+            // Typing re-anchors the cursor: first match while filtering,
+            // no selection on an empty query (the full reference state).
+            selection = newQuery.isEmpty || visible.isEmpty ? nil : 0
+        }
+    }
+
+    private var scrollBody: some View {
+        ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
                         let actions = section.actions.filter(matchesQuery)
@@ -82,18 +98,9 @@ struct KeymapEditor<A: ActionSet>: View {
                     }
                 }
             }
-        }
-        .onAppear {
-            installPressMonitor()
-            // Keyboard-first: the panel opens ready to filter.
-            filterFocused = true
-        }
-        .onDisappear(perform: removePressMonitor)
-        .onChange(of: query) { _, newQuery in
-            // Typing re-anchors the cursor: first match while filtering,
-            // no selection on an empty query (the full reference state).
-            selection = newQuery.isEmpty || visible.isEmpty ? nil : 0
-        }
+        // Content never hard-crops at the viewport: the native soft edge
+        // fades it out under the glass, top and bottom.
+        .scrollEdgeEffectStyle(.soft, for: .vertical)
     }
 
     private func matchesQuery(_ action: A) -> Bool {
@@ -135,7 +142,7 @@ struct KeymapEditor<A: ActionSet>: View {
         }
         .font(.caption2.weight(.semibold))
         .textCase(.uppercase)
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(.secondary)
         .padding(.horizontal, 6)
     }
 
