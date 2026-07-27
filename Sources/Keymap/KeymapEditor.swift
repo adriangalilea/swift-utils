@@ -78,19 +78,39 @@ struct KeymapEditor<A: ActionSet>: View {
         }
     }
 
+    /// Which viewport edges have content hidden beyond them - the fade
+    /// exists ONLY there. At rest at the top there is nothing above, so the
+    /// first rows render whole; scroll a pixel and the fade eases in.
+    private struct ScrollEdges: Equatable {
+        var top = false
+        var bottom = false
+    }
+    @State private var hiddenBeyond = ScrollEdges()
+
     private var scrollBody: some View {
         scrollContent
-            // Content never hard-crops at the viewport: a fade mask melts it
-            // into the glass at both edges. (scrollEdgeEffectStyle only
-            // renders under real edge bars - a padded panel has none.)
+            .onScrollGeometryChange(for: ScrollEdges.self) { geometry in
+                ScrollEdges(
+                    top: geometry.contentOffset.y + geometry.contentInsets.top > 1,
+                    bottom: geometry.contentOffset.y + geometry.containerSize.height
+                        < geometry.contentSize.height - 1
+                )
+            } action: { _, edges in
+                hiddenBeyond = edges
+            }
+            // Content never hard-crops mid-scroll: a fade mask melts it into
+            // the glass, but only at edges that actually hide content.
+            // (scrollEdgeEffectStyle only renders under real edge bars - a
+            // padded panel has none.)
             .mask {
                 VStack(spacing: 0) {
                     LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
+                        .frame(height: hiddenBeyond.top ? 16 : 0)
                     Rectangle().fill(.black)
                     LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 16)
+                        .frame(height: hiddenBeyond.bottom ? 16 : 0)
                 }
+                .animation(.easeOut(duration: 0.15), value: hiddenBeyond)
             }
     }
 
