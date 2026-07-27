@@ -50,6 +50,11 @@ struct KeymapEditor<A: ActionSet>: View {
         sections.flatMap { $0.actions.filter(matchesQuery) }
     }
 
+    /// The cursor is home (no row selected) - the input carries the visible
+    /// focus. The FIELD keeps keyboard focus the whole time either way; the
+    /// row cursor is virtual.
+    private var cursorAtField: Bool { selection == nil }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 6) {
@@ -61,7 +66,12 @@ struct KeymapEditor<A: ActionSet>: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(filterFocused ? Color.inkRaised : Color.inkRest, in: RoundedRectangle(cornerRadius: 8))
+            .background(cursorAtField ? Color.inkRaised : Color.inkRest, in: RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                if cursorAtField {
+                    RoundedRectangle(cornerRadius: 8).strokeBorder(.inkEdge, lineWidth: 1)
+                }
+            }
             columnHeaders
             scrollBody
         }
@@ -69,6 +79,13 @@ struct KeymapEditor<A: ActionSet>: View {
             installPressMonitor()
             // Keyboard-first: the panel opens ready to filter.
             filterFocused = true
+        }
+        .onChange(of: filterFocused) { _, focused in
+            // NOTHING else in the panel takes keyboard focus - if the field
+            // loses it (a click, a re-render), take it straight back. This
+            // is the keyboard grab: while the panel is up, typing can only
+            // ever mean filtering.
+            if !focused { filterFocused = true }
         }
         .onDisappear(perform: removePressMonitor)
         .onChange(of: query) { _, newQuery in
@@ -140,7 +157,14 @@ struct KeymapEditor<A: ActionSet>: View {
     private func move(_ delta: Int) {
         let rows = visible
         guard !rows.isEmpty else { return }
-        selection = ((selection ?? -1) + delta + rows.count) % rows.count
+        if delta > 0 {
+            selection = min((selection ?? -1) + delta, rows.count - 1)
+        } else {
+            // ↑ past the first row hands the cursor back to the input -
+            // no wrapping teleports.
+            let next = (selection ?? 0) + delta
+            selection = next < 0 ? nil : next
+        }
     }
 
     private func fireSelection() -> Bool {
@@ -287,11 +311,14 @@ struct KeymapEditor<A: ActionSet>: View {
                 default: break
                 }
                 guard let pressed = KeyCombo(event: event) else { return false }
-                // The focused filter field owns bare keys and shift-combos -
-                // typing must type. Chorded combos can't be typed, so they
-                // still teach by doing.
-                if filterFocused, pressed.eventModifiers.isDisjoint(with: [.command, .control, .option]) {
-                    return false
+                // Bare keys are TYPING, unconditionally: focused → they pass
+                // to the field; focus slipped → swallow the stray and take
+                // focus back. They never fire actions. Only chorded combos
+                // (unmistakably not typing) teach by doing.
+                if pressed.eventModifiers.isDisjoint(with: [.command, .control, .option]) {
+                    if filterFocused { return false }
+                    filterFocused = true
+                    return true
                 }
                 guard let action = A.allCases.first(where: { candidate in
                     store.combos(for: candidate, .local).contains(pressed)
