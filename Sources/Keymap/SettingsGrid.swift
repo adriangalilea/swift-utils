@@ -122,10 +122,7 @@ public struct KeymapGrid<A: ActionSet>: View {
     }
 
     private func columnHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.tertiary)
-            .textCase(.uppercase)
+        Text(title).planeHeaderStyle()
     }
 
     /// A category label spanning the full width - the grouping without

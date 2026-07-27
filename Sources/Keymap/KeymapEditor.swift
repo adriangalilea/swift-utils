@@ -110,9 +110,9 @@ struct KeymapEditor<A: ActionSet>: View {
         scrollContent
             .onScrollGeometryChange(for: ScrollEdges.self) { geometry in
                 ScrollEdges(
-                    top: geometry.contentOffset.y + geometry.contentInsets.top > 1,
+                    top: geometry.contentOffset.y + geometry.contentInsets.top > 4,
                     bottom: geometry.contentOffset.y + geometry.containerSize.height
-                        < geometry.contentSize.height - 1
+                        < geometry.contentSize.height - 4
                 )
             } action: { _, edges in
                 hiddenBeyond = edges
@@ -196,9 +196,7 @@ struct KeymapEditor<A: ActionSet>: View {
                 .help(String(localized: "System-wide - works even when this app is in the background", bundle: .module))
             Color.clear.frame(width: Self.resetColumn, height: 1)
         }
-        .font(.caption2.weight(.semibold))
-        .textCase(.uppercase)
-        .foregroundStyle(.secondary)
+        .planeHeaderStyle()
         .padding(.horizontal, 6)
     }
 

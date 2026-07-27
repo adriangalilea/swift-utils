@@ -8,6 +8,17 @@ import SwiftUI
 ///
 /// tailwind-discipline, Swift-shaped: when a second theme appears, this
 /// becomes an Environment-injected struct and these turn into its defaults.
+extension View {
+    /// The plane column header (In-app / From any app) - ONE style; the
+    /// settings grid and the cheat panel both wear it, so the two surfaces
+    /// can never drift apart again.
+    func planeHeaderStyle() -> some View {
+        font(.caption2.weight(.semibold))
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
+    }
+}
+
 extension ShapeStyle where Self == Color {
     /// A resting interactive surface: the filter field, an idle ＋ slot.
     static var inkRest: Color { .white.opacity(0.12) }
