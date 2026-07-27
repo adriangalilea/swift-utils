@@ -40,9 +40,12 @@ public struct Spec: Sendable {
     /// that's where the ergonomics live). GLOBALS are where modifiers
     /// belong: a registered global steals its combo from EVERY app on the
     /// system while yours runs, so a default must be a deliberate, heavy
-    /// chord (⌃⌥⌘-class) unlikely to be anyone else's key. The grid warns
-    /// live on combos macOS itself uses and dims registrations another app
-    /// already owns.
+    /// chord (⌃⌥⌘-class) unlikely to be anyone else's key. Two default
+    /// shapes have earned the blessing as studio convention: SUMMON (bring
+    /// the app forward from anywhere - ⌃⌥⌘+initial) and the app's single
+    /// identity verb (hollow's panic lock). Everything else is the user's
+    /// opt-in. The grid warns live on combos macOS itself uses and dims
+    /// registrations another app already owns.
     public var global: [KeyCombo]
     public init(
         title: String, symbol: String,
