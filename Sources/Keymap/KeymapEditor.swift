@@ -311,13 +311,22 @@ struct KeymapEditor<A: ActionSet>: View {
                 default: break
                 }
                 guard let pressed = KeyCombo(event: event) else { return false }
-                // Bare keys are TYPING, unconditionally: focused → they pass
-                // to the field; focus slipped → swallow the stray and take
-                // focus back. They never fire actions. Only chorded combos
-                // (unmistakably not typing) teach by doing.
+                // Bare keys are TYPING, unconditionally - they never fire
+                // actions. The gate is the REAL first responder, not our
+                // focus flag: after the panel opens, AppKit takes a tick to
+                // move first responder into the field while the flag is
+                // already true, and a keystroke must never fall into that
+                // gap. In the gap (or after a focus slip) the key routes
+                // into the query BY HAND, so nothing is ever eaten.
                 if pressed.eventModifiers.isDisjoint(with: [.command, .control, .option]) {
-                    if filterFocused { return false }
+                    if event.window?.firstResponder is NSTextView { return false }
                     filterFocused = true
+                    if event.keyCode == 51 { // delete
+                        if !query.isEmpty { query.removeLast() }
+                    } else if let typed = event.characters, !typed.isEmpty,
+                              typed.allSatisfy({ !$0.isNewline && $0.asciiValue != 27 }) {
+                        query += typed
+                    }
                     return true
                 }
                 guard let action = A.allCases.first(where: { candidate in
