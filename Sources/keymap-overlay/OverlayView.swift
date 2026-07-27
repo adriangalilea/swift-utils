@@ -21,7 +21,7 @@ struct OverlayView: View {
         }
         .background(.black.opacity(0.55))
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: .inkPanel))
         .environment(\.colorScheme, .dark)
     }
 }

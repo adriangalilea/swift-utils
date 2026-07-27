@@ -134,7 +134,7 @@ private struct ShortcutTipLayer: ViewModifier {
                 }
             }
             .allowsHitTesting(false)
-            .animation(.easeOut(duration: 0.1), value: monitor.revealing)
+            .animation(.inkFlick, value: monitor.revealing)
         }
     }
 }

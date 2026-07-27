@@ -1,6 +1,20 @@
 import AppKit
 import SwiftUI
 
+/// The AppKit keycodes structural monitors speak - named ONCE, public,
+/// so no consumer scatters 53/123/36 magic through its own monitors.
+public enum KeyCode {
+    public static let `return`: UInt16 = 36
+    public static let tab: UInt16 = 48
+    public static let space: UInt16 = 49
+    public static let delete: UInt16 = 51
+    public static let escape: UInt16 = 53
+    public static let left: UInt16 = 123
+    public static let right: UInt16 = 124
+    public static let down: UInt16 = 125
+    public static let up: UInt16 = 126
+}
+
 /// One key press, stored as SwiftUI-shaped data: a key name plus
 /// EventModifiers. Named keys ("space", "left", …) map to KeyEquivalent
 /// statics; anything else is a single character.

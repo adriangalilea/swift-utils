@@ -21,15 +21,6 @@ public struct StaticShortcut: Sendable {
     }
 }
 
-/// The keycodes the panel speaks - named, not scattered magic.
-private enum Key {
-    static let `return`: UInt16 = 36
-    static let delete: UInt16 = 51
-    static let escape: UInt16 = 53
-    static let down: UInt16 = 125
-    static let up: UInt16 = 126
-}
-
 struct KeymapEditor<A: ActionSet>: View {
     /// The two plane columns are FIXED so every row aligns and nothing
     /// shifts as chips come and go; the reset slot is always reserved.
@@ -100,10 +91,10 @@ struct KeymapEditor<A: ActionSet>: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(cursorAtField ? Color.inkRaised : Color.inkRest, in: RoundedRectangle(cornerRadius: 8))
+            .background(cursorAtField ? Color.inkRaised : Color.inkRest, in: RoundedRectangle(cornerRadius: .inkField))
             .overlay {
                 if cursorAtField {
-                    RoundedRectangle(cornerRadius: 8).strokeBorder(.inkEdge, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: .inkField).strokeBorder(.inkEdge, lineWidth: 1)
                 }
             }
             columnHeaders
@@ -159,7 +150,7 @@ struct KeymapEditor<A: ActionSet>: View {
                     LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
                         .frame(height: hiddenBeyond.bottom ? 16 : 0)
                 }
-                .animation(.easeOut(duration: 0.15), value: hiddenBeyond)
+                .animation(.inkSettle, value: hiddenBeyond)
             }
     }
 
@@ -249,7 +240,7 @@ struct KeymapEditor<A: ActionSet>: View {
                     .padding(.horizontal, 6)
                     .background {
                         if isSelected(.extra(sectionIndex, rowIndex)) {
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: .inkRow)
                                 .fill(.inkSelection)
                                 .strokeBorder(.inkEdge, lineWidth: 1)
                         }
@@ -306,7 +297,7 @@ struct KeymapEditor<A: ActionSet>: View {
         .padding(.horizontal, 6)
         .background {
             if flashed == action || isSelected(.action(action)) {
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: .inkRow)
                     .fill(.inkSelection)
                     .strokeBorder(.inkEdge, lineWidth: 1)
             }
@@ -349,19 +340,19 @@ struct KeymapEditor<A: ActionSet>: View {
                 // Esc is the HOST's key - dismissal - and local monitors run
                 // newest-first, so the panel must explicitly disown it or
                 // the typing catch-all below would swallow it.
-                if event.keyCode == Key.escape { return false }
+                if event.keyCode == KeyCode.escape { return false }
                 // Panel navigation first - claimed HERE because menu key
                 // equivalents dispatch before any focused-view handler, and
                 // bare arrows are often an app action's menu representative.
                 switch event.keyCode {
-                case Key.down: move(1); return true
-                case Key.up: move(-1); return true
-                case Key.return: return fireSelection()
+                case KeyCode.down: move(1); return true
+                case KeyCode.up: move(-1); return true
+                case KeyCode.return: return fireSelection()
                 default: break
                 }
                 guard let pressed = KeyCombo(event: event) else { return false }
                 // Editing verbs on the query - the panel IS the field.
-                if event.keyCode == Key.delete { // ⌫; ⌘⌫ clears
+                if event.keyCode == KeyCode.delete { // ⌫; ⌘⌫ clears
                     if event.modifierFlags.contains(.command) { query = "" }
                     else if !query.isEmpty { query.removeLast() }
                     return true
@@ -421,7 +412,7 @@ private struct RecordingChip: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
-            .background(Color.inkRaised, in: RoundedRectangle(cornerRadius: 4))
+            .background(Color.inkRaised, in: RoundedRectangle(cornerRadius: .inkChip))
             .onAppear {
                 capture = KeyCapture(
                     onCombo: { combo in finish(combo); return true },
