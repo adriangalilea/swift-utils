@@ -2,10 +2,10 @@ import AppKit
 import SwiftUI
 
 /// App-wide modifier state. ONE monitor lives at the window root and
-/// publishes what's held; every reveal badge reads it from the environment.
+/// publishes what's held; the floating tip layer reads it from the environment.
 /// This is what makes discoverability structural rather than per-view:
-/// a single source of "which modifiers are down right now", so badges can
-/// paint the instant a prefix goes down, everywhere at once.
+/// a single source of "which modifiers are down right now", so every tip
+/// paints the instant a prefix goes down, everywhere at once.
 ///
 /// The which-key rule, generalized: ANY held modifier combination is a
 /// prefix, and the reveal shows the minimal completions of exactly that

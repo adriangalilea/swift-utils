@@ -2,7 +2,8 @@ import SwiftUI
 
 /// THE registry contract. An app declares one enum conforming to this and
 /// everything derives from it: native menus with live key display, the remap
-/// Settings pane, tooltips, the cheat-sheet panel, reveal badges, system-wide
+/// Settings pane, tooltips, the cheat-sheet panel, the which-key tips,
+/// system-wide
 /// hotkeys, the App Intents surface, and the published keymap JSON the
 /// system-wide overlay reads. Adding a command = one case + one spec + one
 /// branch in the app's perform funnel (the exhaustive switch is the compiler
@@ -34,30 +35,15 @@ public struct Spec: Sendable {
     public var local: [KeyCombo]
     /// System-wide (Carbon) accelerators. Empty = no system-wide reach.
     public var global: [KeyCombo]
-    /// Where the in-app combos are live: everywhere, or only while one of
-    /// the named focus regions holds focus (FocusMap reports which). This is
-    /// reach DATA - the app's `canPerform` remains the only policy hook.
-    public var reach: Reach
-
     public init(
         title: String, symbol: String,
-        local: [KeyCombo] = [], global: [KeyCombo] = [],
-        reach: Reach = .everywhere
+        local: [KeyCombo] = [], global: [KeyCombo] = []
     ) {
         self.title = title
         self.symbol = symbol
         self.local = local
         self.global = global
-        self.reach = reach
     }
-}
-
-/// Reach of an action's in-app combos. Regions are app-defined string ids
-/// registered with FocusMap; an unregistered id is a programmer error and
-/// asserts at match time.
-public enum Reach: Equatable, Sendable {
-    case everywhere
-    case regions(Set<String>)
 }
 
 /// One display group of the registry (menu section, cheat-sheet block).

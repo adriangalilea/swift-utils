@@ -2,13 +2,14 @@ import AppKit
 import Ink
 import SwiftUI
 
-/// The interactive keymap surface behind `CheatSheetPanel`. Keyboard-first
-/// by construction: the filter field GRABS focus on open (type immediately),
-/// ↑/↓ move a selection through the filtered rows, ⏎ fires the selection.
-/// While typing, bare keys belong to the field; chorded combos (⌘/⌃/⌥)
-/// still press-to-flash and fire. Every combo chip removes on hover-x,
-/// every row records a new combo in place, conflicts are reported inline
-/// with the owner's name.
+/// The engine behind `CheatSheetPanel` - its only host. ONE keyboard owner
+/// by construction: there is no text field and no focus system; the query
+/// is rendered state and the panel's monitor is the single input path.
+/// Printable keys filter, ⌫ deletes (⌘⌫ clears), ⌘V pastes, ↑/↓ walk the
+/// filtered rows (↑ past the first returns the cursor to the input), ⏎
+/// fires the selection, chorded combos press-to-flash and fire, Esc is
+/// disowned to the host (dismissal). Chips remove on hover-✕, rows record
+/// in place, the STORE rules every add.
 /// A literal reference row for keys that aren't registry actions - the
 /// structural layer (Tab, arrows, Esc ladders) an app documents verbatim.
 public struct StaticShortcut: Sendable {
@@ -38,9 +39,6 @@ struct KeymapEditor<A: ActionSet>: View {
 
     let store: KeymapStore<A>
     let sections: [ActionSection<A>]
-    /// Highlight (and optionally fire) the row whose combo is pressed while
-    /// the surface is visible - the panel teaches by doing.
-    let flashOnPress: Bool
     let perform: ((A) -> Void)?
     /// Structural rows appended after the registry sections, read-only.
     let extras: [(name: String, rows: [StaticShortcut])]
@@ -103,11 +101,11 @@ struct KeymapEditor<A: ActionSet>: View {
             // The capture surface raises the ONE stand-down signal - every
             // routing engine (lib and app alike) reads it instead of each
             // host wiring its own yields.
-            if flashOnPress { store.keyboardCaptured = true }
+            store.keyboardCaptured = true
         }
         .onDisappear {
             removePressMonitor()
-            if flashOnPress { store.keyboardCaptured = false }
+            store.keyboardCaptured = false
         }
         .onChange(of: query) { _, newQuery in
             // Typing re-anchors the cursor: first match while filtering,
@@ -316,7 +314,7 @@ struct KeymapEditor<A: ActionSet>: View {
     // MARK: - Press-to-flash
 
     private func installPressMonitor() {
-        guard flashOnPress, pressMonitor == nil else { return }
+        guard pressMonitor == nil else { return }
         pressMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let handled = MainActor.assumeIsolated { () -> Bool in
                 guard recording == nil else { return false }
@@ -445,7 +443,7 @@ public struct CheatSheetPanel<A: ActionSet>: View {
     }
 
     public var body: some View {
-        KeymapEditor(store: store, sections: sections, flashOnPress: true, perform: perform, extras: extras)
+        KeymapEditor(store: store, sections: sections, perform: perform, extras: extras)
             .padding()
     }
 }

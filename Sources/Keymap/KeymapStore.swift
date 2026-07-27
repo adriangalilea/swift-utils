@@ -245,24 +245,18 @@ public final class KeymapStore<A: ActionSet> {
     /// A capture surface (the cheat panel) owns the keyboard wholesale. The
     /// ONE stand-down signal: the panel raises it on appear, every routing
     /// engine - LocalKeyRouter here, an app's own monitors - checks it in
-    /// one place instead of each host wiring its own yields.
-    public internal(set) var keyboardCaptured = false
+    /// one place instead of each host wiring its own yields. Settable by
+    /// hosts too: a host tearing down a panel window force-clears it, so a
+    /// missed onDisappear can never leave every shortcut dead.
+    public var keyboardCaptured = false
 
-    /// keyDown → action over the in-app combos, honoring reach: an action
-    /// bound to regions matches only while one of them holds focus. For
-    /// surfaces the menu bar can't reach (nonactivating panels) and for
-    /// alternate combos beyond the menu representative.
-    public func match(_ event: NSEvent, focusedRegion: String? = nil) -> A? {
+    /// keyDown → action over the in-app combos. For surfaces the menu bar
+    /// can't reach (nonactivating panels) and for alternate combos beyond
+    /// the menu representative. Whether the matched action may fire RIGHT
+    /// NOW is the app's policy hook, not the store's.
+    public func match(_ event: NSEvent) -> A? {
         guard let pressed = KeyCombo(event: event) else { return nil }
-        return A.allCases.first { action in
-            guard combos(for: action, .local).contains(pressed) else { return false }
-            switch action.spec.reach {
-            case .everywhere: return true
-            case .regions(let regions):
-                guard let focusedRegion else { return false }
-                return regions.contains(focusedRegion)
-            }
-        }
+        return A.allCases.first { combos(for: $0, .local).contains(pressed) }
     }
 
     /// Tooltip text that can never drift from the actual combo.

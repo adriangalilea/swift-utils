@@ -15,7 +15,7 @@ The registry spine behind the studio keyboard rule: every app fully keyboard nav
 - the filterable cheat sheet with press-to-flash and inline remapping, embeddable in Settings or floating (`CheatSheetPanel`, with `StaticShortcut` rows for structural keys)
 - which-key discoverability: anchored floating tips that show the minimal completion of whatever prefix is held (`shortcutTipLayer` / `.shortcutTip`), fed by the ONE `RevealMonitor`
 - system-wide hotkeys - registry combos AND family combos (⌥⌘1-9 style) - re-registered live on remap and keyboard-layout change, no accessibility permission (`GlobalHotkeys`)
-- in-app routing for alternate combos, families, and panel surfaces, honoring focus regions and skipping menu-carried representatives (`LocalKeyRouter` + `FocusMap`; apps with richer arbitration keep their own monitor and just use `store.match`)
+- in-app routing for alternate combos, families, and panel surfaces, skipping menu-carried representatives (`LocalKeyRouter`; apps with richer arbitration keep their own monitor and just use `store.match`)
 - Spotlight / Siri / Shortcuts / Apple Intelligence via App Intents (`KeymapAppEnum`) - the macOS command palette is the OS, so Keymap ships none
 - a published keymap manifest (JSON with a versioned `$schema`, per bundle id) rendered by `KeymapCard` - the overlay windows the same card any in-app surface can show
 - one stand-down signal: the cheat panel raises `store.keyboardCaptured` while it owns the keyboard; `LocalKeyRouter` and any app-side monitor check that one flag
@@ -53,7 +53,7 @@ store.publish(appName: "myapp", accent: "#8FA98C")
 
 Titles are declared with literal `String(localized:)` so compiler extraction (`SWIFT_EMIT_LOC_STRINGS`) lands them in the app's string catalog - a plain literal would ship untranslatable.
 
-The library owns routing primitives; policy stays in the app: `canPerform` decides whether an action fires right now, and focus arbitration beyond "which region holds focus" (`FocusMap`) is the app's.
+The library owns routing primitives; policy stays in the app: `canPerform`/`shouldRoute` decide whether an action fires right now - focus arbitration is deliberately NOT a library concept (lore's rules proved it unabstractable).
 
 ## keymap-overlay
 

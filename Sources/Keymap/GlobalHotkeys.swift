@@ -68,6 +68,14 @@ package final class GlobalHotkey {
     }
 }
 
+/// KNOWN EDGE: Carbon swallows a registered global's keyDown before the
+/// app's event stream sees it, so pressing a global-registered combo while
+/// the cheat panel is open FIRES (via the Carbon handler) without flashing
+/// the panel row. Suspending registrations while captured would fix the
+/// flash but kill true system-wide reach for a backgrounded app with its
+/// panel open - not worth it. The action still fires; only the flash is
+/// missed.
+///
 /// The store's system-wide plane, kept live: registers every global combo,
 /// re-registers when bindings change (the store's onChange) or the keyboard
 /// layout changes (input source switch), and unregisters on deinit - an

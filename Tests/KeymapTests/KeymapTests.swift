@@ -11,7 +11,7 @@ enum Act: String, CaseIterable, ActionSet {
         switch self {
         case .play: Spec(title: "Play", symbol: "play", local: [KeyCombo("space")], global: [KeyCombo("space", [.command, .shift])])
         case .search: Spec(title: "Search", symbol: "magnifyingglass", local: [KeyCombo("f", .command)])
-        case .favorite: Spec(title: "Favorite", symbol: "heart", local: [KeyCombo("d", .command)], reach: .regions(["library"]))
+        case .favorite: Spec(title: "Favorite", symbol: "heart", local: [KeyCombo("d", .command)])
         }
     }
 
@@ -106,17 +106,14 @@ private let jump = ComboFamily(
         #expect(reloaded.combos(for: .play, .local) == [KeyCombo("space")])
     }
 
-    @Test func matchHonorsReach() {
+    @Test func matchFindsLocalCombos() {
         let store = KeymapStore<Act>(defaults: freshDefaults())
         let event = NSEvent.keyEvent(
             with: .keyDown, location: .zero, modifierFlags: [.command],
             timestamp: 0, windowNumber: 0, context: nil,
             characters: "d", charactersIgnoringModifiers: "d", isARepeat: false, keyCode: 2
         )!
-        // favorite reaches only the library region.
-        #expect(store.match(event) == nil)
-        #expect(store.match(event, focusedRegion: "browser") == nil)
-        #expect(store.match(event, focusedRegion: "library") == .favorite)
+        #expect(store.match(event) == .favorite)
     }
 
     @Test func legacyRemapsMigrate() throws {

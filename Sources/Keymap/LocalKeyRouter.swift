@@ -7,12 +7,12 @@ import SwiftUI
 /// installed once at launch.
 ///
 /// Routing order per keyDown:
-/// 1. Typing guard - a focused text input owns the keyboard; bare-key and
+/// 1. The capture signal - a cheat panel that owns the keyboard wins.
+/// 2. Typing guard - a focused text input owns the keyboard; bare-key and
 ///    plain-shift combos never fire over it (⌘-chords still do).
-/// 2. `store.match` honoring the focused region (`FocusMap`).
-/// 3. The app's policy hook - `shouldRoute` decides if the action fires
-///    RIGHT NOW (lore's needsVideo, list-nav cession, modal state). Return
-///    false to let the event pass through to the responder chain.
+/// 3. `store.match`, then the app's policy hook - `shouldRoute` decides if
+///    the action fires RIGHT NOW (lore's needsVideo, list-nav cession,
+///    modal state). Return false to pass the event to the responder chain.
 @MainActor
 public final class LocalKeyRouter<A: ActionSet> {
     private var monitor: Any?
@@ -27,7 +27,6 @@ public final class LocalKeyRouter<A: ActionSet> {
     /// nothing fires twice.
     public init(
         store: KeymapStore<A>,
-        focus: FocusMap? = nil,
         alternatesOnly: Bool = false,
         shouldRoute: @escaping (A?, NSEvent) -> Bool = { _, _ in true },
         perform: @escaping (A) -> Void,
@@ -44,7 +43,7 @@ public final class LocalKeyRouter<A: ActionSet> {
                 if Self.textInputIsFocused(event.window), pressed.eventModifiers.isDisjoint(with: [.command, .control]) {
                     return false
                 }
-                if let action = store.match(event, focusedRegion: focus?.active) {
+                if let action = store.match(event) {
                     if alternatesOnly, store.menuCombo(for: action) == pressed { return false }
                     guard shouldRoute(action, event) else { return false }
                     perform(action)
