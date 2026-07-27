@@ -64,7 +64,7 @@ struct KeymapEditor<A: ActionSet>: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(.white.opacity(filterFocused ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 8))
+            .background(filterFocused ? Color.inkRaised : Color.inkRest, in: RoundedRectangle(cornerRadius: 8))
             columnHeaders
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -198,10 +198,13 @@ struct KeymapEditor<A: ActionSet>: View {
         }
         .padding(.vertical, 3)
         .padding(.horizontal, 6)
-        .background(
-            flashed == action || isSelected(action) ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
-            in: RoundedRectangle(cornerRadius: 6)
-        )
+        .background {
+            if flashed == action || isSelected(action) {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(.inkSelection)
+                    .strokeBorder(.inkEdge, lineWidth: 1)
+            }
+        }
     }
 
     /// One plane's chips + its add slot. ＋ leads so it stays put as chips
@@ -281,7 +284,7 @@ private struct AddSlot: View {
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                 .frame(width: 18, height: 18)
-                .background(.white.opacity(hovering ? 0.22 : 0.09), in: Circle())
+                .background(hovering ? Color.inkHover : Color.inkRest, in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -303,7 +306,7 @@ private struct RecordingChip: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 4)
             .padding(.vertical, 1)
-            .background(.selection, in: RoundedRectangle(cornerRadius: 4))
+            .background(Color.inkRaised, in: RoundedRectangle(cornerRadius: 4))
             .onAppear {
                 monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                     MainActor.assumeIsolated {
