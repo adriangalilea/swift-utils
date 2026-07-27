@@ -19,6 +19,7 @@ public struct StaticShortcut: Sendable {
 
 struct KeymapEditor<A: ActionSet>: View {
     let store: KeymapStore<A>
+    let sections: [ActionSection<A>]
     /// Highlight (and optionally fire) the row whose combo is pressed while
     /// the surface is visible - the panel teaches by doing.
     let flashOnPress: Bool
@@ -38,7 +39,7 @@ struct KeymapEditor<A: ActionSet>: View {
                 .textFieldStyle(.roundedBorder)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    ForEach(Array(A.sections.enumerated()), id: \.offset) { _, section in
+                    ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
                         let actions = section.actions.filter(matchesQuery)
                         if !actions.isEmpty {
                             sectionView(section.name, actions)
@@ -233,24 +234,29 @@ private struct RecordingChip: View {
 /// Generated from the registry + the live store, so it can never drift.
 public struct CheatSheetPanel<A: ActionSet>: View {
     let store: KeymapStore<A>
+    let sections: [ActionSection<A>]
     let perform: ((A) -> Void)?
     let extras: [(name: String, rows: [StaticShortcut])]
 
     /// `perform` non-nil makes a pressed combo FIRE while the panel is up
-    /// (teach by doing); nil just flashes the row. `extras` documents the
-    /// structural keys that aren't registry actions.
+    /// (teach by doing); nil just flashes the row. `sections` defaults to
+    /// the registry's grouping - pass more when some actions live outside
+    /// `A.sections`. `extras` documents the structural keys that aren't
+    /// registry actions.
     public init(
         store: KeymapStore<A>,
+        sections: [ActionSection<A>] = A.sections,
         perform: ((A) -> Void)? = nil,
         extras: [(name: String, rows: [StaticShortcut])] = []
     ) {
         self.store = store
+        self.sections = sections
         self.perform = perform
         self.extras = extras
     }
 
     public var body: some View {
-        KeymapEditor(store: store, flashOnPress: true, perform: perform, extras: extras)
+        KeymapEditor(store: store, sections: sections, flashOnPress: true, perform: perform, extras: extras)
             .padding()
             .frame(minWidth: 440, minHeight: 320)
     }
