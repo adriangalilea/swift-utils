@@ -24,19 +24,6 @@ public struct ShortcutChord: Sendable {
     }
 }
 
-extension ActionSet {
-    /// Every accelerator this command answers to - the in-app (remappable)
-    /// combos and the global forms. The reveal walks these.
-    @MainActor
-    public func chords(_ store: KeymapStore<Self>) -> [ShortcutChord] {
-        store.combos(for: self, .local).map {
-            ShortcutChord(modifiers: $0.eventModifiers, display: $0.display, isGlobal: false)
-        } + store.combos(for: self, .global).map {
-            ShortcutChord(modifiers: $0.eventModifiers, display: $0.display, isGlobal: true)
-        }
-    }
-}
-
 extension EventModifiers {
     fileprivate var count: Int { rawValue.nonzeroBitCount }
 }
@@ -160,7 +147,7 @@ extension View {
         _ action: A, _ store: KeymapStore<A>,
         extra: [ShortcutChord] = [], edge: Edge = .top
     ) -> some View {
-        let item = ShortcutTip.Item(chords: action.chords(store) + extra, label: nil)
+        let item = ShortcutTip.Item(chords: store.chords(for: action) + extra, label: nil)
         return anchorPreference(key: ShortcutTipKey.self, value: .bounds) {
             [ShortcutTip(id: action.rawValue, anchor: $0, edge: edge, items: [item])]
         }

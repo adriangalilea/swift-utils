@@ -1,49 +1,6 @@
 import AppKit
+import Ink
 import SwiftUI
-
-/// A bound accelerator: a keycap showing the combo (glyphs read as the keys
-/// they are). The chip IS the remove control - on hover it turns red and
-/// shows an ✕ over the combo, the tag-delete idiom. Zero reserved space (no
-/// external badge), so sibling chips pack tight and align perfectly with ＋.
-public struct ComboChip: View {
-    let combo: KeyCombo
-    let remove: () -> Void
-    @State private var hovering = false
-
-    public init(_ combo: KeyCombo, remove: @escaping () -> Void) {
-        self.combo = combo
-        self.remove = remove
-    }
-
-    // A one-glyph combo (←, [, ⌫) gets a square frame, so the Capsule below
-    // renders as a perfect circle; multi-glyph combos (Space, ⌘←) stay capsules.
-    private var single: Bool { combo.display.count == 1 }
-
-    public var body: some View {
-        Button(action: remove) {
-            ZStack {
-                Text(verbatim: combo.display)
-                    .font(.callout.monospaced())
-                    .opacity(hovering ? 0 : 1)
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .opacity(hovering ? 1 : 0)
-            }
-            .frame(width: single ? 24 : nil, height: 24)
-            .padding(.horizontal, single ? 0 : 9)
-            .background(
-                hovering ? AnyShapeStyle(.red.opacity(0.9)) : AnyShapeStyle(.quaternary.opacity(0.85)),
-                in: Capsule()
-            )
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .help(String(localized: "Remove this shortcut", bundle: .module))
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
-    }
-}
 
 /// Restore Defaults for a whole store - place it wherever the settings
 /// surface ends. Stateless on purpose: conflicts already report inline at
@@ -158,7 +115,7 @@ public struct KeymapGrid<A: ActionSet>: View {
             if !combos.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(combos, id: \.self) { combo in
-                        ComboChip(combo) { store.remove(combo, plane: plane, from: action) }
+                        ComboChip(combo.display) { store.remove(combo, plane: plane, from: action) }
                     }
                 }
                 .padding(.leading, 14)
@@ -261,9 +218,9 @@ public struct KeymapGrid<A: ActionSet>: View {
         }
     }
 
-    /// Swallows every key while recording: ⎋ cancels, a global needs a
-    /// modifier, a taken key reports its owner and keeps listening, anything
-    /// else binds.
+    /// Swallows every key while recording: ⎋ cancels, a refused key (the
+    /// STORE owns every binding rule) reports its verdict and keeps
+    /// listening, anything else binds.
     private func handle(_ event: NSEvent) -> NSEvent? {
         guard let target = recording else { return event }
         if event.keyCode == 53 { // esc
@@ -271,15 +228,8 @@ public struct KeymapGrid<A: ActionSet>: View {
             return nil
         }
         guard let pressed = KeyCombo(event: event) else { return nil }
-        if target.plane == .global {
-            let modifiers = pressed.eventModifiers
-            if !modifiers.contains(.command), !modifiers.contains(.option), !modifiers.contains(.control) {
-                message = String(localized: "System-wide shortcuts need ⌘, ⌥, or ⌃", bundle: .module)
-                return nil
-            }
-        }
-        if let owner = store.add(pressed, plane: target.plane, to: target.action) {
-            message = String(localized: "\(pressed.display) is already \(owner)", bundle: .module)
+        if let rejection = store.add(pressed, plane: target.plane, to: target.action) {
+            message = rejection.message(for: pressed)
             return nil
         }
         message = ""

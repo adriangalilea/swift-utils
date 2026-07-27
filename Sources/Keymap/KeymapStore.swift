@@ -43,6 +43,26 @@ public struct LegacyKeys: Sendable {
     }
 }
 
+/// Why an `add` was refused. The store owns EVERY binding rule - the UIs
+/// (settings grid, cheat panel, anything else) just render the verdict, so
+/// they can never diverge on what's bindable.
+public enum AddRejection: Equatable, Sendable {
+    /// The combo is already bound on that plane - by this action's named owner.
+    case taken(by: String)
+    /// A system-wide combo needs a real modifier (⌘, ⌥, or ⌃) to register.
+    case needsModifier
+
+    /// The one user-facing sentence for this verdict.
+    public func message(for combo: KeyCombo) -> String {
+        switch self {
+        case .taken(let owner):
+            String(localized: "\(combo.display) is already \(owner)", bundle: .module)
+        case .needsModifier:
+            String(localized: "System-wide shortcuts need ⌘, ⌥, or ⌃", bundle: .module)
+        }
+    }
+}
+
 /// User-remappable combos over the registry defaults, persisted as a sparse
 /// override map. Each action carries a LIST per plane (multiple accelerators,
 /// add/remove freely; empty = unbound). Conflicts are rejected per-plane,
@@ -163,19 +183,23 @@ public final class KeymapStore<A: ActionSet> {
         persist()
     }
 
-    /// Adds a combo on the given plane unless the key is already taken ON THAT
-    /// PLANE - by another action, or by a combo family (which reserves
-    /// <modifier>+each key). Returns the conflicting owner's name for the UI;
-    /// nil = added. (Planes don't collide: a key may be an in-app combo for
-    /// one action and a system-wide form for another.)
-    public func add(_ combo: KeyCombo, plane: ComboPlane, to action: A) -> String? {
+    /// Adds a combo on the given plane unless a binding rule refuses it:
+    /// taken on that plane (by another action or a combo family, which
+    /// reserves <modifier>+each key), or a system-wide combo without a real
+    /// modifier. nil = added. (Planes don't collide: a key may be an in-app
+    /// combo for one action and a system-wide form for another.)
+    public func add(_ combo: KeyCombo, plane: ComboPlane, to action: A) -> AddRejection? {
+        if plane == .global,
+           combo.eventModifiers.isDisjoint(with: [.command, .option, .control]) {
+            return .needsModifier
+        }
         if let owner = A.allCases.first(where: {
             $0 != action && combos(for: $0, plane).contains(combo)
-        }) { return owner.spec.title }
+        }) { return .taken(by: owner.spec.title) }
         for family in families {
             let modifier = familyModifier(family.id, plane)
             if !modifier.isEmpty, family.keys.contains(combo.key), combo.eventModifiers == modifier {
-                return family.name
+                return .taken(by: family.name)
             }
         }
         var edited = effective(for: action)
@@ -218,6 +242,12 @@ public final class KeymapStore<A: ActionSet> {
 
     // MARK: - Routing
 
+    /// A capture surface (the cheat panel) owns the keyboard wholesale. The
+    /// ONE stand-down signal: the panel raises it on appear, every routing
+    /// engine - LocalKeyRouter here, an app's own monitors - checks it in
+    /// one place instead of each host wiring its own yields.
+    public internal(set) var keyboardCaptured = false
+
     /// keyDown → action over the in-app combos, honoring reach: an action
     /// bound to regions matches only while one of them holds focus. For
     /// surfaces the menu bar can't reach (nonactivating panels) and for
@@ -240,5 +270,18 @@ public final class KeymapStore<A: ActionSet> {
         let combo = displayPrimary(for: action)
         let label = detail ?? action.spec.title
         return combo.isEmpty ? label : "\(label) (\(combo))"
+    }
+}
+
+
+extension KeymapStore {
+    /// Every accelerator a command answers to - the in-app (remappable)
+    /// combos and the global forms. The reveal walks these.
+    public func chords(for action: A) -> [ShortcutChord] {
+        combos(for: action, .local).map {
+            ShortcutChord(modifiers: $0.eventModifiers, display: $0.display, isGlobal: false)
+        } + combos(for: action, .global).map {
+            ShortcutChord(modifiers: $0.eventModifiers, display: $0.display, isGlobal: true)
+        }
     }
 }

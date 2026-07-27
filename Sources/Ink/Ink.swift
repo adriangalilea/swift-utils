@@ -1,0 +1,117 @@
+import SwiftUI
+
+/// THE styling ladder for the studio's dark-glass surfaces. Five roles, no
+/// raw values at call sites - a view names WHAT a surface is, never how
+/// transparent it is. Products build on these atoms (Keymap's panel and
+/// overlay today; AppSettings and the credits pane next) so surfaces can
+/// never drift apart.
+///
+/// tailwind-discipline, Swift-shaped: when a second theme appears, this
+/// becomes an Environment-injected struct and these turn into its defaults.
+extension ShapeStyle where Self == Color {
+    /// A resting interactive surface: a filter field, an idle ＋ slot.
+    public static var inkRest: Color { .white.opacity(0.12) }
+    /// A raised element: keycaps, chips, the focused field.
+    public static var inkRaised: Color { .white.opacity(0.18) }
+    /// A hovered control - unmistakably live.
+    public static var inkHover: Color { .white.opacity(0.32) }
+    /// The cursor/flash row - paired with `inkEdge` as its border.
+    public static var inkSelection: Color { .white.opacity(0.22) }
+    /// The stroke that separates a selected/active region from the glass.
+    public static var inkEdge: Color { .white.opacity(0.38) }
+}
+
+extension View {
+    /// A column-header label (the plane headers, any grid's column caps) -
+    /// ONE style; every surface wears it, so two surfaces can never drift.
+    /// `tint` covers accent-tinted headers (the manifest card) without the
+    /// caller fighting the style's own color.
+    public func planeHeaderStyle(_ tint: some ShapeStyle = HierarchicalShapeStyle.secondary) -> some View {
+        font(.caption2.weight(.semibold))
+            .textCase(.uppercase)
+            .foregroundStyle(tint)
+    }
+}
+
+/// The one key-cap. Every surface renders combos through it - never
+/// re-styled per site.
+public struct ShortcutBadge: View {
+    let text: String
+    public init(_ text: String) { self.text = text }
+
+    public var body: some View {
+        Text(text)
+            .font(.caption2.monospacedDigit().weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+/// A bound accelerator: a keycap showing the combo (glyphs read as the keys
+/// they are). The chip IS the remove control - on hover it turns red and
+/// shows an ✕ over the combo, the tag-delete idiom. Zero reserved space (no
+/// external badge), so sibling chips pack tight and align perfectly with ＋.
+public struct ComboChip: View {
+    let display: String
+    let remove: () -> Void
+    @State private var hovering = false
+
+    public init(_ display: String, remove: @escaping () -> Void) {
+        self.display = display
+        self.remove = remove
+    }
+
+    // A one-glyph combo (←, [, ⌫) gets a square frame, so the Capsule below
+    // renders as a perfect circle; multi-glyph combos (Space, ⌘←) stay capsules.
+    private var single: Bool { display.count == 1 }
+
+    public var body: some View {
+        Button(action: remove) {
+            ZStack {
+                Text(verbatim: display)
+                    .font(.callout.monospaced())
+                    .opacity(hovering ? 0 : 1)
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
+                    .opacity(hovering ? 1 : 0)
+            }
+            .frame(width: single ? 24 : nil, height: 24)
+            .padding(.horizontal, single ? 0 : 9)
+            .background(
+                hovering ? AnyShapeStyle(.red.opacity(0.9)) : AnyShapeStyle(.quaternary.opacity(0.85)),
+                in: Capsule()
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(String(localized: "Remove this shortcut", bundle: .module))
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}
+
+/// The ＋ that arms an add - a visible slot, not a ghost: a filled circle
+/// that brightens and sharpens on hover so it reads as pressable.
+public struct AddSlot: View {
+    let arm: () -> Void
+    @State private var hovering = false
+
+    public init(arm: @escaping () -> Void) { self.arm = arm }
+
+    public var body: some View {
+        Button(action: arm) {
+            Image(systemName: "plus")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .frame(width: 18, height: 18)
+                .background(hovering ? Color.inkHover : Color.inkRest, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+    }
+}

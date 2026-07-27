@@ -37,6 +37,9 @@ public final class LocalKeyRouter<A: ActionSet> {
             // The local monitor always delivers on the main thread; NSEvent
             // itself isn't Sendable, so only the handled verdict crosses.
             let handled = MainActor.assumeIsolated { () -> Bool in
+                // A capture surface (the cheat panel) owns the keyboard -
+                // routing stands down wholesale while it's up.
+                if store.keyboardCaptured { return false }
                 guard let pressed = KeyCombo(event: event) else { return false }
                 if Self.textInputIsFocused(event.window), pressed.eventModifiers.isDisjoint(with: [.command, .control]) {
                     return false

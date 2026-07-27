@@ -2,6 +2,10 @@
 
 Swift utilities for mac apps. The sibling of [ts-utils](https://github.com/adriangalilea/ts-utils), py-utils, and go-utils: one repo, multiple products, each module links only if imported.
 
+## Ink
+
+The styling atoms every product builds on: the `ink*` token ladder for dark-glass surfaces (five semantic roles, no raw values at call sites), `planeHeaderStyle`, and the micro-components - `ShortcutBadge` (the one key-cap), `ComboChip` (keycap with hover-✕ remove), `AddSlot` (the pressable ＋). No dependencies; future products (AppSettings, the credits pane) consume it without the keymap machine.
+
 ## Keymap
 
 The registry spine behind the studio keyboard rule: every app fully keyboard navigable, the pointer a fallback, never the only path. Register every user-invocable action once; everything else derives from the registry and can never drift from it:
@@ -9,11 +13,12 @@ The registry spine behind the studio keyboard rule: every app fully keyboard nav
 - native menus with live key display (`KeymapMenu`)
 - the remap settings surface: aligned two-plane grid, keycap chips with hover-x remove, in-place recording, family modifier pickers, conflicts rejected by name and reported inline (`KeymapGrid` + `KeymapRestoreDefaults`)
 - the filterable cheat sheet with press-to-flash and inline remapping, embeddable in Settings or floating (`CheatSheetPanel`, with `StaticShortcut` rows for structural keys)
-- which-key discoverability, two tiers: anchored floating tips that show the minimal completion of whatever prefix is held (`shortcutTipLayer` / `.shortcutTip`) and the simple per-control badge with an always-on "linear UI" mode (`.keymapBadge`), both fed by the ONE `RevealMonitor`
+- which-key discoverability: anchored floating tips that show the minimal completion of whatever prefix is held (`shortcutTipLayer` / `.shortcutTip`), fed by the ONE `RevealMonitor`
 - system-wide hotkeys - registry combos AND family combos (⌥⌘1-9 style) - re-registered live on remap and keyboard-layout change, no accessibility permission (`GlobalHotkeys`)
 - in-app routing for alternate combos, families, and panel surfaces, honoring focus regions and skipping menu-carried representatives (`LocalKeyRouter` + `FocusMap`; apps with richer arbitration keep their own monitor and just use `store.match`)
 - Spotlight / Siri / Shortcuts / Apple Intelligence via App Intents (`KeymapAppEnum`) - the macOS command palette is the OS, so Keymap ships none
-- a published keymap manifest (JSON with a versioned `$schema`, per bundle id) that `keymap-overlay` reads
+- a published keymap manifest (JSON with a versioned `$schema`, per bundle id) rendered by `KeymapCard` - the overlay windows the same card any in-app surface can show
+- one stand-down signal: the cheat panel raises `store.keyboardCaptured` while it owns the keyboard; `LocalKeyRouter` and any app-side monitor check that one flag
 
 ### Usage
 

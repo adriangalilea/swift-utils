@@ -1,4 +1,5 @@
 import AppKit
+import Ink
 import SwiftUI
 
 /// The interactive keymap surface behind `CheatSheetPanel`. Keyboard-first
@@ -17,6 +18,15 @@ public struct StaticShortcut: Sendable {
         self.keys = keys
         self.what = what
     }
+}
+
+/// The keycodes the panel speaks - named, not scattered magic.
+private enum Key {
+    static let `return`: UInt16 = 36
+    static let delete: UInt16 = 51
+    static let escape: UInt16 = 53
+    static let down: UInt16 = 125
+    static let up: UInt16 = 126
 }
 
 struct KeymapEditor<A: ActionSet>: View {
@@ -88,8 +98,17 @@ struct KeymapEditor<A: ActionSet>: View {
             columnHeaders
             scrollBody
         }
-        .onAppear(perform: installPressMonitor)
-        .onDisappear(perform: removePressMonitor)
+        .onAppear {
+            installPressMonitor()
+            // The capture surface raises the ONE stand-down signal - every
+            // routing engine (lib and app alike) reads it instead of each
+            // host wiring its own yields.
+            if flashOnPress { store.keyboardCaptured = true }
+        }
+        .onDisappear {
+            removePressMonitor()
+            if flashOnPress { store.keyboardCaptured = false }
+        }
         .onChange(of: query) { _, newQuery in
             // Typing re-anchors the cursor: first match while filtering,
             // no selection on an empty query (the full reference state).
@@ -279,15 +298,15 @@ struct KeymapEditor<A: ActionSet>: View {
                 recording = (action, plane)
             }
             ForEach(store.combos(for: action, plane), id: \.self) { combo in
-                ComboChip(combo) {
+                ComboChip(combo.display) {
                     store.remove(combo, plane: plane, from: action)
                 }
             }
             if recording?.action == action, recording?.plane == plane {
                 RecordingChip { combo in
                     recording = nil
-                    if let combo, let owner = store.add(combo, plane: plane, to: action) {
-                        conflict = (action, String(localized: "\(combo.display) is already \(owner)", bundle: .module))
+                    if let combo, let rejection = store.add(combo, plane: plane, to: action) {
+                        conflict = (action, rejection.message(for: combo))
                     }
                 }
             }
@@ -304,19 +323,19 @@ struct KeymapEditor<A: ActionSet>: View {
                 // Esc is the HOST's key - dismissal - and local monitors run
                 // newest-first, so the panel must explicitly disown it or
                 // the typing catch-all below would swallow it.
-                if event.keyCode == 53 { return false }
+                if event.keyCode == Key.escape { return false }
                 // Panel navigation first - claimed HERE because menu key
                 // equivalents dispatch before any focused-view handler, and
                 // bare arrows are often an app action's menu representative.
                 switch event.keyCode {
-                case 125: move(1); return true // ↓
-                case 126: move(-1); return true // ↑
-                case 36: return fireSelection() // ⏎
+                case Key.down: move(1); return true
+                case Key.up: move(-1); return true
+                case Key.return: return fireSelection()
                 default: break
                 }
                 guard let pressed = KeyCombo(event: event) else { return false }
                 // Editing verbs on the query - the panel IS the field.
-                if event.keyCode == 51 { // ⌫; ⌘⌫ clears
+                if event.keyCode == Key.delete { // ⌫; ⌘⌫ clears
                     if event.modifierFlags.contains(.command) { query = "" }
                     else if !query.isEmpty { query.removeLast() }
                     return true
@@ -363,27 +382,6 @@ struct KeymapEditor<A: ActionSet>: View {
     }
 }
 
-/// The ＋ that records a new combo - a visible slot, not a ghost: a filled
-/// circle that brightens and sharpens on hover so it reads as pressable.
-private struct AddSlot: View {
-    let arm: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        Button(action: arm) {
-            Image(systemName: "plus")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                .frame(width: 18, height: 18)
-                .background(hovering ? Color.inkHover : Color.inkRest, in: Circle())
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
-    }
-}
-
 /// The add slot while armed: captures the next keyDown as the new combo.
 /// Esc cancels. Bare modifiers don't resolve (KeyCombo(event:) is nil) so
 /// holding ⌘ while choosing the key works naturally.
@@ -401,7 +399,7 @@ private struct RecordingChip: View {
             .onAppear {
                 monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                     MainActor.assumeIsolated {
-                        if event.keyCode == 53 { // esc
+                        if event.keyCode == Key.escape {
                             finish(nil)
                         } else if let combo = KeyCombo(event: event) {
                             finish(combo)
@@ -449,6 +447,5 @@ public struct CheatSheetPanel<A: ActionSet>: View {
     public var body: some View {
         KeymapEditor(store: store, sections: sections, flashOnPress: true, perform: perform, extras: extras)
             .padding()
-            .frame(minWidth: 440, minHeight: 320)
     }
 }

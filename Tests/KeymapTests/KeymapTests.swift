@@ -67,7 +67,7 @@ private let jump = ComboFamily(
 
     @Test func conflictIsRejectedWithOwnerName() {
         let store = KeymapStore<Act>(defaults: freshDefaults())
-        #expect(store.add(KeyCombo("f", .command), plane: .local, to: .play) == "Search")
+        #expect(store.add(KeyCombo("f", .command), plane: .local, to: .play) == .taken(by: "Search"))
         #expect(store.combos(for: .play, .local) == [KeyCombo("space")])
     }
 
@@ -77,9 +77,17 @@ private let jump = ComboFamily(
         #expect(store.add(KeyCombo("f", .command), plane: .global, to: .play) == nil)
     }
 
+    @Test func globalPlaneDemandsARealModifier() {
+        let store = KeymapStore<Act>(defaults: freshDefaults())
+        // The STORE owns the rule - no UI can bind an un-registrable global.
+        #expect(store.add(KeyCombo("p"), plane: .global, to: .play) == .needsModifier)
+        #expect(store.add(KeyCombo("p", .shift), plane: .global, to: .play) == .needsModifier)
+        #expect(store.add(KeyCombo("p", .option), plane: .global, to: .play) == nil)
+    }
+
     @Test func familyReservesItsPrefix() {
         let store = KeymapStore<Act>(families: [jump], defaults: freshDefaults())
-        #expect(store.add(KeyCombo("3", .command), plane: .local, to: .play) == "the numbered jumps")
+        #expect(store.add(KeyCombo("3", .command), plane: .local, to: .play) == .taken(by: "the numbered jumps"))
         // Moving the family's modifier frees the old prefix.
         store.setFamilyModifier("jump", .local, to: [.command, .control])
         #expect(store.add(KeyCombo("3", .command), plane: .local, to: .play) == nil)

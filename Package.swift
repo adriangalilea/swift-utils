@@ -11,6 +11,11 @@ let package = Package(
     name: "swift-utils",
     platforms: [.macOS(.v26)],
     products: [
+        // The styling atoms: the Ink token ladder + the studio's
+        // micro-components (keycaps, chips, slots). No dependencies -
+        // future products (AppSettings, credits) build on it without
+        // dragging the keymap machine.
+        .library(name: "Ink", targets: ["Ink"]),
         .library(name: "Keymap", targets: ["Keymap"]),
         // The system-wide shortcut overlay: a tiny background agent showing
         // the frontmost app's published keymap on one global chord (⌃⌘/).
@@ -18,8 +23,10 @@ let package = Package(
         .executable(name: "keymap-overlay", targets: ["keymap-overlay"]),
     ],
     targets: [
+        .target(name: "Ink", resources: [.process("Resources")]),
         .target(
             name: "Keymap",
+            dependencies: ["Ink"],
             resources: [.process("Resources")]
         ),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap"]),

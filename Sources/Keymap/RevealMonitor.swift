@@ -54,14 +54,6 @@ public final class RevealMonitor {
     /// globals-only state) - the layer inline badges belong to.
     public var revealingInApp: Bool { revealing && !globalsOnly }
 
-    /// Does a combo complete the currently held prefix? The reveal shows a
-    /// combo iff its modifiers are exactly the prefix (bare layer shows
-    /// modifier-less combos, the ⌘ layer shows ⌘-combos, never both mixed).
-    public func completes(_ combo: KeyCombo) -> Bool {
-        guard let reveal else { return false }
-        return combo.eventModifiers == reveal.required
-    }
-
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
 
     public init() {
