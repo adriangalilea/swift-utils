@@ -1,11 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// The one keymap surface, hosted twice: `CheatSheetPanel` (floating
-/// reference, press-to-flash) and `KeymapSettingsPane` (Settings, plus
-/// family prefixes and Reset All). Reference and editor are the same rows:
-/// every combo chip removes on hover-x, every row records a new combo in
-/// place, conflicts are reported inline with the owner's name.
+/// The interactive keymap surface behind `CheatSheetPanel`. Keyboard-first
+/// by construction: the filter field GRABS focus on open (type immediately),
+/// ↑/↓ move a selection through the filtered rows, ⏎ fires the selection.
+/// While typing, bare keys belong to the field; chorded combos (⌘/⌃/⌥)
+/// still press-to-flash and fire. Every combo chip removes on hover-x,
+/// every row records a new combo in place, conflicts are reported inline
+/// with the owner's name.
 /// A literal reference row for keys that aren't registry actions - the
 /// structural layer (Tab, arrows, Esc ladders) an app documents verbatim.
 public struct StaticShortcut: Sendable {
@@ -32,11 +34,24 @@ struct KeymapEditor<A: ActionSet>: View {
     @State private var conflict: (action: A, message: String)?
     @State private var flashed: A?
     @State private var pressMonitor: Any?
+    @FocusState private var filterFocused: Bool
+    /// Index into `visible` - the cursor ↑/↓ drive and ⏎ fires.
+    @State private var selection: Int?
+
+    /// The filtered actions in display order - the one list the cursor
+    /// walks, the sections merely render it in groups.
+    private var visible: [A] {
+        sections.flatMap { $0.actions.filter(matchesQuery) }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextField(String(localized: "Filter actions", bundle: .module), text: $query)
                 .textFieldStyle(.roundedBorder)
+                .focused($filterFocused)
+                .onKeyPress(.downArrow) { move(1); return .handled }
+                .onKeyPress(.upArrow) { move(-1); return .handled }
+                .onKeyPress(.return) { fireSelection() }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
@@ -54,12 +69,41 @@ struct KeymapEditor<A: ActionSet>: View {
                 }
             }
         }
-        .onAppear(perform: installPressMonitor)
+        .onAppear {
+            installPressMonitor()
+            // Keyboard-first: the panel opens ready to filter.
+            filterFocused = true
+        }
         .onDisappear(perform: removePressMonitor)
+        .onChange(of: query) { _, newQuery in
+            // Typing re-anchors the cursor: first match while filtering,
+            // no selection on an empty query (the full reference state).
+            selection = newQuery.isEmpty || visible.isEmpty ? nil : 0
+        }
     }
 
     private func matchesQuery(_ action: A) -> Bool {
         query.isEmpty || action.spec.title.localizedCaseInsensitiveContains(query)
+    }
+
+    private func move(_ delta: Int) {
+        let rows = visible
+        guard !rows.isEmpty else { return }
+        selection = ((selection ?? -1) + delta + rows.count) % rows.count
+    }
+
+    private func fireSelection() -> KeyPress.Result {
+        let rows = visible
+        guard let selection, rows.indices.contains(selection) else { return .ignored }
+        let action = rows[selection]
+        flash(action)
+        perform?(action)
+        return .handled
+    }
+
+    private func isSelected(_ action: A) -> Bool {
+        guard let selection, visible.indices.contains(selection) else { return false }
+        return visible[selection] == action
     }
 
     private func staticSection(_ name: String, _ rows: [StaticShortcut]) -> some View {
@@ -119,7 +163,7 @@ struct KeymapEditor<A: ActionSet>: View {
         .padding(.vertical, 3)
         .padding(.horizontal, 6)
         .background(
-            flashed == action ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
+            flashed == action || isSelected(action) ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear),
             in: RoundedRectangle(cornerRadius: 6)
         )
     }
@@ -167,6 +211,12 @@ struct KeymapEditor<A: ActionSet>: View {
         pressMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let handled = MainActor.assumeIsolated { () -> Bool in
                 guard recording == nil, let pressed = KeyCombo(event: event) else { return false }
+                // The focused filter field owns bare keys and shift-combos -
+                // typing must type. Chorded combos can't be typed, so they
+                // still teach by doing.
+                if filterFocused, pressed.eventModifiers.isDisjoint(with: [.command, .control, .option]) {
+                    return false
+                }
                 guard let action = A.allCases.first(where: { candidate in
                     store.combos(for: candidate, .local).contains(pressed)
                         || store.combos(for: candidate, .global).contains(pressed)
