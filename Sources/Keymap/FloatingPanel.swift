@@ -5,14 +5,18 @@ import SwiftUI
 /// dismissal contract BUILT IN, because every hand-rolled float forgot part
 /// of it: clicking ANYWHERE outside the panel dismisses - inside this app
 /// (local monitor), inside ANY OTHER app (global monitor, no permissions
-/// needed for mouse events), or switching apps at all. Esc stays the
-/// host's key monitor (hosts own dismissal keys); this owns the pointer
-/// side. One instance per surface; `show` replaces, `dismiss` tears down.
+/// needed for mouse events), switching apps at all, or Esc (a local
+/// monitor, so it works exactly while the host app is active - a
+/// nonactivating agent never sees keys anyway and rides its chord + the
+/// pointer side). Both hosts wrote the identical Esc monitor before it
+/// moved in here; a dismissal key is part of the contract, not policy.
+/// One instance per surface; `show` replaces, `dismiss` tears down.
 @MainActor
 public final class FloatingPanel {
     private var panel: NSPanel?
     private var localClicks: Any?
     private var globalClicks: Any?
+    private var escKey: Any?
     private var appSwitch: NSObjectProtocol?
 
     /// Fired on any built-in dismissal trigger. The HOST flips its own
@@ -64,6 +68,14 @@ public final class FloatingPanel {
         globalClicks = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated { self?.onDismissRequest?() }
         }
+        escKey = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let swallow = MainActor.assumeIsolated { () -> Bool in
+                guard event.keyCode == KeyCode.escape, self?.panel != nil else { return false }
+                self?.onDismissRequest?()
+                return true
+            }
+            return swallow ? nil : event
+        }
         if dismissOnAppSwitch {
             appSwitch = NSWorkspace.shared.notificationCenter.addObserver(
                 forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
@@ -80,6 +92,8 @@ public final class FloatingPanel {
         localClicks = nil
         if let globalClicks { NSEvent.removeMonitor(globalClicks) }
         globalClicks = nil
+        if let escKey { NSEvent.removeMonitor(escKey) }
+        escKey = nil
         if let appSwitch { NSWorkspace.shared.notificationCenter.removeObserver(appSwitch) }
         appSwitch = nil
     }
