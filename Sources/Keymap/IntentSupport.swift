@@ -34,17 +34,19 @@ import Foundation
 /// The duplication the extractor forces is guarded by the screamer below -
 /// call it once at startup and the duplicate can never silently drift.
 extension ActionSet where Self: AppEnum {
-    /// Asserts every intent display title against the registry title (both
-    /// resolve through the app's own catalog, so equal keys are equal
-    /// strings). Free in Release; the first dev launch screams on drift.
+    /// Checks every intent display title against the registry title.
+    /// `precondition`, deliberately: dev builds are Release-config in this
+    /// house, so `assert` would never run anywhere - and because both sides
+    /// resolve the same catalog KEY, an English match implies every
+    /// language matches, making the crash impossible to ship past the first
+    /// launch that could reveal it.
     @MainActor public static func assertIntentDisplayMatchesRegistry() {
         for action in allCases {
             guard let representation = caseDisplayRepresentations[action] else {
-                assertionFailure("intent display missing for \(action.rawValue)")
-                continue
+                preconditionFailure("intent display missing for \(action.rawValue)")
             }
             let intentTitle = String(localized: representation.title)
-            assert(
+            precondition(
                 intentTitle == action.spec.title,
                 "intent display '\(intentTitle)' drifted from registry title '\(action.spec.title)' for \(action.rawValue)"
             )
