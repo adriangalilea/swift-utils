@@ -303,6 +303,10 @@ struct KeymapEditor<A: ActionSet>: View {
         pressMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let handled = MainActor.assumeIsolated { () -> Bool in
                 guard recording == nil else { return false }
+                // Esc is the HOST's key - dismissal - and local monitors run
+                // newest-first, so the panel must explicitly disown it or
+                // the typing catch-all below would swallow it.
+                if event.keyCode == 53 { return false }
                 // Panel navigation first - claimed HERE because menu key
                 // equivalents dispatch before any focused-view handler, and
                 // bare arrows are often an app action's menu representative.
