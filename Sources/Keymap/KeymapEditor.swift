@@ -151,7 +151,7 @@ struct KeymapEditor<A: ActionSet>: View {
     }
 
     private var scrollContent: some View {
-        ScrollView {
+        CursorScrollView(cursor: selection.flatMap { visible.indices.contains($0) ? visible[$0] : nil }) {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
                         let actions = section.actions.filter(matchesQuery)
@@ -239,7 +239,9 @@ struct KeymapEditor<A: ActionSet>: View {
             Text(name)
                 .font(.caption.smallCaps().weight(.semibold))
                 .foregroundStyle(.secondary)
-            ForEach(actions, id: \.self, content: row)
+            ForEach(actions, id: \.self) { action in
+                row(action).id(action)
+            }
         }
     }
 

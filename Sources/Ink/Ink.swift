@@ -115,3 +115,35 @@ public struct AddSlot: View {
         .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }
+
+
+/// THE LAW OF NAVIGABLE SURFACES: a keyboard cursor must never leave its
+/// own viewport. Any scrollable list/gallery a cursor walks keeps the
+/// focused item CENTERED while scrolling is possible (clamped naturally at
+/// the edges - SwiftUI's .center anchor does the right thing at both ends).
+/// This component IS the pattern: wrap the content, give every row
+/// `.id(...)`, bind the cursor - the lock follows. Hand-rolling this per
+/// surface is how the cursor-below-the-fold sin keeps recurring; don't.
+public struct CursorScrollView<Cursor: Hashable, Content: View>: View {
+    let cursor: Cursor?
+    let content: Content
+
+    public init(cursor: Cursor?, @ViewBuilder content: () -> Content) {
+        self.cursor = cursor
+        self.content = content()
+    }
+
+    public var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                content
+            }
+            .onChange(of: cursor) { _, target in
+                guard let target else { return }
+                withAnimation(.easeOut(duration: 0.12)) {
+                    proxy.scrollTo(target, anchor: .center)
+                }
+            }
+        }
+    }
+}
