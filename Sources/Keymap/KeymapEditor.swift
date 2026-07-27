@@ -58,9 +58,6 @@ struct KeymapEditor<A: ActionSet>: View {
                 TextField(String(localized: "Filter actions", bundle: .module), text: $query)
                     .textFieldStyle(.plain)
                     .focused($filterFocused)
-                    .onKeyPress(.downArrow) { move(1); return .handled }
-                    .onKeyPress(.upArrow) { move(-1); return .handled }
-                    .onKeyPress(.return) { fireSelection() }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
@@ -82,6 +79,22 @@ struct KeymapEditor<A: ActionSet>: View {
     }
 
     private var scrollBody: some View {
+        scrollContent
+            // Content never hard-crops at the viewport: a fade mask melts it
+            // into the glass at both edges. (scrollEdgeEffectStyle only
+            // renders under real edge bars - a padded panel has none.)
+            .mask {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 16)
+                    Rectangle().fill(.black)
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 16)
+                }
+            }
+    }
+
+    private var scrollContent: some View {
         ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
@@ -98,9 +111,6 @@ struct KeymapEditor<A: ActionSet>: View {
                     }
                 }
             }
-        // Content never hard-crops at the viewport: the native soft edge
-        // fades it out under the glass, top and bottom.
-        .scrollEdgeEffectStyle(.soft, for: .vertical)
     }
 
     private func matchesQuery(_ action: A) -> Bool {
@@ -113,13 +123,13 @@ struct KeymapEditor<A: ActionSet>: View {
         selection = ((selection ?? -1) + delta + rows.count) % rows.count
     }
 
-    private func fireSelection() -> KeyPress.Result {
+    private func fireSelection() -> Bool {
         let rows = visible
-        guard let selection, rows.indices.contains(selection) else { return .ignored }
+        guard let selection, rows.indices.contains(selection) else { return false }
         let action = rows[selection]
         flash(action)
         perform?(action)
-        return .handled
+        return true
     }
 
     private func isSelected(_ action: A) -> Bool {
@@ -246,7 +256,17 @@ struct KeymapEditor<A: ActionSet>: View {
         guard flashOnPress, pressMonitor == nil else { return }
         pressMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let handled = MainActor.assumeIsolated { () -> Bool in
-                guard recording == nil, let pressed = KeyCombo(event: event) else { return false }
+                guard recording == nil else { return false }
+                // Panel navigation first - claimed HERE because menu key
+                // equivalents dispatch before any focused-view handler, and
+                // bare arrows are often an app action's menu representative.
+                switch event.keyCode {
+                case 125: move(1); return true // ↓
+                case 126: move(-1); return true // ↑
+                case 36: return fireSelection() // ⏎
+                default: break
+                }
+                guard let pressed = KeyCombo(event: event) else { return false }
                 // The focused filter field owns bare keys and shift-combos -
                 // typing must type. Chorded combos can't be typed, so they
                 // still teach by doing.
