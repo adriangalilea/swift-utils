@@ -1,0 +1,16 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Premium (dev toggle)": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Premium (interruptor dev)"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
