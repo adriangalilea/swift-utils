@@ -46,12 +46,19 @@ struct KeymapEditor<A: ActionSet>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextField(String(localized: "Filter actions", bundle: .module), text: $query)
-                .textFieldStyle(.roundedBorder)
-                .focused($filterFocused)
-                .onKeyPress(.downArrow) { move(1); return .handled }
-                .onKeyPress(.upArrow) { move(-1); return .handled }
-                .onKeyPress(.return) { fireSelection() }
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField(String(localized: "Filter actions", bundle: .module), text: $query)
+                    .textFieldStyle(.plain)
+                    .focused($filterFocused)
+                    .onKeyPress(.downArrow) { move(1); return .handled }
+                    .onKeyPress(.upArrow) { move(-1); return .handled }
+                    .onKeyPress(.return) { fireSelection() }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.white.opacity(filterFocused ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 8))
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
@@ -109,8 +116,8 @@ struct KeymapEditor<A: ActionSet>: View {
     private func staticSection(_ name: String, _ rows: [StaticShortcut]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(name)
-                .font(.caption.smallCaps())
-                .foregroundStyle(.tertiary)
+                .font(.caption.smallCaps().weight(.semibold))
+                .foregroundStyle(.secondary)
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 8) {
                     Text(row.what)
@@ -126,8 +133,8 @@ struct KeymapEditor<A: ActionSet>: View {
     private func sectionView(_ name: String, _ actions: [A]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(name)
-                .font(.caption.smallCaps())
-                .foregroundStyle(.tertiary)
+                .font(.caption.smallCaps().weight(.semibold))
+                .foregroundStyle(.secondary)
             ForEach(actions, id: \.self, content: row)
         }
     }
@@ -191,15 +198,10 @@ struct KeymapEditor<A: ActionSet>: View {
                     }
                 }
             } else {
-                Button {
+                AddSlot {
                     conflict = nil
                     recording = (action, plane)
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.caption2)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tertiary)
             }
         }
     }
@@ -240,6 +242,27 @@ struct KeymapEditor<A: ActionSet>: View {
             try? await Task.sleep(for: .milliseconds(350))
             if flashed == action { flashed = nil }
         }
+    }
+}
+
+/// The ＋ that records a new combo - a visible slot, not a ghost: a filled
+/// circle that brightens and sharpens on hover so it reads as pressable.
+private struct AddSlot: View {
+    let arm: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: arm) {
+            Image(systemName: "plus")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .frame(width: 18, height: 18)
+                .background(.white.opacity(hovering ? 0.22 : 0.09), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }
 
