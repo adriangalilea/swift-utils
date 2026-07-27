@@ -17,6 +17,12 @@ let package = Package(
         // dragging the keymap machine.
         .library(name: "Ink", targets: ["Ink"]),
         .library(name: "Keymap", targets: ["Keymap"]),
+        // The about/support tab every app drops into its Settings: bundle
+        // identity + author + links + the support ask, designed once.
+        .library(name: "Colophon", targets: ["Colophon"]),
+        // The premium gate shape: one boolean the app reads, dev-toggleable
+        // in every non-release build, compile-time sealed in release.
+        .library(name: "Entitlement", targets: ["Entitlement"]),
         // The system-wide shortcut overlay: a tiny background agent showing
         // the frontmost app's published keymap on one global chord (⌃⌘/).
         // Dogfood-first: `swift run keymap-overlay`.
@@ -29,6 +35,12 @@ let package = Package(
             dependencies: ["Ink"],
             resources: [.process("Resources")]
         ),
+        .target(
+            name: "Colophon",
+            dependencies: ["Ink"],
+            resources: [.process("Resources")]
+        ),
+        .target(name: "Entitlement", resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap"]),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
     ]
