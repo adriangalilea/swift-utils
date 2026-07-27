@@ -380,12 +380,12 @@ struct KeymapEditor<A: ActionSet>: View {
     }
 }
 
-/// The add slot while armed: captures the next keyDown as the new combo.
-/// Esc cancels. Bare modifiers don't resolve (KeyCombo(event:) is nil) so
-/// holding ⌘ while choosing the key works naturally.
+/// The add slot while armed - a skin over KeyCapture, like the grid's
+/// recording pill. Bare modifiers don't resolve (KeyCombo(event:) is nil)
+/// so holding ⌘ while choosing the key works naturally.
 private struct RecordingChip: View {
     let finish: (KeyCombo?) -> Void
-    @State private var monitor: Any?
+    @State private var capture: KeyCapture?
 
     var body: some View {
         Text(String(localized: "press keys…", bundle: .module))
@@ -395,23 +395,12 @@ private struct RecordingChip: View {
             .padding(.vertical, 1)
             .background(Color.inkRaised, in: RoundedRectangle(cornerRadius: 4))
             .onAppear {
-                monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                    MainActor.assumeIsolated {
-                        if event.keyCode == Key.escape {
-                            finish(nil)
-                        } else if let combo = KeyCombo(event: event) {
-                            finish(combo)
-                        } else {
-                            return
-                        }
-                    }
-                    return nil
-                }
+                capture = KeyCapture(
+                    onCombo: { combo in finish(combo); return true },
+                    onCancel: { finish(nil) }
+                )
             }
-            .onDisappear {
-                if let monitor { NSEvent.removeMonitor(monitor) }
-                monitor = nil
-            }
+            .onDisappear { capture = nil }
     }
 }
 

@@ -34,7 +34,7 @@ public struct KeymapGrid<A: ActionSet>: View {
     let sections: [ActionSection<A>]
 
     @State private var recording: RecordTarget<A>?
-    @State private var monitor: Any?
+    @State private var capture: KeyCapture?
     @State private var message = ""
 
     /// `sections` defaults to the registry's own grouping; pass more groups
@@ -208,38 +208,21 @@ public struct KeymapGrid<A: ActionSet>: View {
         }
         recording = target
         message = ""
-        if monitor == nil {
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                // Delivered on the main thread; NSEvent isn't Sendable, so
-                // only the swallow verdict crosses the isolation boundary.
-                let swallow = MainActor.assumeIsolated { handle(event) == nil }
-                return swallow ? nil : event
+        // A refused key (the STORE owns every binding rule) reports its
+        // verdict and keeps listening; an accepted one ends the session.
+        capture = KeyCapture(onCombo: { pressed in
+            if let rejection = store.add(pressed, plane: target.plane, to: target.action) {
+                message = rejection.message(for: pressed)
+                return false
             }
-        }
-    }
-
-    /// Swallows every key while recording: ⎋ cancels, a refused key (the
-    /// STORE owns every binding rule) reports its verdict and keeps
-    /// listening, anything else binds.
-    private func handle(_ event: NSEvent) -> NSEvent? {
-        guard let target = recording else { return event }
-        if event.keyCode == 53 { // esc
+            message = ""
             stopRecording()
-            return nil
-        }
-        guard let pressed = KeyCombo(event: event) else { return nil }
-        if let rejection = store.add(pressed, plane: target.plane, to: target.action) {
-            message = rejection.message(for: pressed)
-            return nil
-        }
-        message = ""
-        stopRecording()
-        return nil
+            return true
+        }, onCancel: stopRecording)
     }
 
     private func stopRecording() {
         recording = nil
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
+        capture = nil
     }
 }
