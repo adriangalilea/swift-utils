@@ -103,4 +103,21 @@ Local development: swap `url` for `path: ../../swift-utils`.
 
 ## Release
 
-Tag and push: `git tag 0.1.0 && git push --tags`. Git is the registry.
+Tag and push: `git tag 0.1.2 && git push --tags`. Git is the registry. SwiftPM has no manifest version field, so the tag is not a record of the version, it IS the version, and any file claiming otherwise is a second source of truth that will eventually disagree. Pushing the tag publishes the changelog and the GitHub Release.
+
+Mac apps invert this: an app bundle has a native version (`CFBundleShortVersionString`), so there the manifest is truth and CI derives the tag from it.
+
+The pipeline is itself a product here. `lib-release.yml` is reusable (`workflow_call`); any Swift library repo consumes it by ref:
+
+```yaml
+jobs:
+  release:
+    uses: adriangalilea/swift-utils/.github/workflows/lib-release.yml@ci-v1
+    permissions: { contents: write }
+```
+
+`ci-v1` is a moving major tag, deliberately NOT the library's semver: a Keymap patch and a pipeline change must never share a version number. Advance it for compatible pipeline changes, cut `ci-v2` when a consumer's call would break. Never pin a consumer to `@main`; a bad push here would then break their releases silently.
+
+The changelog format is `.github/cliff.toml`, which the workflow checks out into `.ci/` at `ci-v1`, so consuming repos inherit format fixes without copying the file. swift-utils calls its own workflow through `./` rather than `@ci-v1`, so the pipeline is always tested by the commit that changes it.
+
+Verify runs on `macos-26` (the package targets macOS 26); the release job runs on Linux, because a library release ships no binaries and git-cliff-action is a Docker action, which cannot run on macOS runners.

@@ -1,0 +1,85 @@
+# The release pipeline for a Swift LIBRARY: verify the tag, then publish notes.
+#
+# SwiftPM has no manifest version field and no registry: a package's version IS
+# its git tag, which is why nothing here writes a version anywhere. The tag is
+# the input, not the output. Cut a release with:
+#
+#   git tag 0.1.2 && git push --tags
+#
+# Mac APPS invert this, because an app bundle DOES have a native version
+# (CFBundleShortVersionString): there the manifest is truth and CI derives the
+# tag from it. See mac-app-release.yml.
+#
+# Consumers call this by ref, never by branch:
+#   on:
+#     push:
+#       tags: ['[0-9]+.[0-9]+.[0-9]+']
+#   jobs:
+#     release:
+#       uses: adriangalilea/swift-utils/.github/workflows/lib-release.yml@ci-v1
+#       permissions: { contents: write }
+name: lib release
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: Runner for build + test. Must satisfy the package's platforms.
+        type: string
+        default: macos-26
+      test:
+        description: Run `swift test`. Off for packages with no test target.
+        type: boolean
+        default: true
+      ci-ref:
+        description: swift-utils ref supplying the shared cliff.toml.
+        type: string
+        default: ci-v1
+
+jobs:
+  # The tag is already public by the time this runs, so verify cannot prevent a
+  # bad tag. What it prevents is a bad tag becoming a published RELEASE.
+  verify:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build
+        run: swift build -c release
+      - name: Test
+        if: inputs.test
+        run: swift test
+
+  release:
+    # Linux on purpose: a library release ships no binaries, and git-cliff-action
+    # is a Docker action, which cannot run on macOS runners.
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: The shared changelog format
+        uses: actions/checkout@v6
+        with:
+          repository: adriangalilea/swift-utils
+          ref: ${{ inputs.ci-ref }}
+          path: .ci
+
+      - name: Changelog
+        id: cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: .ci/cliff.toml
+          args: --latest
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          body: ${{ steps.cliff.outputs.content }}

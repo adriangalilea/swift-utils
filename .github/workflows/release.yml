@@ -1,0 +1,14 @@
+# swift-utils releasing itself through the same reusable workflow every consumer
+# calls. Local ref (./) rather than @ci-v1 on purpose: the pipeline must be tested
+# by the commit that changes it, not by the last tagged copy of itself.
+name: release
+
+on:
+  push:
+    tags: ['[0-9]+.[0-9]+.[0-9]+']
+
+jobs:
+  release:
+    uses: ./.github/workflows/lib-release.yml
+    permissions:
+      contents: write

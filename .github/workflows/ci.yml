@@ -1,0 +1,20 @@
+# The gate on the way in. Releases fire on a tag, which is AFTER the fact, so
+# this is the only thing standing between a broken main and a broken tag.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+      - run: swift build -c release
+      - run: swift test
