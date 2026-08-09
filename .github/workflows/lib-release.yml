@@ -67,12 +67,20 @@ jobs:
           repository: adriangalilea/swift-utils
           ref: ${{ inputs.ci-ref }}
           path: .ci
+          sparse-checkout: .github/cliff.toml
+          sparse-checkout-cone-mode: false
+
+      # git-cliff WARNS and falls back to its built-in config when the file is
+      # missing, so a wrong path ships plausible-looking notes in the wrong
+      # format with the wrong version header. Make it fatal instead.
+      - name: The format must exist
+        run: test -f .ci/.github/cliff.toml
 
       - name: Changelog
         id: cliff
         uses: orhun/git-cliff-action@v4
         with:
-          config: .ci/cliff.toml
+          config: .ci/.github/cliff.toml
           args: --latest
         env:
           OUTPUT: CHANGELOG.md

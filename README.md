@@ -103,7 +103,7 @@ Local development: swap `url` for `path: ../../swift-utils`.
 
 ## Release
 
-Tag and push: `git tag 0.1.2 && git push --tags`. Git is the registry. SwiftPM has no manifest version field, so the tag is not a record of the version, it IS the version, and any file claiming otherwise is a second source of truth that will eventually disagree. Pushing the tag publishes the changelog and the GitHub Release.
+Tag and push: `git tag 0.1.2 && git push --tags`. Git is the registry. Push the tag ON ITS OWN: a tag pushed in the same command as a branch produces no tag event, so the release silently never fires. SwiftPM has no manifest version field, so the tag is not a record of the version, it IS the version, and any file claiming otherwise is a second source of truth that will eventually disagree. Pushing the tag publishes the changelog and the GitHub Release.
 
 Mac apps invert this: an app bundle has a native version (`CFBundleShortVersionString`), so there the manifest is truth and CI derives the tag from it.
 
