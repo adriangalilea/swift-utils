@@ -19,6 +19,11 @@ extension ShapeStyle where Self == Color {
     public static var inkSelection: Color { .white.opacity(0.22) }
     /// The stroke that separates a selected/active region from the glass.
     public static var inkEdge: Color { .white.opacity(0.38) }
+    /// THE highlight color - the one hue for "a moment the user marked"
+    /// (karaoke gold words, scrubber ticks/spans, timeline markers).
+    /// One color, alpha tiers only, per the flare rule: full for the mark
+    /// itself, ~0.55 for spans/corridors. Never a second yellow per app.
+    public static var inkGold: Color { .yellow }
 }
 
 /// The radius ladder - four sizes, named by WHAT wears them, so two
@@ -82,6 +87,9 @@ public struct ShortcutBadge: View {
     }
 }
 
+// Pointer-shaped micro-components (.onHover/.help) - mac-only by nature,
+// not by neglect: a hover affordance has no meaning under a focus engine.
+#if os(macOS)
 /// A bound accelerator: a keycap showing the combo (glyphs read as the keys
 /// they are). The chip IS the remove control - on hover it turns red and
 /// shows an ✕ over the combo, the tag-delete idiom. Zero reserved space (no
@@ -148,6 +156,7 @@ public struct AddSlot: View {
         .animation(.inkFlick, value: hovering)
     }
 }
+#endif
 
 
 /// THE LAW OF NAVIGABLE SURFACES: a keyboard cursor must never leave its
