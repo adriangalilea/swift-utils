@@ -11,7 +11,7 @@ import SwiftUI
 /// 2. Typing guard - a focused text input owns the keyboard; bare-key and
 ///    plain-shift combos never fire over it (⌘-chords still do).
 /// 3. `store.match`, then the app's policy hook - `shouldRoute` decides if
-///    the action fires RIGHT NOW (lore's needsVideo, list-nav cession,
+///    the action fires RIGHT NOW (a needs-media gate, list-nav cession,
 ///    modal state). Return false to pass the event to the responder chain.
 @MainActor
 public final class LocalKeyRouter<A: ActionSet> {

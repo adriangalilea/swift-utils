@@ -26,7 +26,7 @@ public struct ComboFamily: Sendable {
     }
 }
 
-/// Keys lore-era apps persisted remaps under, so adoption migrates users'
+/// Keys pre-adoption apps persisted remaps under, so adoption migrates users'
 /// customizations instead of losing them. Read once on first init (the new
 /// store key absent, a legacy key present), rewritten into the new shape;
 /// the legacy values are left in place as a rollback breadcrumb.

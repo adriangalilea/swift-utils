@@ -120,7 +120,7 @@ store.publish(appName: "myapp", accent: "#8FA98C")
 
 Titles are declared with literal `String(localized:)` so compiler extraction (`SWIFT_EMIT_LOC_STRINGS`) lands them in the app's string catalog - a plain literal would ship untranslatable.
 
-The library owns routing primitives; policy stays in the app: `canPerform`/`shouldRoute` decide whether an action fires right now - focus arbitration is deliberately NOT a library concept (lore's rules proved it unabstractable).
+The library owns routing primitives; policy stays in the app: `canPerform`/`shouldRoute` decide whether an action fires right now - focus arbitration is deliberately NOT a library concept (a real app's rules proved it unabstractable).
 
 ## keymap-overlay (WIP - parked)
 
