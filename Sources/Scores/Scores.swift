@@ -1,3 +1,4 @@
+import Ink
 import SwiftUI
 
 // The SCORE vocabulary: one chip per source wearing its source's REAL
@@ -33,14 +34,14 @@ public struct ScoreChip: View {
         switch source {
         case .imdb:
             HStack(spacing: 7) {
-                BrandMark(.imdb, height: 26)
+                BrandMark(Brand.imdb, height: 26)
                 Text(one(value)).font(.callout.weight(.semibold)).monospacedDigit()
             }
         case .rtCritic, .rtAudience:
             HStack(spacing: 7) {
                 // Fresh wears the tomato, rotten the splat green - the one
                 // place a semantic tint overrides the brand's own color.
-                BrandMark(.rottentomatoes, height: 22,
+                BrandMark(Brand.rottentomatoes, height: 22,
                           tint: value >= 60 ? nil : Color(red: 0.42, green: 0.62, blue: 0.14))
                 Text("\(Int(value))%").font(.callout.weight(.semibold)).monospacedDigit()
             }
@@ -68,7 +69,7 @@ public struct ScoreChip: View {
             }
         case .tmdb:
             HStack(spacing: 7) {
-                BrandMark(.themoviedatabase, height: 18)
+                BrandMark(Brand.themoviedatabase, height: 18)
                 Text(one(value)).font(.callout.weight(.semibold)).monospacedDigit()
             }
         case .user:

@@ -6,26 +6,34 @@ Swift utilities for mac apps. The sibling of [ts-utils](https://github.com/adria
 
 The styling atoms every product builds on: the `ink*` fill ladder for dark-glass surfaces (five semantic roles), the radius ladder (`.inkChip/.inkRow/.inkField/.inkPanel`), the motion ladder (`.inkFlick/.inkSettle`), the spacing ladder (`.inkTight/.inkGap/.inkLane/.inkBlock`) - no raw values at call sites - plus `planeHeaderStyle` and the micro-components: `ShortcutBadge` (the one key-cap), `ComboChip` (keycap with hover-✕ remove), `AddSlot` (the pressable ＋), `CursorScrollView` (the center-locked law of navigable surfaces). No dependencies; other products consume it without the keymap machine.
 
-Ink also carries the pieces every surface repeats: `Pill` / `PersonPill` / `PillButtonStyle` (the leading slot - avatar or icon, always - is a circle whose diameter is the pill's height, flush at the left end, so its curvature IS the cap's curvature), `inkEdgeFade` (the law of scrolling regions: content near a scroll edge fades, never cuts mid-element; mask-based, so it works over any background), and `ScoreChip` / `ScoreStrip` (one chip per ratings source, each value in that source's own scale).
+Ink also carries the pieces every surface repeats: `Pill` / `PersonPill` / `PillButtonStyle` (the leading slot - avatar or icon, always - is a circle whose diameter is the pill's height, flush at the left end, so its curvature IS the cap's curvature), `inkEdgeFade` (the law of scrolling regions: content near a scroll edge fades, never cuts mid-element; mask-based, so it works over any background), and the brand-mark machinery below.
 
 ## Brands (`brandgen`)
 
 Any brand mark, natively, with no runtime SVG engine and no dependency. Swift has nothing like react-icons: SF Symbols excludes brands by trademark policy, and every third-party option is either an icon-font relic or a runtime parser. But asset catalogs compile SVG with vector preservation and template rendering, so the only missing piece was a way to GET the artwork.
 
 ```bash
-swift run brandgen add spotify netflix   # fetch + regenerate the enum
-swift run brandgen sync                  # refetch what already ships
+swift run brandgen add spotify netflix          # into Scores (the default target)
+swift run brandgen add figma --into MyProduct   # another target in this package
+swift run brandgen add acme \                   # ...or any app, anywhere
+  --catalog ~/app/Assets.xcassets --out ~/app/Brands.generated.swift
 ```
 
 Upstream is [simple-icons](https://simpleicons.org) (CC0, ~3.4k brands): one SVG per slug, plus a data file carrying each brand's OFFICIAL hex - so colors are the brand's own, never hand-transcribed by whoever added the icon. **The catalog is the manifest**: one imageset per brand on disk, committed, and `Brand` is generated from it - no second list to drift, and a fresh clone builds offline (the network is only for adding a brand).
 
+**BRANDS LIVE WITH THEIR CONSUMER, and Ink ships none.** Resources are not code: the linker dead-strips unused code, but a resource ships whether or not anything renders it (asset names resolve by string at runtime, so per-asset usage is undecidable). A brand added to the base layer every app links would ride along forever - so Ink owns only `BrandMarkable` + `BrandMark`, and each module generates the catalog it actually renders. Zero brand bytes by construction, not by discipline.
+
 ```swift
-BrandMark(.imdb, height: 26)                          // official color
-BrandMark(.rottentomatoes, height: 22, tint: .green)  // semantic override
-Brand.github.luminance                                // 0.091 - vanishes on dark
+BrandMark(Brand.imdb, height: 26)                          // official color
+BrandMark(Brand.rottentomatoes, height: 22, tint: .green)  // semantic override
+Brand.metacritic.luminance                                 // 0.0 - vanishes on dark
 ```
 
-Marks are template images: they carry shape, never color. `luminance` is the fact a dark-surface consumer needs, resolved at generation time - a brand whose official color is near-black (GitHub's #181717, Metacritic's #000000) wants a shape-based treatment or an explicit tint, never a silent repaint of someone's logo.
+Marks are template images: they carry shape, never color. `luminance` is the fact a dark-surface consumer needs, resolved at generation time - a brand whose official color is near-black (Metacritic's #000000, GitHub's #181717) wants a shape-based treatment or an explicit tint, never a silent repaint of someone's logo.
+
+## Scores
+
+The media-ratings vocabulary and the only place the ratings brands ship: `ScoreChip` / `ScoreStrip`, one chip per source with each value in that source's own scale (IMDb 0-10, RT and Metacritic 0-100, Letterboxd pre-scaled 0-10). Two sources get shape-based chips rather than a logo, and they are exactly the two whose official color is unusable on dark: Metacritic's colored box that IS the number, and Letterboxd's tri-color dots. An app that shows no ratings links no ratings logos.
 
 ## Gallery
 
