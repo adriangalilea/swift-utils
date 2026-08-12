@@ -38,6 +38,10 @@ let package = Package(
         // the frontmost app's published keymap on one global chord (⌃⌘/).
         // Dogfood-first: `swift run keymap-overlay`.
         .executable(name: "keymap-overlay", targets: ["keymap-overlay"]),
+        // Any brand mark, natively: fetches simple-icons artwork (CC0) into
+        // Ink's asset catalog and regenerates the typed `Brand` enum with
+        // each brand's OFFICIAL color. `swift run brandgen add <slug>...`.
+        .executable(name: "brandgen", targets: ["brandgen"]),
         // Gallery's gate + demo: `swift run gallery-example --check` runs
         // the kernel invariants headless (nonzero exit on failure);
         // without the flag it opens a demo window with the keyboard walk
@@ -60,6 +64,7 @@ let package = Package(
         .target(name: "Gallery", dependencies: ["Ink"]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap"]),
         .executableTarget(name: "gallery-example", dependencies: ["Gallery"]),
+        .executableTarget(name: "brandgen"),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
     ]
 )

@@ -1,12 +1,14 @@
 import SwiftUI
 
 // The SCORE vocabulary: one chip per source wearing its source's REAL
-// brand glyph (Simple Icons CC0 monochrome SVGs in Scores.xcassets,
-// template-rendered and tinted the brand color) beside the value in that
-// source's OWN scale. Two deliberate exceptions where the brand IS a
-// shape: Metacritic's colored box that IS the number, and Letterboxd's
-// tri-color dots (the mono glyph would lose the three colors). Composable:
-// a strip is just chips in a row; consumers pick which sources ride.
+// brand mark (BrandMark over the generated `Brand` enum - artwork and
+// official colors both from upstream, never hand-transcribed here)
+// beside the value in that source's OWN scale. Two deliberate exceptions
+// where the brand IS a shape, and they are exactly the two whose official
+// color is unusable on a dark surface: Metacritic's colored box that IS
+// the number (#000000), and Letterboxd's tri-color dots (#202830, and a
+// mono glyph would lose the three colors). Composable: a strip is chips
+// in a row; consumers pick which sources ride.
 
 public enum ScoreSource: String, Sendable {
     case imdb          // 0-10
@@ -31,19 +33,15 @@ public struct ScoreChip: View {
         switch source {
         case .imdb:
             HStack(spacing: 7) {
-                Image("imdb", bundle: .module)
-                    .renderingMode(.template)
-                    .resizable().scaledToFit().frame(height: 26)
-                    .foregroundStyle(Color(red: 0.96, green: 0.77, blue: 0.09))
+                BrandMark(.imdb, height: 26)
                 Text(one(value)).font(.callout.weight(.semibold)).monospacedDigit()
             }
         case .rtCritic, .rtAudience:
             HStack(spacing: 7) {
-                Image("rottentomatoes", bundle: .module)
-                    .renderingMode(.template)
-                    .resizable().scaledToFit().frame(height: 22)
-                    // Fresh wears the tomato, rotten the splat green.
-                    .foregroundStyle(value >= 60 ? Color(red: 0.98, green: 0.20, blue: 0.04) : Color(red: 0.42, green: 0.62, blue: 0.14))
+                // Fresh wears the tomato, rotten the splat green - the one
+                // place a semantic tint overrides the brand's own color.
+                BrandMark(.rottentomatoes, height: 22,
+                          tint: value >= 60 ? nil : Color(red: 0.42, green: 0.62, blue: 0.14))
                 Text("\(Int(value))%").font(.callout.weight(.semibold)).monospacedDigit()
             }
         case .metacritic:
@@ -70,10 +68,7 @@ public struct ScoreChip: View {
             }
         case .tmdb:
             HStack(spacing: 7) {
-                Image("themoviedatabase", bundle: .module)
-                    .renderingMode(.template)
-                    .resizable().scaledToFit().frame(height: 18)
-                    .foregroundStyle(Color(red: 0.00, green: 0.71, blue: 0.89))
+                BrandMark(.themoviedatabase, height: 18)
                 Text(one(value)).font(.callout.weight(.semibold)).monospacedDigit()
             }
         case .user:

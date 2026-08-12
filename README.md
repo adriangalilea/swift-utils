@@ -6,6 +6,37 @@ Swift utilities for mac apps. The sibling of [ts-utils](https://github.com/adria
 
 The styling atoms every product builds on: the `ink*` fill ladder for dark-glass surfaces (five semantic roles), the radius ladder (`.inkChip/.inkRow/.inkField/.inkPanel`), the motion ladder (`.inkFlick/.inkSettle`), the spacing ladder (`.inkTight/.inkGap/.inkLane/.inkBlock`) - no raw values at call sites - plus `planeHeaderStyle` and the micro-components: `ShortcutBadge` (the one key-cap), `ComboChip` (keycap with hover-✕ remove), `AddSlot` (the pressable ＋), `CursorScrollView` (the center-locked law of navigable surfaces). No dependencies; other products consume it without the keymap machine.
 
+Ink also carries the pieces every surface repeats: `Pill` / `PersonPill` / `PillButtonStyle` (the leading slot - avatar or icon, always - is a circle whose diameter is the pill's height, flush at the left end, so its curvature IS the cap's curvature), `inkEdgeFade` (the law of scrolling regions: content near a scroll edge fades, never cuts mid-element; mask-based, so it works over any background), and `ScoreChip` / `ScoreStrip` (one chip per ratings source, each value in that source's own scale).
+
+## Brands (`brandgen`)
+
+Any brand mark, natively, with no runtime SVG engine and no dependency. Swift has nothing like react-icons: SF Symbols excludes brands by trademark policy, and every third-party option is either an icon-font relic or a runtime parser. But asset catalogs compile SVG with vector preservation and template rendering, so the only missing piece was a way to GET the artwork.
+
+```bash
+swift run brandgen add spotify netflix   # fetch + regenerate the enum
+swift run brandgen sync                  # refetch what already ships
+```
+
+Upstream is [simple-icons](https://simpleicons.org) (CC0, ~3.4k brands): one SVG per slug, plus a data file carrying each brand's OFFICIAL hex - so colors are the brand's own, never hand-transcribed by whoever added the icon. **The catalog is the manifest**: one imageset per brand on disk, committed, and `Brand` is generated from it - no second list to drift, and a fresh clone builds offline (the network is only for adding a brand).
+
+```swift
+BrandMark(.imdb, height: 26)                          // official color
+BrandMark(.rottentomatoes, height: 22, tint: .green)  // semantic override
+Brand.github.luminance                                // 0.091 - vanishes on dark
+```
+
+Marks are template images: they carry shape, never color. `luminance` is the fact a dark-surface consumer needs, resolved at generation time - a brand whose official color is near-black (GitHub's #181717, Metacritic's #000000) wants a shape-based treatment or an explicit tint, never a silent repaint of someone's logo.
+
+## Gallery
+
+The library-grid product: a framework-free layout kernel plus the SwiftUI shell, cross-platform by design - macOS binds keyboards to the kernels, tvOS lets the focus engine drive the same geometry.
+
+- `GalleryPack.justifiedRows` - greedy justified rows (every row fills the width, each item at its TRUE aspect). **Prefix-stable**: a row is emitted the moment it fills, on its own items alone, so appending a page can only re-pack the old last row - the property paging stands on when nothing may reflow under a cursor or a focus engine.
+- `GallerySelection` - the 3-mode selection verb (replace / toggle / range) with anchor+cursor discipline and the 2D ragged-row walk. Pure state over `(orderedItems, Set)`, zero UI: the host binds the inputs.
+- `GalleryView` - observation-agnostic (plain values + closures, never a god-object), with `rowFocusSections` as the tvOS focus fallback and `galleryZoomSource`/`galleryZoomDestination` wrapping the system zoom navigation transition, so a card expands into its page and collapses back.
+
+Gate: `swift run gallery-example --check` asserts the kernel invariants headless (row fill, append stability, every selection law); without the flag it opens a demo window with the keyboard walk wired.
+
 ## Colophon
 
 The about/support Settings tab, designed once: app identity (name, version, build, icon) derived from the running bundle so it can never drift, the author byline, external links, the support ask, and an optional check-for-updates hook (Sparkle stays app-side, pass a closure).
