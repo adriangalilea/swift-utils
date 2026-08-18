@@ -1,5 +1,7 @@
 # The gate on the way in. Releases fire on a tag, which is AFTER the fact, so
 # this is the only thing standing between a broken main and a broken tag.
+# check = format + release build + tests; the diff step makes format-clean a
+# hard requirement (swift-format changes nothing).
 name: ci
 
 on:
@@ -12,9 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  check:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
-      - run: swift build -c release
-      - run: swift test
+      - uses: jdx/mise-action@v3
+      - run: mise run check
+      - run: git diff --exit-code

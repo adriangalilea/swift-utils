@@ -1,8 +1,26 @@
+# swift-utils verbs (`mise <task>` from the repo root; `mise tasks` lists them).
+# check = format + build + test, what CI runs; format-clean is the gate.
+
 [tasks.build]
+description = "swift build (debug)"
 run = "swift build"
 
 [tasks.test]
+description = "swift test"
 run = "swift test"
 
+[tasks.format]
+description = "swift-format in place (the Xcode toolchain's, studio config: .swift-format)"
+run = "xcrun swift-format --recursive Sources/ Tests/ --in-place"
+
+[tasks.lint]
+description = "swift-format lint, advisory (format-clean is the gate, not lint taste)"
+run = "xcrun swift-format lint --recursive Sources/ Tests/"
+
+[tasks.check]
+description = "format + build (release) + test: the gate"
+run = ["mise run format", "swift build -c release", "mise run test", "echo 'swift-utils: check passed'"]
+
 [tasks.overlay]
+description = "Run the keymap overlay example"
 run = "swift run keymap-overlay"
