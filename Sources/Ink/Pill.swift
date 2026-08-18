@@ -29,13 +29,13 @@ public struct Pill<Leading: View, Content: View>: View {
         HStack(spacing: height * 0.18) {
             leading
                 .frame(width: height, height: height)
-                .clipShape(Circle())   // round, always - diameter = height = the cap's own circle
+                .clipShape(Circle())  // round, always - diameter = height = the cap's own circle
             content
                 .padding(.trailing, height * 0.42)
         }
         .frame(height: height)
         .background(tint, in: Capsule())
-        .contentShape(Capsule())       // hit/focus shape = the visible shape
+        .contentShape(Capsule())  // hit/focus shape = the visible shape
     }
 }
 
@@ -48,7 +48,10 @@ public struct PersonPill<Portrait: View>: View {
     let height: CGFloat
     let portrait: Portrait
 
-    public init(name: String, detail: String? = nil, height: CGFloat = 64, @ViewBuilder portrait: () -> Portrait) {
+    public init(
+        name: String, detail: String? = nil, height: CGFloat = 64,
+        @ViewBuilder portrait: () -> Portrait
+    ) {
         self.name = name
         self.detail = detail
         self.height = height

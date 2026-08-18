@@ -18,7 +18,9 @@ final class Overlay {
     func start() {
         // ⌃⌘/ - kVK_ANSI_Slash is 44; modifiers via the same Carbon masks
         // the library uses.
-        hotkey = GlobalHotkey(keyCode: 44, modifiers: KeyCombo("/", [.command, .control]).carbonModifiers) { [weak self] in
+        hotkey = GlobalHotkey(
+            keyCode: 44, modifiers: KeyCombo("/", [.command, .control]).carbonModifiers
+        ) { [weak self] in
             MainActor.assumeIsolated { self?.toggle() }
         }
         // The built-in contract: any click anywhere, or an app switch (the
@@ -27,7 +29,10 @@ final class Overlay {
     }
 
     private func toggle() {
-        if float.isVisible { float.dismiss(); return }
+        if float.isVisible {
+            float.dismiss()
+            return
+        }
         let front = NSWorkspace.shared.frontmostApplication
         let manifest = front?.bundleIdentifier.flatMap(Self.manifest(for:))
         float.show(
@@ -37,7 +42,9 @@ final class Overlay {
     }
 
     private static func manifest(for bundleID: String) -> KeymapManifest? {
-        guard let data = try? Data(contentsOf: KeymapManifest.url(forBundleID: bundleID)) else { return nil }
+        guard let data = try? Data(contentsOf: KeymapManifest.url(forBundleID: bundleID)) else {
+            return nil
+        }
         return try? JSONDecoder().decode(KeymapManifest.self, from: data)
     }
 }

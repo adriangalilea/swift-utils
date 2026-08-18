@@ -33,25 +33,31 @@ import Foundation
 
 // ---- locations (package-root relative, so `swift run` works anywhere) ----
 
-let root = URL(fileURLWithPath: #filePath)          // Sources/brandgen/main.swift
-    .deletingLastPathComponent()                    // Sources/brandgen
-    .deletingLastPathComponent()                    // Sources
-    .deletingLastPathComponent()                    // <package root>
+let root = URL(fileURLWithPath: #filePath)  // Sources/brandgen/main.swift
+    .deletingLastPathComponent()  // Sources/brandgen
+    .deletingLastPathComponent()  // Sources
+    .deletingLastPathComponent()  // <package root>
 
 func flag(_ name: String) -> String? {
     guard let i = CommandLine.arguments.firstIndex(of: "--" + name),
-          i + 1 < CommandLine.arguments.count else { return nil }
+        i + 1 < CommandLine.arguments.count
+    else { return nil }
     return CommandLine.arguments[i + 1]
 }
 
 let target = flag("into") ?? "Scores"
-let catalog = flag("catalog").map { URL(filePath: ($0 as NSString).expandingTildeInPath) }
+let catalog =
+    flag("catalog").map { URL(filePath: ($0 as NSString).expandingTildeInPath) }
     ?? root.appending(path: "Sources/\(target)/Resources/Brands.xcassets")
-let generated = flag("out").map { URL(filePath: ($0 as NSString).expandingTildeInPath) }
+let generated =
+    flag("out").map { URL(filePath: ($0 as NSString).expandingTildeInPath) }
     ?? root.appending(path: "Sources/\(target)/Brands.generated.swift")
 
 let iconsBase = "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/"
-let dataURL = URL(string: "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json")!
+let dataURL = URL(
+    string:
+        "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/data/simple-icons.json"
+)!
 
 func die(_ message: String) -> Never {
     FileHandle.standardError.write(Data(("brandgen: " + message + "\n").utf8))
@@ -63,7 +69,7 @@ func die(_ message: String) -> Never {
 struct IconEntry: Decodable {
     let title: String
     let hex: String
-    let slug: String?   // present only where the derived slug needed an override
+    let slug: String?  // present only where the derived slug needed an override
 }
 
 /// simple-icons' own title -> slug rule, ported. Their data file names
@@ -71,9 +77,11 @@ struct IconEntry: Decodable {
 /// override, so reading hexes back out means deriving the same key they do.
 func slugify(_ title: String) -> String {
     var s = title.lowercased()
-    for (from, to) in [("+", "plus"), (".", "dot"), ("&", "and"),
-                       ("đ", "d"), ("ħ", "h"), ("ı", "i"), ("ĸ", "k"),
-                       ("ŀ", "l"), ("ł", "l"), ("ß", "ss"), ("ŧ", "t")] {
+    for (from, to) in [
+        ("+", "plus"), (".", "dot"), ("&", "and"),
+        ("đ", "d"), ("ħ", "h"), ("ı", "i"), ("ĸ", "k"),
+        ("ŀ", "l"), ("ł", "l"), ("ß", "ss"), ("ŧ", "t"),
+    ] {
         s = s.replacingOccurrences(of: from, with: to)
     }
     s = s.folding(options: .diacriticInsensitive, locale: nil)
@@ -83,7 +91,8 @@ func slugify(_ title: String) -> String {
 
 func fetch(_ url: URL) async -> Data? {
     guard let (data, resp) = try? await URLSession.shared.data(from: url),
-          (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        (resp as? HTTPURLResponse)?.statusCode == 200
+    else { return nil }
     return data
 }
 
@@ -107,8 +116,9 @@ func installed() -> [String] {
 }
 
 func write(_ text: String, to url: URL) {
-    do { try text.write(to: url, atomically: true, encoding: .utf8) }
-    catch { die("cannot write \(url.path()): \(error.localizedDescription)") }
+    do { try text.write(to: url, atomically: true, encoding: .utf8) } catch {
+        die("cannot write \(url.path()): \(error.localizedDescription)")
+    }
 }
 
 /// Fetch one brand's artwork into its imageset. The SVG fetch is the
@@ -120,23 +130,27 @@ func install(_ slug: String) async {
     }
     let dir = catalog.appending(path: "\(slug).imageset")
     try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    do { try svg.write(to: dir.appending(path: "\(slug).svg")) }
-    catch { die("cannot write the svg for \(slug): \(error.localizedDescription)") }
-    write("""
-    {
-      "images" : [ { "filename" : "\(slug).svg", "idiom" : "universal" } ],
-      "info" : { "author" : "brandgen", "version" : 1 },
-      "properties" : { "preserves-vector-representation" : true, "template-rendering-intent" : "template" }
+    do { try svg.write(to: dir.appending(path: "\(slug).svg")) } catch {
+        die("cannot write the svg for \(slug): \(error.localizedDescription)")
     }
+    write(
+        """
+        {
+          "images" : [ { "filename" : "\(slug).svg", "idiom" : "universal" } ],
+          "info" : { "author" : "brandgen", "version" : 1 },
+          "properties" : { "preserves-vector-representation" : true, "template-rendering-intent" : "template" }
+        }
 
-    """, to: dir.appending(path: "Contents.json"))
+        """, to: dir.appending(path: "Contents.json"))
 }
 
 // ---- codegen ----
 
-let swiftKeywords: Set<String> = ["class", "enum", "struct", "protocol", "extension", "func",
-                                  "import", "return", "static", "public", "internal", "private",
-                                  "true", "false", "nil", "self", "super", "where", "default"]
+let swiftKeywords: Set<String> = [
+    "class", "enum", "struct", "protocol", "extension", "func",
+    "import", "return", "static", "public", "internal", "private",
+    "true", "false", "nil", "self", "super", "where", "default",
+]
 
 func caseName(_ slug: String) -> String {
     // Swift identifiers cannot open with a digit (backticks do not help);
@@ -157,66 +171,76 @@ func fmt(_ v: Double) -> String { String(format: "%.3f", v) }
 func regenerate(_ index: [String: IconEntry]) {
     let slugs = installed()
     guard !slugs.isEmpty else { die("the catalog holds no brands - `brandgen add <slug>` first") }
-    var cases: [String] = [], titles: [String] = [], colors: [String] = [], lums: [String] = []
+    var cases: [String] = []
+    var titles: [String] = []
+    var colors: [String] = []
+    var lums: [String] = []
     for slug in slugs {
         guard let e = index[slug] else {
-            die("\(slug) is in the catalog but not upstream - it was renamed or withdrawn; delete the imageset or fix the slug")
+            die(
+                "\(slug) is in the catalog but not upstream - it was renamed or withdrawn; delete the imageset or fix the slug"
+            )
         }
         let (r, g, b) = components(e.hex)
         cases.append("    case \(caseName(slug)) = \"\(slug)\"")
-        titles.append("        case .\(caseName(slug)): \"\(e.title.replacingOccurrences(of: "\"", with: "\\\""))\"")
-        colors.append("        case .\(caseName(slug)): Color(red: \(fmt(r)), green: \(fmt(g)), blue: \(fmt(b)))  // #\(e.hex)")
+        titles.append(
+            "        case .\(caseName(slug)): \"\(e.title.replacingOccurrences(of: "\"", with: "\\\""))\""
+        )
+        colors.append(
+            "        case .\(caseName(slug)): Color(red: \(fmt(r)), green: \(fmt(g)), blue: \(fmt(b)))  // #\(e.hex)"
+        )
         // Rec. 709 relative luminance, resolved at generation time - the
         // fact a dark-surface consumer needs, stated instead of eyeballed.
         lums.append("        case .\(caseName(slug)): \(fmt(0.2126 * r + 0.7152 * g + 0.0722 * b))")
     }
-    write("""
-    // GENERATED by `swift run brandgen`. Do not edit - add a brand and
-    // regenerate instead. Artwork + colors: simple-icons (CC0).
-    //
-    // This enum belongs to the module that RENDERS these marks: resources
-    // cannot be tree-shaken, so brands never live in a shared base layer
-    // (Ink/Brand.swift states the rule). Marks are TEMPLATE images -
-    // shape, never color - so a consumer can tint them semantically while
-    // `color` stays the brand's own official hex.
-    import Ink
-    import SwiftUI
+    write(
+        """
+        // GENERATED by `swift run brandgen`. Do not edit - add a brand and
+        // regenerate instead. Artwork + colors: simple-icons (CC0).
+        //
+        // This enum belongs to the module that RENDERS these marks: resources
+        // cannot be tree-shaken, so brands never live in a shared base layer
+        // (Ink/Brand.swift states the rule). Marks are TEMPLATE images -
+        // shape, never color - so a consumer can tint them semantically while
+        // `color` stays the brand's own official hex.
+        import Ink
+        import SwiftUI
 
-    public enum Brand: String, CaseIterable, Sendable, BrandMarkable {
-    \(cases.joined(separator: "\n"))
+        public enum Brand: String, CaseIterable, Sendable, BrandMarkable {
+        \(cases.joined(separator: "\n"))
 
-        /// The brand's own name, as its owner writes it.
-        public var title: String {
-            switch self {
-    \(titles.joined(separator: "\n"))
+            /// The brand's own name, as its owner writes it.
+            public var title: String {
+                switch self {
+        \(titles.joined(separator: "\n"))
+                }
+            }
+
+            /// The official brand color.
+            public var color: Color {
+                switch self {
+        \(colors.joined(separator: "\n"))
+                }
+            }
+
+            /// Relative luminance of `color` (0 black … 1 white). A brand whose
+            /// official color is near-black - GitHub's #181717, Metacritic's
+            /// #000000 - vanishes on a dark surface, and the answer there is a
+            /// shape-based treatment or an explicit tint, never a silent repaint
+            /// of someone's logo.
+            public var luminance: Double {
+                switch self {
+        \(lums.joined(separator: "\n"))
+                }
+            }
+
+            /// The mark itself, template-rendered (untinted).
+            public var image: Image {
+                Image(rawValue, bundle: .module).renderingMode(.template)
             }
         }
 
-        /// The official brand color.
-        public var color: Color {
-            switch self {
-    \(colors.joined(separator: "\n"))
-            }
-        }
-
-        /// Relative luminance of `color` (0 black … 1 white). A brand whose
-        /// official color is near-black - GitHub's #181717, Metacritic's
-        /// #000000 - vanishes on a dark surface, and the answer there is a
-        /// shape-based treatment or an explicit tint, never a silent repaint
-        /// of someone's logo.
-        public var luminance: Double {
-            switch self {
-    \(lums.joined(separator: "\n"))
-            }
-        }
-
-        /// The mark itself, template-rendered (untinted).
-        public var image: Image {
-            Image(rawValue, bundle: .module).renderingMode(.template)
-        }
-    }
-
-    """, to: generated)
+        """, to: generated)
     print("brandgen: \(slugs.count) brands -> \(generated.lastPathComponent)")
 }
 

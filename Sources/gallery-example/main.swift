@@ -7,6 +7,6 @@ import SwiftUI
 // the keyboard walk and selection grammar wired the way a host app would.
 
 if CommandLine.arguments.contains("--check") {
-    runChecks()   // never returns
+    runChecks()  // never returns
 }
 DemoApp.main()

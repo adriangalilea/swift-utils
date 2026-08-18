@@ -27,7 +27,9 @@ public enum GalleryPack {
     /// The one aspect clamp: one extreme panorama or sliver must never own
     /// a whole row. Callers clamp BEFORE packing so layout and cell render
     /// read the same number.
-    public static func clamped(_ aspect: CGFloat, to range: ClosedRange<CGFloat> = 0.45...2.6) -> CGFloat {
+    public static func clamped(_ aspect: CGFloat, to range: ClosedRange<CGFloat> = 0.45...2.6)
+        -> CGFloat
+    {
         max(range.lowerBound, min(range.upperBound, aspect))
     }
 

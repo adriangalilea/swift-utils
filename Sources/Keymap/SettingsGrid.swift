@@ -115,8 +115,11 @@ public struct KeymapGrid<A: ActionSet>: View {
             if !combos.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(combos, id: \.self) { combo in
-                        globalAdvisory(ComboChip(combo.display) { store.remove(combo, plane: plane, from: action) },
-                                       combo: combo, plane: plane)
+                        globalAdvisory(
+                            ComboChip(combo.display) {
+                                store.remove(combo, plane: plane, from: action)
+                            },
+                            combo: combo, plane: plane)
                     }
                 }
                 .padding(.leading, 14)
@@ -129,22 +132,31 @@ public struct KeymapGrid<A: ActionSet>: View {
     /// currently uses may never reach us (warning tint). Advisories, never
     /// walls - both states are the machine's live truth, re-read on render.
     @ViewBuilder
-    private func globalAdvisory(_ chip: ComboChip, combo: KeyCombo, plane: ComboPlane) -> some View {
+    private func globalAdvisory(_ chip: ComboChip, combo: KeyCombo, plane: ComboPlane) -> some View
+    {
         if plane == .global, store.deadGlobals.contains(combo) {
             chip.opacity(0.4)
-                .help(String(localized: "Another app owns this system-wide right now - it won't fire", bundle: .module))
+                .help(
+                    String(
+                        localized: "Another app owns this system-wide right now - it won't fire",
+                        bundle: .module))
         } else if plane == .global, SystemHotkeys.owns(combo) {
             chip.overlay(alignment: .topTrailing) {
                 Circle().fill(.orange).frame(width: 6, height: 6).offset(x: 2, y: -2)
             }
-            .help(String(localized: "macOS also uses this combo system-wide right now - it may not fire", bundle: .module))
+            .help(
+                String(
+                    localized: "macOS also uses this combo system-wide right now - it may not fire",
+                    bundle: .module))
         } else {
             chip
         }
     }
 
     private func resetButton(_ action: A) -> some View {
-        Button { store.reset(action) } label: {
+        Button {
+            store.reset(action)
+        } label: {
             Image(systemName: "arrow.uturn.backward").font(.system(size: 10))
         }
         .buttonStyle(.borderless)
@@ -166,7 +178,9 @@ public struct KeymapGrid<A: ActionSet>: View {
     /// The family modifier picker (one per column) - a curated menu, since
     /// only the modifier varies, never the member keys. "Off" disables the
     /// system-wide column.
-    private func familyPicker(_ family: ComboFamily, _ plane: ComboPlane, allowOff: Bool) -> some View {
+    private func familyPicker(_ family: ComboFamily, _ plane: ComboPlane, allowOff: Bool)
+        -> some View
+    {
         let range = "\(family.keys.first ?? "")–\(family.keys.last ?? "")"
         let current = store.familyModifier(family.id, plane)
         return Menu {
@@ -181,8 +195,11 @@ public struct KeymapGrid<A: ActionSet>: View {
                 }
             }
         } label: {
-            Text(current.isEmpty ? String(localized: "Off", bundle: .module) : "\(current.glyphs)\(range)")
-                .font(.callout.monospaced())
+            Text(
+                current.isEmpty
+                    ? String(localized: "Off", bundle: .module) : "\(current.glyphs)\(range)"
+            )
+            .font(.callout.monospaced())
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
@@ -194,7 +211,9 @@ public struct KeymapGrid<A: ActionSet>: View {
         // red and names the reason RIGHT HERE - feedback lives at the action.
         let rejected = isRecording && !message.isEmpty
         // Same capsule + fill as a combo chip, so the row reads as one family.
-        return Button { beginRecording(action, plane) } label: {
+        return Button {
+            beginRecording(action, plane)
+        } label: {
             Group {
                 if isRecording {
                     Text(rejected ? message : String(localized: "type a key…", bundle: .module))
@@ -205,15 +224,21 @@ public struct KeymapGrid<A: ActionSet>: View {
                     Image(systemName: "plus").font(.system(size: 11, weight: .semibold))
                 }
             }
-            .foregroundStyle(rejected ? AnyShapeStyle(.white)
-                : isRecording ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+            .foregroundStyle(
+                rejected
+                    ? AnyShapeStyle(.white)
+                    : isRecording ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary)
+            )
             // Idle is a square → the Capsule renders as a circle; recording
             // grows to a pill to fit its text.
             .frame(width: isRecording ? nil : 24, height: 24)
             .padding(.horizontal, isRecording ? 10 : 0)
             .background(
-                rejected ? AnyShapeStyle(.red.opacity(0.9))
-                    : isRecording ? AnyShapeStyle(.tint.opacity(0.18)) : AnyShapeStyle(.quaternary.opacity(0.85)),
+                rejected
+                    ? AnyShapeStyle(.red.opacity(0.9))
+                    : isRecording
+                        ? AnyShapeStyle(.tint.opacity(0.18))
+                        : AnyShapeStyle(.quaternary.opacity(0.85)),
                 in: Capsule()
             )
         }
@@ -230,15 +255,16 @@ public struct KeymapGrid<A: ActionSet>: View {
         message = ""
         // A refused key (the STORE owns every binding rule) reports its
         // verdict and keeps listening; an accepted one ends the session.
-        capture = KeyCapture(onCombo: { pressed in
-            if let rejection = store.add(pressed, plane: target.plane, to: target.action) {
-                message = rejection.message(for: pressed)
-                return false
-            }
-            message = ""
-            stopRecording()
-            return true
-        }, onCancel: stopRecording)
+        capture = KeyCapture(
+            onCombo: { pressed in
+                if let rejection = store.add(pressed, plane: target.plane, to: target.action) {
+                    message = rejection.message(for: pressed)
+                    return false
+                }
+                message = ""
+                stopRecording()
+                return true
+            }, onCancel: stopRecording)
     }
 
     private func stopRecording() {

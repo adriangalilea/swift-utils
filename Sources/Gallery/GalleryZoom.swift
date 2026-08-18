@@ -13,16 +13,16 @@ import SwiftUI
 // twice (two rails sharing a work) keeps the standard push instead of
 // registering two sources for one id.
 #if !os(macOS)
-extension View {
-    /// Mark a gallery cell as the zoom SOURCE for a navigation value.
-    public func galleryZoomSource(id: some Hashable, in ns: Namespace.ID) -> some View {
-        matchedTransitionSource(id: id, in: ns)
-    }
+    extension View {
+        /// Mark a gallery cell as the zoom SOURCE for a navigation value.
+        public func galleryZoomSource(id: some Hashable, in ns: Namespace.ID) -> some View {
+            matchedTransitionSource(id: id, in: ns)
+        }
 
-    /// Apply on the pushed DESTINATION view: it expands out of the marked
-    /// card and collapses back into it on pop.
-    public func galleryZoomDestination(id: some Hashable, in ns: Namespace.ID) -> some View {
-        navigationTransition(.zoom(sourceID: id, in: ns))
+        /// Apply on the pushed DESTINATION view: it expands out of the marked
+        /// card and collapses back into it on pop.
+        public func galleryZoomDestination(id: some Hashable, in ns: Namespace.ID) -> some View {
+            navigationTransition(.zoom(sourceID: id, in: ns))
+        }
     }
-}
 #endif

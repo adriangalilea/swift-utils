@@ -29,7 +29,9 @@ struct DemoApp: App {
 }
 
 struct DemoView: View {
-    let items: [DemoItem] = syntheticAspects(200).enumerated().map { DemoItem(id: $0.offset, aspect: $0.element) }
+    let items: [DemoItem] = syntheticAspects(200).enumerated().map {
+        DemoItem(id: $0.offset, aspect: $0.element)
+    }
     @State private var selection = GallerySelection<Int>()
     @State private var scrollTarget: Int?
     @State private var geometry = DemoGeometry()
@@ -65,7 +67,9 @@ struct DemoView: View {
         .overlay {
             if selected {
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color.accentColor.opacity(item.id == selection.cursor ? 0.9 : 0.6), lineWidth: 2)
+                    .strokeBorder(
+                        Color.accentColor.opacity(item.id == selection.cursor ? 0.9 : 0.6),
+                        lineWidth: 2)
             }
         }
         .contentShape(Rectangle())
@@ -80,7 +84,8 @@ struct DemoView: View {
     private func handle(_ press: KeyPress) -> KeyPress.Result {
         let extend = press.modifiers.contains(.shift)
         func move(_ dx: Int, _ dy: Int) -> KeyPress.Result {
-            scrollTarget = selection.move(dx: dx, dy: dy, extend: extend, order: order, rows: geometry.rows)
+            scrollTarget = selection.move(
+                dx: dx, dy: dy, extend: extend, order: order, rows: geometry.rows)
             return .handled
         }
         switch press.key {

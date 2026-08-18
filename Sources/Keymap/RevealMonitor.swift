@@ -58,14 +58,23 @@ public final class RevealMonitor {
 
     public init() {
         let center = NotificationCenter.default
-        observers.append(center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.appActive = true }
-        })
-        observers.append(center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            // Dropping active also clears held flags - a reveal that began
-            // in-app shouldn't linger after focus leaves.
-            MainActor.assumeIsolated { self?.appActive = false; self?.flags = [] }
-        })
+        observers.append(
+            center.addObserver(
+                forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.appActive = true }
+            })
+        observers.append(
+            center.addObserver(
+                forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                // Dropping active also clears held flags - a reveal that began
+                // in-app shouldn't linger after focus leaves.
+                MainActor.assumeIsolated {
+                    self?.appActive = false
+                    self?.flags = []
+                }
+            })
     }
 
     isolated deinit { observers.forEach(NotificationCenter.default.removeObserver) }

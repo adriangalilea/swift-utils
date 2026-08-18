@@ -10,7 +10,8 @@ import Foundation
 public struct KeymapManifest: Codable, Sendable {
     /// Self-description for whoever opens the file cold: the schema URL is
     /// versioned (v1) and doubles as the context pointer to this repo.
-    public static let schemaURL = "https://raw.githubusercontent.com/adriangalilea/swift-utils/main/Schemas/keymap.v1.json"
+    public static let schemaURL =
+        "https://raw.githubusercontent.com/adriangalilea/swift-utils/main/Schemas/keymap.v1.json"
 
     public struct Action: Codable, Sendable {
         public let title: String
@@ -77,8 +78,10 @@ extension KeymapStore {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             do {
-                try FileManager.default.createDirectory(at: KeymapManifest.directory, withIntermediateDirectories: true)
-                try encoder.encode(manifest).write(to: KeymapManifest.url(forBundleID: bundleID), options: .atomic)
+                try FileManager.default.createDirectory(
+                    at: KeymapManifest.directory, withIntermediateDirectories: true)
+                try encoder.encode(manifest).write(
+                    to: KeymapManifest.url(forBundleID: bundleID), options: .atomic)
             } catch {
                 // Publishing is a courtesy to the overlay, never worth
                 // failing the app for - but say so once per session.

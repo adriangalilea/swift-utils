@@ -57,7 +57,8 @@ public final class Entitlement {
 
     /// Dev-only: flip free ⇄ premium and feel both, persisted.
     public func setDevPremium(_ on: Bool) {
-        precondition(check == nil, "setDevPremium on a sealed Entitlement - the release seam leaked")
+        precondition(
+            check == nil, "setDevPremium on a sealed Entitlement - the release seam leaked")
         isPremium = on
         defaults.set(on, forKey: Self.devKey)
     }
@@ -73,10 +74,12 @@ public struct EntitlementDevToggle: View {
 
     public var body: some View {
         if entitlement.isDev {
-            Toggle(String(localized: "Premium (dev toggle)", bundle: .module), isOn: Binding(
-                get: { entitlement.isPremium },
-                set: { entitlement.setDevPremium($0) }
-            ))
+            Toggle(
+                String(localized: "Premium (dev toggle)", bundle: .module),
+                isOn: Binding(
+                    get: { entitlement.isPremium },
+                    set: { entitlement.setDevPremium($0) }
+                ))
         }
     }
 }

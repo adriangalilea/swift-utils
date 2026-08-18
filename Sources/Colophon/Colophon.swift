@@ -119,12 +119,17 @@ public struct ColophonPane: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
-                Link(String(localized: "made by \(author.title)", bundle: .module), destination: author.url)
-                    .font(.caption)
+                Link(
+                    String(localized: "made by \(author.title)", bundle: .module),
+                    destination: author.url
+                )
+                .font(.caption)
             }
             Spacer()
             if let checkForUpdates {
-                Button(String(localized: "Check for Updates…", bundle: .module), action: checkForUpdates)
+                Button(
+                    String(localized: "Check for Updates…", bundle: .module),
+                    action: checkForUpdates)
             }
         }
         .padding(.vertical, .inkTight)
@@ -155,8 +160,9 @@ public struct ColophonSections<Extras: View>: View {
     public var body: some View {
         Section {
             extras
-            LabeledContent(String(localized: "Version", bundle: .module),
-                           value: "\(Bundle.colophonVersion) (\(Bundle.colophonBuild))")
+            LabeledContent(
+                String(localized: "Version", bundle: .module),
+                value: "\(Bundle.colophonVersion) (\(Bundle.colophonBuild))")
             ForEach(rows, content: rowView)
             if let support {
                 SupportCard(support: support)
@@ -232,12 +238,17 @@ private struct SupportCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, .inkBlock)
-        .background(RoundedRectangle(cornerRadius: .inkLane).fill(LinearGradient(
-            colors: [support.tint.opacity(0.14), support.tint.opacity(0.04)],
-            startPoint: .topLeading, endPoint: .bottomTrailing)))
-        .overlay(RoundedRectangle(cornerRadius: .inkLane).strokeBorder(LinearGradient(
-            colors: [support.tint.opacity(0.4), support.tint.opacity(0.1)],
-            startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
+        .background(
+            RoundedRectangle(cornerRadius: .inkLane).fill(
+                LinearGradient(
+                    colors: [support.tint.opacity(0.14), support.tint.opacity(0.04)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: .inkLane).strokeBorder(
+                LinearGradient(
+                    colors: [support.tint.opacity(0.4), support.tint.opacity(0.1)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
     }
 }
 

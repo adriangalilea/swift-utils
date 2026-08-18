@@ -89,9 +89,9 @@ public struct GalleryView<Item: Identifiable, Cell: View>: View {
                 }
                 .onChange(of: scrollTarget.wrappedValue) { _, target in
                     guard let target,
-                          let ri = rows.firstIndex(where: { row in
-                              row.range.contains { items[$0].id == target }
-                          })
+                        let ri = rows.firstIndex(where: { row in
+                            row.range.contains { items[$0].id == target }
+                        })
                     else { return }
                     withAnimation(.inkFlick) { proxy.scrollTo(ri) }
                     scrollTarget.wrappedValue = nil

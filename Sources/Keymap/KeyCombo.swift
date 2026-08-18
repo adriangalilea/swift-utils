@@ -20,7 +20,7 @@ public enum KeyCode {
 /// statics; anything else is a single character.
 public struct KeyCombo: Codable, Equatable, Hashable, Sendable {
     public let key: String
-    public let modifiers: Int // EventModifiers.rawValue
+    public let modifiers: Int  // EventModifiers.rawValue
 
     public init(_ key: String, _ modifiers: EventModifiers = []) {
         self.key = key
@@ -47,7 +47,9 @@ public struct KeyCombo: Codable, Equatable, Hashable, Sendable {
         if let name = Self.keyCodeNames[event.keyCode] {
             key = name
         } else if let chars = event.charactersIgnoringModifiers?.lowercased(),
-                  chars.count == 1, let char = chars.first, !char.isWhitespace, char.isASCII, char.asciiValue! > 32 {
+            chars.count == 1, let char = chars.first, !char.isWhitespace, char.isASCII,
+            char.asciiValue! > 32
+        {
             key = String(char)
         } else {
             return nil

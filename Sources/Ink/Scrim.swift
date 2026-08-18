@@ -7,9 +7,9 @@ import SwiftUI
 // with a layered background (material / tint) when the region should
 // elevate or recede in the page's depth story.
 
-public extension View {
+extension View {
     /// Fade this view's rendered content at its vertical scroll edges.
-    func inkEdgeFade(top: CGFloat = 0, bottom: CGFloat = 0) -> some View {
+    public func inkEdgeFade(top: CGFloat = 0, bottom: CGFloat = 0) -> some View {
         mask(
             VStack(spacing: 0) {
                 if top > 0 {
@@ -26,17 +26,21 @@ public extension View {
     }
 
     /// The horizontal twin (rails, pill rows).
-    func inkEdgeFade(leading: CGFloat = 0, trailing: CGFloat = 0) -> some View {
+    public func inkEdgeFade(leading: CGFloat = 0, trailing: CGFloat = 0) -> some View {
         mask(
             HStack(spacing: 0) {
                 if leading > 0 {
-                    LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: leading)
+                    LinearGradient(
+                        colors: [.clear, .black], startPoint: .leading, endPoint: .trailing
+                    )
+                    .frame(width: leading)
                 }
                 Rectangle().fill(.black)
                 if trailing > 0 {
-                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: trailing)
+                    LinearGradient(
+                        colors: [.black, .clear], startPoint: .leading, endPoint: .trailing
+                    )
+                    .frame(width: trailing)
                 }
             }
         )

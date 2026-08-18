@@ -40,7 +40,9 @@ public final class LocalKeyRouter<A: ActionSet> {
                 // routing stands down wholesale while it's up.
                 if store.keyboardCaptured { return false }
                 guard let pressed = KeyCombo(event: event) else { return false }
-                if Self.textInputIsFocused(event.window), pressed.eventModifiers.isDisjoint(with: [.command, .control]) {
+                if Self.textInputIsFocused(event.window),
+                    pressed.eventModifiers.isDisjoint(with: [.command, .control])
+                {
                     return false
                 }
                 if let action = store.match(event) {
@@ -52,8 +54,8 @@ public final class LocalKeyRouter<A: ActionSet> {
                 for family in store.families {
                     let modifier = store.familyModifier(family.id, .local)
                     guard !modifier.isEmpty, pressed.eventModifiers == modifier,
-                          family.keys.contains(pressed.key),
-                          shouldRoute(nil, event)
+                        family.keys.contains(pressed.key),
+                        shouldRoute(nil, event)
                     else { continue }
                     performFamily(family.id, pressed.key)
                     return true

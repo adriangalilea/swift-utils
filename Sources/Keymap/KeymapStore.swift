@@ -37,7 +37,9 @@ public struct LegacyKeys: Sendable {
     /// and plane.
     public let familyModifiers: [String: (local: String, global: String)]
 
-    public init(overrides: String?, familyModifiers: [String: (local: String, global: String)] = [:]) {
+    public init(
+        overrides: String?, familyModifiers: [String: (local: String, global: String)] = [:]
+    ) {
         self.overrides = overrides
         self.familyModifiers = familyModifiers
     }
@@ -100,18 +102,26 @@ public final class KeymapStore<A: ActionSet> {
         self.defaults = defaults
         migrate(legacy)
         if let data = defaults.data(forKey: Self.overridesKey),
-           let decoded = try? JSONDecoder().decode([String: ActionCombos].self, from: data) {
+            let decoded = try? JSONDecoder().decode([String: ActionCombos].self, from: data)
+        {
             // Raw values that no longer name an action are dropped silently:
             // renaming a case sheds its override, which is the correct decay.
-            overrides = Dictionary(uniqueKeysWithValues: decoded.compactMap { raw, combos in
-                A(rawValue: raw).map { ($0, combos) }
-            })
+            overrides = Dictionary(
+                uniqueKeysWithValues: decoded.compactMap { raw, combos in
+                    A(rawValue: raw).map { ($0, combos) }
+                })
         }
         for family in families {
             let local = defaults.object(forKey: Self.familyKey(family.id, .local))
-                .map { _ in EventModifiers(rawValue: defaults.integer(forKey: Self.familyKey(family.id, .local))) }
+                .map { _ in
+                    EventModifiers(
+                        rawValue: defaults.integer(forKey: Self.familyKey(family.id, .local)))
+                }
             let global = defaults.object(forKey: Self.familyKey(family.id, .global))
-                .map { _ in EventModifiers(rawValue: defaults.integer(forKey: Self.familyKey(family.id, .global))) }
+                .map { _ in
+                    EventModifiers(
+                        rawValue: defaults.integer(forKey: Self.familyKey(family.id, .global)))
+                }
             familyOverrides[family.id] = (local, global)
         }
     }
@@ -124,17 +134,21 @@ public final class KeymapStore<A: ActionSet> {
         }
         for (familyID, keys) in legacy.familyModifiers {
             if defaults.object(forKey: keys.local) != nil {
-                defaults.set(defaults.integer(forKey: keys.local), forKey: Self.familyKey(familyID, .local))
+                defaults.set(
+                    defaults.integer(forKey: keys.local), forKey: Self.familyKey(familyID, .local))
             }
             if defaults.object(forKey: keys.global) != nil {
-                defaults.set(defaults.integer(forKey: keys.global), forKey: Self.familyKey(familyID, .global))
+                defaults.set(
+                    defaults.integer(forKey: keys.global), forKey: Self.familyKey(familyID, .global)
+                )
             }
         }
     }
 
     private func persist() {
         defaults.set(
-            try! JSONEncoder().encode(Dictionary(uniqueKeysWithValues: overrides.map { ($0.rawValue, $1) })),
+            try! JSONEncoder().encode(
+                Dictionary(uniqueKeysWithValues: overrides.map { ($0.rawValue, $1) })),
             forKey: Self.overridesKey
         )
         notifyChange()
@@ -147,7 +161,9 @@ public final class KeymapStore<A: ActionSet> {
         ActionCombos(local: action.spec.local, global: action.spec.global)
     }
 
-    public func effective(for action: A) -> ActionCombos { overrides[action] ?? specDefaults(action) }
+    public func effective(for action: A) -> ActionCombos {
+        overrides[action] ?? specDefaults(action)
+    }
     public func combos(for action: A, _ plane: ComboPlane) -> [KeyCombo] {
         plane == .local ? effective(for: action).local : effective(for: action).global
     }
@@ -155,7 +171,9 @@ public final class KeymapStore<A: ActionSet> {
     /// The one in-app accelerator a SwiftUI control / menu item carries.
     public func menuCombo(for action: A) -> KeyCombo? { combos(for: action, .local).first }
     public func menuShortcut(for action: A) -> KeyboardShortcut? {
-        menuCombo(for: action).map { KeyboardShortcut($0.keyEquivalent, modifiers: $0.eventModifiers) }
+        menuCombo(for: action).map {
+            KeyboardShortcut($0.keyEquivalent, modifiers: $0.eventModifiers)
+        }
     }
 
     /// One representative combo for inline display (tooltips, badges): the
@@ -190,29 +208,39 @@ public final class KeymapStore<A: ActionSet> {
     /// combo for one action and a system-wide form for another.)
     public func add(_ combo: KeyCombo, plane: ComboPlane, to action: A) -> AddRejection? {
         if plane == .global,
-           combo.eventModifiers.isDisjoint(with: [.command, .option, .control]) {
+            combo.eventModifiers.isDisjoint(with: [.command, .option, .control])
+        {
             return .needsModifier
         }
         if let owner = A.allCases.first(where: {
             $0 != action && combos(for: $0, plane).contains(combo)
-        }) { return .taken(by: owner.spec.title) }
+        }) {
+            return .taken(by: owner.spec.title)
+        }
         for family in families {
             let modifier = familyModifier(family.id, plane)
-            if !modifier.isEmpty, family.keys.contains(combo.key), combo.eventModifiers == modifier {
+            if !modifier.isEmpty, family.keys.contains(combo.key), combo.eventModifiers == modifier
+            {
                 return .taken(by: family.name)
             }
         }
         var edited = effective(for: action)
-        if plane == .local { if !edited.local.contains(combo) { edited.local.append(combo) } }
-        else { if !edited.global.contains(combo) { edited.global.append(combo) } }
+        if plane == .local {
+            if !edited.local.contains(combo) { edited.local.append(combo) }
+        } else {
+            if !edited.global.contains(combo) { edited.global.append(combo) }
+        }
         store(edited, for: action)
         return nil
     }
 
     public func remove(_ combo: KeyCombo, plane: ComboPlane, from action: A) {
         var edited = effective(for: action)
-        if plane == .local { edited.local.removeAll { $0 == combo } }
-        else { edited.global.removeAll { $0 == combo } }
+        if plane == .local {
+            edited.local.removeAll { $0 == combo }
+        } else {
+            edited.global.removeAll { $0 == combo }
+        }
         store(edited, for: action)
     }
 
@@ -273,15 +301,15 @@ public final class KeymapStore<A: ActionSet> {
     }
 }
 
-
 extension KeymapStore {
     /// Every accelerator a command answers to - the in-app (remappable)
     /// combos and the global forms. The reveal walks these.
     public func chords(for action: A) -> [ShortcutChord] {
         combos(for: action, .local).map {
             ShortcutChord(modifiers: $0.eventModifiers, display: $0.display, isGlobal: false)
-        } + combos(for: action, .global).map {
-            ShortcutChord(modifiers: $0.eventModifiers, display: $0.display, isGlobal: true)
         }
+            + combos(for: action, .global).map {
+                ShortcutChord(modifiers: $0.eventModifiers, display: $0.display, isGlobal: true)
+            }
     }
 }

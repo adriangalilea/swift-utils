@@ -64,7 +64,9 @@ extension View {
     /// ONE style; every surface wears it, so two surfaces can never drift.
     /// `tint` covers accent-tinted headers (the manifest card) without the
     /// caller fighting the style's own color.
-    public func planeHeaderStyle(_ tint: some ShapeStyle = HierarchicalShapeStyle.secondary) -> some View {
+    public func planeHeaderStyle(_ tint: some ShapeStyle = HierarchicalShapeStyle.secondary)
+        -> some View
+    {
         font(.caption2.weight(.semibold))
             .textCase(.uppercase)
             .foregroundStyle(tint)
@@ -90,74 +92,75 @@ public struct ShortcutBadge: View {
 // Pointer-shaped micro-components (.onHover/.help) - mac-only by nature,
 // not by neglect: a hover affordance has no meaning under a focus engine.
 #if os(macOS)
-/// A bound accelerator: a keycap showing the combo (glyphs read as the keys
-/// they are). The chip IS the remove control - on hover it turns red and
-/// shows an ✕ over the combo, the tag-delete idiom. Zero reserved space (no
-/// external badge), so sibling chips pack tight and align perfectly with ＋.
-public struct ComboChip: View {
-    let display: String
-    let remove: () -> Void
-    @State private var hovering = false
+    /// A bound accelerator: a keycap showing the combo (glyphs read as the keys
+    /// they are). The chip IS the remove control - on hover it turns red and
+    /// shows an ✕ over the combo, the tag-delete idiom. Zero reserved space (no
+    /// external badge), so sibling chips pack tight and align perfectly with ＋.
+    public struct ComboChip: View {
+        let display: String
+        let remove: () -> Void
+        @State private var hovering = false
 
-    public init(_ display: String, remove: @escaping () -> Void) {
-        self.display = display
-        self.remove = remove
-    }
+        public init(_ display: String, remove: @escaping () -> Void) {
+            self.display = display
+            self.remove = remove
+        }
 
-    // A one-glyph combo (←, [, ⌫) gets a square frame, so the Capsule below
-    // renders as a perfect circle; multi-glyph combos (Space, ⌘←) stay capsules.
-    private var single: Bool { display.count == 1 }
+        // A one-glyph combo (←, [, ⌫) gets a square frame, so the Capsule below
+        // renders as a perfect circle; multi-glyph combos (Space, ⌘←) stay capsules.
+        private var single: Bool { display.count == 1 }
 
-    public var body: some View {
-        Button(action: remove) {
-            ZStack {
-                Text(verbatim: display)
-                    .font(.callout.monospaced())
-                    .opacity(hovering ? 0 : 1)
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white)
-                    .opacity(hovering ? 1 : 0)
+        public var body: some View {
+            Button(action: remove) {
+                ZStack {
+                    Text(verbatim: display)
+                        .font(.callout.monospaced())
+                        .opacity(hovering ? 0 : 1)
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .opacity(hovering ? 1 : 0)
+                }
+                .frame(width: single ? 24 : nil, height: 24)
+                .padding(.horizontal, single ? 0 : 9)
+                .background(
+                    hovering
+                        ? AnyShapeStyle(.red.opacity(0.9))
+                        : AnyShapeStyle(.quaternary.opacity(0.85)),
+                    in: Capsule()
+                )
+                .contentShape(Capsule())
             }
-            .frame(width: single ? 24 : nil, height: 24)
-            .padding(.horizontal, single ? 0 : 9)
-            .background(
-                hovering ? AnyShapeStyle(.red.opacity(0.9)) : AnyShapeStyle(.quaternary.opacity(0.85)),
-                in: Capsule()
-            )
-            .contentShape(Capsule())
+            .buttonStyle(.plain)
+            .help(String(localized: "Remove this shortcut", bundle: .module))
+            .onHover { hovering = $0 }
+            .animation(.inkFlick, value: hovering)
         }
-        .buttonStyle(.plain)
-        .help(String(localized: "Remove this shortcut", bundle: .module))
-        .onHover { hovering = $0 }
-        .animation(.inkFlick, value: hovering)
     }
-}
 
-/// The ＋ that arms an add - a visible slot, not a ghost: a filled circle
-/// that brightens and sharpens on hover so it reads as pressable.
-public struct AddSlot: View {
-    let arm: () -> Void
-    @State private var hovering = false
+    /// The ＋ that arms an add - a visible slot, not a ghost: a filled circle
+    /// that brightens and sharpens on hover so it reads as pressable.
+    public struct AddSlot: View {
+        let arm: () -> Void
+        @State private var hovering = false
 
-    public init(arm: @escaping () -> Void) { self.arm = arm }
+        public init(arm: @escaping () -> Void) { self.arm = arm }
 
-    public var body: some View {
-        Button(action: arm) {
-            Image(systemName: "plus")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                .frame(width: 18, height: 18)
-                .background(hovering ? Color.inkHover : Color.inkRest, in: Circle())
-                .contentShape(Circle())
+        public var body: some View {
+            Button(action: arm) {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                    .frame(width: 18, height: 18)
+                    .background(hovering ? Color.inkHover : Color.inkRest, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering = $0 }
+            .animation(.inkFlick, value: hovering)
         }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .animation(.inkFlick, value: hovering)
     }
-}
 #endif
-
 
 /// THE LAW OF NAVIGABLE SURFACES: a keyboard cursor must never leave its
 /// own viewport. Any scrollable list/gallery a cursor walks keeps the

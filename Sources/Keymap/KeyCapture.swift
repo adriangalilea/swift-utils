@@ -14,13 +14,13 @@ final class KeyCapture {
     init(onCombo: @escaping (KeyCombo) -> Bool, onCancel: @escaping () -> Void) {
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             MainActor.assumeIsolated {
-                if event.keyCode == 53 { // esc
+                if event.keyCode == 53 {  // esc
                     onCancel()
                 } else if let combo = KeyCombo(event: event) {
                     _ = onCombo(combo)
                 }
             }
-            return nil // armed = every key belongs to the capture
+            return nil  // armed = every key belongs to the capture
         }
     }
 

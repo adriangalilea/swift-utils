@@ -91,7 +91,10 @@ struct KeymapEditor<A: ActionSet>: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(cursorAtField ? Color.inkRaised : Color.inkRest, in: RoundedRectangle(cornerRadius: .inkField))
+            .background(
+                cursorAtField ? Color.inkRaised : Color.inkRest,
+                in: RoundedRectangle(cornerRadius: .inkField)
+            )
             .overlay {
                 if cursorAtField {
                     RoundedRectangle(cornerRadius: .inkField).strokeBorder(.inkEdge, lineWidth: 1)
@@ -155,21 +158,23 @@ struct KeymapEditor<A: ActionSet>: View {
     }
 
     private var scrollContent: some View {
-        CursorScrollView(cursor: selection.flatMap { visible.indices.contains($0) ? visible[$0] : nil }) {
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
-                        let actions = section.actions.filter(matchesQuery)
-                        if !actions.isEmpty {
-                            sectionView(section.name, actions)
-                        }
+        CursorScrollView(
+            cursor: selection.flatMap { visible.indices.contains($0) ? visible[$0] : nil }
+        ) {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
+                    let actions = section.actions.filter(matchesQuery)
+                    if !actions.isEmpty {
+                        sectionView(section.name, actions)
                     }
-                    ForEach(Array(extras.enumerated()), id: \.offset) { sectionIndex, extra in
-                        if extra.rows.contains(where: matchesQuery) {
-                            staticSection(sectionIndex, extra)
-                        }
+                }
+                ForEach(Array(extras.enumerated()), id: \.offset) { sectionIndex, extra in
+                    if extra.rows.contains(where: matchesQuery) {
+                        staticSection(sectionIndex, extra)
                     }
                 }
             }
+        }
     }
 
     private func matchesQuery(_ action: A) -> Bool {
@@ -196,7 +201,8 @@ struct KeymapEditor<A: ActionSet>: View {
     private func fireSelection() -> Bool {
         let rows = visible
         guard let selection, rows.indices.contains(selection),
-              case .action(let action) = rows[selection] else { return false }
+            case .action(let action) = rows[selection]
+        else { return false }
         flash(action)
         perform?(action)
         return true
@@ -217,14 +223,19 @@ struct KeymapEditor<A: ActionSet>: View {
                 .help(String(localized: "Works while this app is frontmost", bundle: .module))
             Label(String(localized: "From any app", bundle: .module), systemImage: "globe")
                 .frame(width: Self.globalColumn, alignment: .leading)
-                .help(String(localized: "System-wide - works even when this app is in the background", bundle: .module))
+                .help(
+                    String(
+                        localized: "System-wide - works even when this app is in the background",
+                        bundle: .module))
             Color.clear.frame(width: Self.resetColumn, height: 1)
         }
         .planeHeaderStyle()
         .padding(.horizontal, 6)
     }
 
-    private func staticSection(_ sectionIndex: Int, _ extra: (name: String, rows: [StaticShortcut])) -> some View {
+    private func staticSection(_ sectionIndex: Int, _ extra: (name: String, rows: [StaticShortcut]))
+        -> some View
+    {
         VStack(alignment: .leading, spacing: 4) {
             Text(extra.name)
                 .font(.caption.smallCaps().weight(.semibold))
@@ -345,20 +356,28 @@ struct KeymapEditor<A: ActionSet>: View {
                 // equivalents dispatch before any focused-view handler, and
                 // bare arrows are often an app action's menu representative.
                 switch event.keyCode {
-                case KeyCode.down: move(1); return true
-                case KeyCode.up: move(-1); return true
+                case KeyCode.down:
+                    move(1)
+                    return true
+                case KeyCode.up:
+                    move(-1)
+                    return true
                 case KeyCode.return: return fireSelection()
                 default: break
                 }
                 guard let pressed = KeyCombo(event: event) else { return false }
                 // Editing verbs on the query - the panel IS the field.
-                if event.keyCode == KeyCode.delete { // ⌫; ⌘⌫ clears
-                    if event.modifierFlags.contains(.command) { query = "" }
-                    else if !query.isEmpty { query.removeLast() }
+                if event.keyCode == KeyCode.delete {  // ⌫; ⌘⌫ clears
+                    if event.modifierFlags.contains(.command) {
+                        query = ""
+                    } else if !query.isEmpty {
+                        query.removeLast()
+                    }
                     return true
                 }
                 if event.modifierFlags.contains(.command),
-                   event.charactersIgnoringModifiers == "v" {
+                    event.charactersIgnoringModifiers == "v"
+                {
                     query += NSPasteboard.general.string(forType: .string) ?? ""
                     return true
                 }
@@ -366,17 +385,20 @@ struct KeymapEditor<A: ActionSet>: View {
                 // to the query, never fired as actions, never lost.
                 if pressed.eventModifiers.isDisjoint(with: [.command, .control, .option]) {
                     if let typed = event.characters {
-                        query += String(typed.unicodeScalars.filter { scalar in
-                            !scalar.properties.isDefaultIgnorableCodePoint
-                                && scalar.value >= 0x20 && scalar.value < 0xF700
-                        }.map(Character.init))
+                        query += String(
+                            typed.unicodeScalars.filter { scalar in
+                                !scalar.properties.isDefaultIgnorableCodePoint
+                                    && scalar.value >= 0x20 && scalar.value < 0xF700
+                            }.map(Character.init))
                     }
                     return true
                 }
-                guard let action = A.allCases.first(where: { candidate in
-                    store.combos(for: candidate, .local).contains(pressed)
-                        || store.combos(for: candidate, .global).contains(pressed)
-                }) else { return false }
+                guard
+                    let action = A.allCases.first(where: { candidate in
+                        store.combos(for: candidate, .local).contains(pressed)
+                            || store.combos(for: candidate, .global).contains(pressed)
+                    })
+                else { return false }
                 flash(action)
                 perform?(action)
                 return true
@@ -415,7 +437,10 @@ private struct RecordingChip: View {
             .background(Color.inkRaised, in: RoundedRectangle(cornerRadius: .inkChip))
             .onAppear {
                 capture = KeyCapture(
-                    onCombo: { combo in finish(combo); return true },
+                    onCombo: { combo in
+                        finish(combo)
+                        return true
+                    },
                     onCancel: { finish(nil) }
                 )
             }

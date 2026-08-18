@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Testing
+
 @testable import Keymap
 
 // A miniature registry shaped like a real app's.
@@ -9,8 +10,12 @@ enum Act: String, CaseIterable, ActionSet {
 
     var spec: Spec {
         switch self {
-        case .play: Spec(title: "Play", symbol: "play", local: [KeyCombo("space")], global: [KeyCombo("space", [.command, .shift])])
-        case .search: Spec(title: "Search", symbol: "magnifyingglass", local: [KeyCombo("f", .command)])
+        case .play:
+            Spec(
+                title: "Play", symbol: "play", local: [KeyCombo("space")],
+                global: [KeyCombo("space", [.command, .shift])])
+        case .search:
+            Spec(title: "Search", symbol: "magnifyingglass", local: [KeyCombo("f", .command)])
         case .favorite: Spec(title: "Favorite", symbol: "heart", local: [KeyCombo("d", .command)])
         }
     }
@@ -67,7 +72,8 @@ private let jump = ComboFamily(
 
     @Test func conflictIsRejectedWithOwnerName() {
         let store = KeymapStore<Act>(defaults: freshDefaults())
-        #expect(store.add(KeyCombo("f", .command), plane: .local, to: .play) == .taken(by: "Search"))
+        #expect(
+            store.add(KeyCombo("f", .command), plane: .local, to: .play) == .taken(by: "Search"))
         #expect(store.combos(for: .play, .local) == [KeyCombo("space")])
     }
 
@@ -87,7 +93,9 @@ private let jump = ComboFamily(
 
     @Test func familyReservesItsPrefix() {
         let store = KeymapStore<Act>(families: [jump], defaults: freshDefaults())
-        #expect(store.add(KeyCombo("3", .command), plane: .local, to: .play) == .taken(by: "the numbered jumps"))
+        #expect(
+            store.add(KeyCombo("3", .command), plane: .local, to: .play)
+                == .taken(by: "the numbered jumps"))
         // Moving the family's modifier frees the old prefix.
         store.setFamilyModifier("jump", .local, to: [.command, .control])
         #expect(store.add(KeyCombo("3", .command), plane: .local, to: .play) == nil)

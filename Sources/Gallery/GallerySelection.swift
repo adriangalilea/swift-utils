@@ -36,7 +36,8 @@ public struct GallerySelection<ID: Hashable & Sendable>: Equatable, Sendable {
             anchor = id
         case .range:
             guard let ai = order.firstIndex(of: anchor ?? id),
-                  let bi = order.firstIndex(of: id) else {
+                let bi = order.firstIndex(of: id)
+            else {
                 selected = [id]
                 anchor = id
                 break

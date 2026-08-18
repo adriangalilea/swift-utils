@@ -33,10 +33,17 @@ extension EventModifiers {
 /// just the one best completion; the global reference shows EVERY way to
 /// reach it (⏯ and ⇧⌘Space both), so you pick whatever's comfortable.
 /// Empty = nothing reachable from here.
-public func shortcutCompletions(_ chords: [ShortcutChord], _ reveal: RevealMonitor.Reveal) -> [String] {
-    let matching = chords
-        .filter { $0.modifiers.isSuperset(of: reveal.required) && (!reveal.globalsOnly || $0.isGlobal) }
-        .sorted { ($0.modifiers.count, $0.isGlobal ? 1 : 0) < ($1.modifiers.count, $1.isGlobal ? 1 : 0) }
+public func shortcutCompletions(_ chords: [ShortcutChord], _ reveal: RevealMonitor.Reveal)
+    -> [String]
+{
+    let matching =
+        chords
+        .filter {
+            $0.modifiers.isSuperset(of: reveal.required) && (!reveal.globalsOnly || $0.isGlobal)
+        }
+        .sorted {
+            ($0.modifiers.count, $0.isGlobal ? 1 : 0) < ($1.modifiers.count, $1.isGlobal ? 1 : 0)
+        }
     guard !matching.isEmpty else { return [] }
     let chosen = reveal.globalsOnly ? matching : [matching[0]]
     var seen = Set<String>()
@@ -103,7 +110,8 @@ public struct ShortcutTipView: View {
                             }
                         }
                         if let label = shown[index].label {
-                            Text(label).font(.caption2.weight(.medium)).foregroundStyle(.white.opacity(0.72))
+                            Text(label).font(.caption2.weight(.medium)).foregroundStyle(
+                                .white.opacity(0.72))
                         }
                     }
                 }
@@ -128,8 +136,9 @@ private struct ShortcutTipLayer: ViewModifier {
             GeometryReader { proxy in
                 if let reveal = monitor.reveal {
                     ForEach(tips) { tip in
-                        PlacedTip(items: tip.items, reveal: reveal,
-                                  anchor: proxy[tip.anchor], edge: tip.edge, bounds: proxy.size)
+                        PlacedTip(
+                            items: tip.items, reveal: reveal,
+                            anchor: proxy[tip.anchor], edge: tip.edge, bounds: proxy.size)
                     }
                 }
             }
@@ -155,7 +164,9 @@ extension View {
 
     /// Float a row of labeled actions. Only contributes while `present`
     /// (the selected row).
-    public func shortcutActions(_ id: String, _ items: [ShortcutTip.Item], present: Bool, edge: Edge = .top) -> some View {
+    public func shortcutActions(
+        _ id: String, _ items: [ShortcutTip.Item], present: Bool, edge: Edge = .top
+    ) -> some View {
         anchorPreference(key: ShortcutTipKey.self, value: .bounds) {
             present ? [ShortcutTip(id: id, anchor: $0, edge: edge, items: items)] : []
         }

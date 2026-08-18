@@ -59,19 +59,21 @@ package final class GlobalHotkey {
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
         )
-        InstallEventHandler(GetApplicationEventTarget(), { _, event, _ in
-            var pressed = EventHotKeyID()
-            GetEventParameter(
-                event, EventParamName(kEventParamDirectObject),
-                EventParamType(typeEventHotKeyID), nil,
-                MemoryLayout<EventHotKeyID>.size, nil, &pressed
-            )
-            guard let handler = GlobalHotkey.handlers[pressed.id] else {
-                return OSStatus(eventNotHandledErr)
-            }
-            handler()
-            return noErr
-        }, 1, &eventType, nil, nil)
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, event, _ in
+                var pressed = EventHotKeyID()
+                GetEventParameter(
+                    event, EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID), nil,
+                    MemoryLayout<EventHotKeyID>.size, nil, &pressed
+                )
+                guard let handler = GlobalHotkey.handlers[pressed.id] else {
+                    return OSStatus(eventNotHandledErr)
+                }
+                handler()
+                return noErr
+            }, 1, &eventType, nil, nil)
     }
 }
 
@@ -129,7 +131,8 @@ public final class GlobalHotkeys<A: ActionSet> {
         var rebuilt = A.allCases.flatMap { action in
             store.combos(for: action, .global).compactMap { combo -> GlobalHotkey? in
                 guard let keyCode = combo.carbonKeyCode else { return nil }
-                let hotkey = GlobalHotkey(keyCode: keyCode, modifiers: combo.carbonModifiers) { [perform] in
+                let hotkey = GlobalHotkey(keyCode: keyCode, modifiers: combo.carbonModifiers) {
+                    [perform] in
                     perform(action)
                 }
                 if !hotkey.registered { dead.append(combo) }
@@ -143,9 +146,11 @@ public final class GlobalHotkeys<A: ActionSet> {
             guard !modifier.isEmpty else { continue }
             for key in family.keys {
                 guard let keyCode = KeyCombo(key, modifier).carbonKeyCode else { continue }
-                rebuilt.append(GlobalHotkey(keyCode: keyCode, modifiers: modifier.carbonModifiers) { [performFamily] in
-                    performFamily(family.id, key)
-                })
+                rebuilt.append(
+                    GlobalHotkey(keyCode: keyCode, modifiers: modifier.carbonModifiers) {
+                        [performFamily] in
+                        performFamily(family.id, key)
+                    })
             }
         }
         registrations = rebuilt
@@ -165,7 +170,8 @@ enum SystemHotkeys {
         let modifiers = combo.carbonModifiers
         var hotkeys: Unmanaged<CFArray>?
         guard CopySymbolicHotKeys(&hotkeys) == noErr,
-              let list = hotkeys?.takeRetainedValue() as? [[String: Any]] else { return false }
+            let list = hotkeys?.takeRetainedValue() as? [[String: Any]]
+        else { return false }
         return list.contains { entry in
             (entry[kHISymbolicHotKeyEnabled as String] as? Bool) == true
                 && (entry[kHISymbolicHotKeyCode as String] as? Int) == Int(keyCode)
@@ -222,14 +228,14 @@ enum KeyboardLayout {
 
     private static func build() -> [String: UInt16] {
         guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
-              let layoutPtr = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
+            let layoutPtr = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
         else { return [:] }
         let data = Unmanaged<CFData>.fromOpaque(layoutPtr).takeUnretainedValue()
         let layout = unsafeBitCast(CFDataGetBytePtr(data), to: UnsafePointer<UCKeyboardLayout>.self)
         let kbdType = UInt32(LMGetKbdType())
 
         var map: [String: UInt16] = [:]
-        for code in 0 ..< UInt16(128) {
+        for code in 0..<UInt16(128) {
             var deadKeyState: UInt32 = 0
             var length = 0
             var chars = [UniChar](repeating: 0, count: 4)
@@ -239,7 +245,8 @@ enum KeyboardLayout {
             )
             guard status == noErr, length == 1 else { continue }
             let string = String(utf16CodeUnits: chars, count: 1).lowercased()
-            guard let char = string.first, char.isASCII, !char.isWhitespace, char.asciiValue! > 32 else { continue }
+            guard let char = string.first, char.isASCII, !char.isWhitespace, char.asciiValue! > 32
+            else { continue }
             // First wins: the main number row registers before the numpad's digits.
             if map[string] == nil { map[string] = code }
         }

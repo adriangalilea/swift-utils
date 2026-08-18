@@ -51,21 +51,25 @@ public final class FloatingPanel {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = hosting
         if let frame = (screen ?? NSScreen.main)?.visibleFrame {
-            panel.setFrameOrigin(NSPoint(
-                x: frame.midX - size.width / 2,
-                y: frame.midY - size.height / 2
-            ))
+            panel.setFrameOrigin(
+                NSPoint(
+                    x: frame.midX - size.width / 2,
+                    y: frame.midY - size.height / 2
+                ))
         }
         panel.orderFrontRegardless()
         self.panel = panel
 
-        localClicks = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+        localClicks = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown])
+        { [weak self] event in
             MainActor.assumeIsolated {
                 if let self, event.window !== self.panel { self.onDismissRequest?() }
             }
             return event
         }
-        globalClicks = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        globalClicks = NSEvent.addGlobalMonitorForEvents(matching: [
+            .leftMouseDown, .rightMouseDown,
+        ]) { [weak self] _ in
             MainActor.assumeIsolated { self?.onDismissRequest?() }
         }
         escKey = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in

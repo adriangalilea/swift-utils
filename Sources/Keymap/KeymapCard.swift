@@ -5,7 +5,8 @@ extension KeymapManifest {
     /// The manifest's accent as a Color; nil when the hex is malformed.
     public var accentColor: Color? {
         guard accent.hasPrefix("#"), accent.count == 7,
-              let value = UInt32(accent.dropFirst(), radix: 16) else { return nil }
+            let value = UInt32(accent.dropFirst(), radix: 16)
+        else { return nil }
         return Color(
             red: Double((value >> 16) & 0xFF) / 255,
             green: Double((value >> 8) & 0xFF) / 255,
@@ -94,7 +95,9 @@ public struct KeymapCard: View {
 
     /// Greedy column fill: sections stack into a column until it holds
     /// `per` action rows, then a new column starts.
-    private func columned(_ sections: [KeymapManifest.Section], per: Int) -> [[KeymapManifest.Section]] {
+    private func columned(_ sections: [KeymapManifest.Section], per: Int) -> [[KeymapManifest
+        .Section]]
+    {
         var columns: [[KeymapManifest.Section]] = [[]]
         var rows = 0
         for section in sections {
