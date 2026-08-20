@@ -59,6 +59,55 @@ refreshes the lie. References: hollow `PermissionsUI`/`SettingsView` (1s poll
 + app-active), lore's dependency probe. Extract into a module when a third
 consumer appears.
 
+Presentation corollary (Adrian's doctrine, 2026-08-20): live STATE updates
+freely (a row flipping to its green check on grant is the point), but new
+GUIDANCE — extra help text, a changed button label — may appear only when a
+surface ARRIVES already in the state that needs it, or when the app regains
+focus with the task still undone. Never at the moment a button is clicked:
+status often flips the instant a prompt fires, and a row that sprouts a
+paragraph as you click reads as background mutation, not help. Reference:
+hollow `PermissionRow.showDenied`.
+
+## Door (a pending component — in-window authentication, no popup)
+
+The disease: hollow's app curtain (and every gated surface after it)
+authenticates through a bare keychain read or `LAContext.evaluatePolicy`, so macOS throws its
+floating system alert ("hollow is trying to unlock hollow… Use Password /
+Cancel") over the app. Safari private mode proves the god-tier shape: the
+WINDOW is the prompt — lock glyph with a fingerprint badge, one title, one
+subtitle, an inline password field; resting a finger unlocks, typing is the
+fallback, nothing floats.
+
+The design, when built:
+
+- **`LocalAuthenticationEmbeddedUI`** (macOS 12+) is the enabling API:
+  `LAAuthenticationView(context:)` hosts the Touch ID affordance inside our
+  own view; evaluating the policy on that context renders inline instead of
+  the system panel. Verify first; also evaluate `LARightStore` /
+  `LAPersistedRight` + `LAAuthenticationView(right:)` (macOS 13+) as the
+  modern keychain-backed path.
+- **Own the LAContext, return it.** Today's popup is thrown by the KEYCHAIN:
+  reading a `.biometryCurrentSet` item runs the system's own UI. The
+  component evaluates its embedded context first and hands it back on
+  success; the consumer passes it to `SecItemCopyMatching` via
+  `kSecUseAuthenticationContext`, so the gated key reads with NO second
+  prompt. Result type: authorized `LAContext` (biometry door) OR the typed
+  secret (password/recovery door) — the consumer decides which doors exist.
+- **Finger-first, typing-seamless.** Policy armed on appear: a resting
+  finger unlocks with zero clicks. The field is always focusable — no mode
+  switch, no "use password instead" ceremony.
+- **No layout shift, ever** (the presentation corollary above): wrong finger
+  shakes the affordance, wrong secret styles the field; the composition
+  never grows or reflows on failure.
+- **Two sizes, one component**: the full-window curtain (Safari's screen;
+  hollow's LockScreen) and the compact in-field form — hollow's
+  `DoorField`/`SecretBox`/`SecretField` (fingerprint inside the text field,
+  green authorized state, AutoFill content types) migrate here as that
+  compact form when this lands.
+
+Consumers waiting: hollow (curtain + unlock/key sheets) and every gated
+app after it. Build here, not per-app.
+
 ## Colophon
 
 The about/support Settings tab, designed once: app identity (name, version, build, icon) derived from the running bundle so it can never drift, the author byline, external links, the support ask, and an optional check-for-updates hook (Sparkle stays app-side, pass a closure).
