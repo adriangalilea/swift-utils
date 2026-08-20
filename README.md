@@ -87,6 +87,13 @@ The registry spine behind the studio keyboard rule: every app fully keyboard nav
 - a published keymap manifest (JSON with a versioned `$schema`, per bundle id) rendered by `KeymapCard` - the overlay windows the same card any in-app surface can show
 - one stand-down signal: the cheat panel raises `store.keyboardCaptured` while it owns the keyboard; `LocalKeyRouter` and any app-side monitor check that one flag
 
+Idea, not built (2026-08-20): a **hyper key** - Caps Lock remapped to
+⌃⌥⌘⇧-at-once, opening a global shortcut namespace that can never collide
+with any app's combos. Prior art: Hyperkey.app (Knollsoft). Keymap's
+`GlobalHotkeys` would be the natural consumer (hyper+key registry combos);
+the caps-lock remap itself needs `hidutil`/IOKit, which Keymap doesn't
+touch today.
+
 ### Usage
 
 ```swift
