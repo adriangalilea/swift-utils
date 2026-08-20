@@ -129,21 +129,27 @@ public struct Door: View {
             ZStack(alignment: .bottomTrailing) {
                 Image(systemName: icon)
                     .font(.system(size: 56, weight: .regular))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                 if let context, activeState != .inactive {
                     ZStack {
                         Circle().fill(backdrop)
                         // Evaluation starts ONLY from the sensor's onReady -
                         // it must already sit in the window or LA falls back
-                        // to the floating system alert.
+                        // to the floating system alert. .small and a hard
+                        // frame: .regular ignores the frame and explodes
+                        // over the lock (tried, reverted).
                         DoorSensor(context: context, controlSize: .small) {
                             startSensor(context)
                         }
                         .id(attempt)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 25, height: 25)
+                        // The system glyph runs darker than Safari's vivid
+                        // pink; a saturation/brightness lift closes the gap.
+                        .saturation(1.8)
+                        .brightness(0.1)
                     }
-                    .frame(width: 42, height: 42)
-                    .offset(x: 16, y: 10)
+                    .frame(width: 34, height: 34)
+                    .offset(x: 8, y: 6)
                     .onTapGesture { rearm() }
                 }
             }
