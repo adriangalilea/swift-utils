@@ -11,9 +11,7 @@ struct DemoView: View {
 
     var body: some View {
         ZStack {
-            // Safari's locked-private-window tone: a soft dark grey,
-            // never harsh black.
-            Color(white: 0.16).ignoresSafeArea()
+            Color(nsColor: .windowBackgroundColor).ignoresSafeArea()
             if open {
                 VStack(spacing: 12) {
                     Image(systemName: "lock.open.fill")
@@ -27,8 +25,7 @@ struct DemoView: View {
                     title: "This Demo Is Locked",
                     subtitle: "Touch ID or type \u{201c}sesame\u{201d} to open the demo.",
                     inactiveSubtitle: "Type \u{201c}sesame\u{201d} to open the demo.",
-                    reason: "unlock the door demo",
-                    backdrop: AnyShapeStyle(Color(white: 0.16))
+                    reason: "unlock the door demo"
                 ) { verdict in
                     switch verdict {
                     case .biometry:

@@ -57,7 +57,7 @@ public struct Door: View {
     private let prompt: String
     private let reason: String
     private let ask: DoorAsk
-    private let backdrop: AnyShapeStyle
+    private let surface: Color
     private let judge: @MainActor (DoorVerdict) async -> DoorJudgment
 
     // One attempt = one fresh LAContext + one fresh sensor view (`.id`).
@@ -88,10 +88,13 @@ public struct Door: View {
     ///   - reason: the evaluation reason macOS requires (never shown by the
     ///     embedded sensor, but mandatory and user-visible in Settings).
     ///   - ask: what a successful touch authorizes (`.biometry` default).
-    ///   - backdrop: the disc behind the fingerprint badge - pass the
-    ///     surface the door sits on (a color OR a material), so the badge
-    ///     reads as a cutout of the lock's corner (Safari's trick), never
-    ///     a floating glyph.
+    ///   - surface: the door's stage. Door paints its OWN full-bleed solid
+    ///     background and fills the badge disc with the SAME color, so the
+    ///     badge reads as a cutout of the lock's corner (Safari's trick)
+    ///     and the cutout is exact by construction. Solid on purpose:
+    ///     translucency/materials under the door wash the system glyph
+    ///     into low contrast (learned live). Default: the system window
+    ///     background.
     ///   - judge: receives every verdict; return `.accepted` to pass or
     ///     `.rejected(message)` to keep the door up. The consumer owns
     ///     dismissal - on `.accepted`, swap the door out of the hierarchy.
@@ -103,7 +106,7 @@ public struct Door: View {
         prompt: String = "Enter password",
         reason: String,
         ask: DoorAsk = .biometry,
-        backdrop: AnyShapeStyle = AnyShapeStyle(Color.black),
+        surface: Color = Color(nsColor: .windowBackgroundColor),
         judge: @escaping @MainActor (DoorVerdict) async -> DoorJudgment
     ) {
         self.icon = icon
@@ -113,7 +116,7 @@ public struct Door: View {
         self.prompt = prompt
         self.reason = reason
         self.ask = ask
-        self.backdrop = backdrop
+        self.surface = surface
         self.judge = judge
     }
 
@@ -132,7 +135,7 @@ public struct Door: View {
                     .foregroundStyle(.secondary)
                 if let context, activeState != .inactive {
                     ZStack {
-                        Circle().fill(backdrop)
+                        Circle().fill(surface)
                         // Evaluation starts ONLY from the sensor's onReady -
                         // it must already sit in the window or LA falls back
                         // to the floating system alert. .small and a hard
@@ -191,6 +194,7 @@ public struct Door: View {
                 .onSubmit { submitSecret() }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(surface.ignoresSafeArea())
         .onAppear {
             fieldFocused = true
             rearm()
