@@ -26,7 +26,7 @@ struct DemoView: View {
                     DoorField(
                         prompt: "type the secret",
                         text: $fieldSecret, key: $fieldKey,
-                        door: ("authorize the demo field", { _ in "authorized" })
+                        door: DoorUnlock(reason: "authorize the demo field") { _ in "authorized" }
                     )
                     .frame(width: 280)
                 }

@@ -107,6 +107,25 @@ extension SecretField where Trailing == EmptyView {
     }
 }
 
+/// The biometric door a DoorField opens: why (the evaluation reason) and
+/// what a passed evaluation unlocks. A struct, not a tuple: the first real
+/// consumer proved an inline tuple+closure defeats the type checker, and a
+/// nominal type anchors inference so call sites stay inline:
+///
+///     DoorField(prompt: "password", text: $text, key: $key,
+///               door: hasTouchID ? DoorUnlock(reason: "unlock the vault") { ctx in
+///                   try? fetchKey(context: ctx)
+///               } : nil)
+public struct DoorUnlock<Key> {
+    let reason: String
+    let unlock: @MainActor (LAContext) -> Key?
+
+    public init(reason: String, unlock: @escaping @MainActor (LAContext) -> Key?) {
+        self.reason = reason
+        self.unlock = unlock
+    }
+}
+
 /// The authorization field: a SecretField with the biometric door built in.
 /// Three ways through: type the secret (the caller resolves what it is),
 /// REST A FINGER (embedded evaluation, armed while the window is key, no
@@ -120,7 +139,7 @@ public struct DoorField<Key>: View {
     let prompt: String
     @Binding var text: String
     @Binding var key: Key?  // set = the biometric door passed
-    let door: (reason: String, unlock: @MainActor (LAContext) -> Key?)?
+    let door: DoorUnlock<Key>?
 
     @State private var attempt = 0
     @State private var context: LAContext?
@@ -130,7 +149,7 @@ public struct DoorField<Key>: View {
 
     public init(
         prompt: String, text: Binding<String>, key: Binding<Key?>,
-        door: (reason: String, unlock: @MainActor (LAContext) -> Key?)? = nil
+        door: DoorUnlock<Key>? = nil
     ) {
         self.prompt = prompt
         self._text = text
