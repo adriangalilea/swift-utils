@@ -45,6 +45,20 @@ The library-grid product: a framework-free layout kernel plus the SwiftUI shell,
 
 Gate: `swift run gallery-example --check` asserts the kernel invariants headless (row fill, append stability, every selection law); without the flag it opens a demo window with the keyboard walk wired.
 
+## Liveness (a pattern, not yet a module)
+
+Any externally-mutable status an app RENDERS — a TCC grant, an extension's
+enable state, a dependency's presence (lore's yt-dlp probe is the origin) —
+re-checks on every `didBecomeActive` and on a coarse periodic tick while the
+surface showing it is visible. The user flips a toggle in System Settings,
+comes back, and the app already agrees; a status read once at view-init is a
+lie waiting to be screenshotted. Second lesson from the same hollow session:
+check the SOURCE OF TRUTH, not a cache of it — pluginkit mirrors the FSKit
+enable plist and the mirror stales, so polling the mirror faster just
+refreshes the lie. References: hollow `PermissionsUI`/`SettingsView` (1s poll
++ app-active), lore's dependency probe. Extract into a module when a third
+consumer appears.
+
 ## Colophon
 
 The about/support Settings tab, designed once: app identity (name, version, build, icon) derived from the running bundle so it can never drift, the author byline, external links, the support ask, and an optional check-for-updates hook (Sparkle stays app-side, pass a closure).
