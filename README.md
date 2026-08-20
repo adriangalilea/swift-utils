@@ -124,6 +124,14 @@ How it works, and why there is no popup anywhere:
   field in place (geometry-only) and clears it. The consumer judges every
   verdict (`.accepted` / `.rejected(message)`) and owns dismissal.
 
+- **Door paints its own stage.** One `surface` color (default: the system
+  window background) drives the self-painted full-bleed background AND
+  the badge disc, so the fingerprint reads as a cutout of the lock's
+  corner (Safari's trick) exactly, by construction. Solid on purpose:
+  translucency/materials under the door wash the system glyph into low
+  contrast (learned live in a consumer). A consumer writes
+  `Door(title:subtitle:reason:judge:)` and nothing else.
+
 Demo: `swift run door-example` — real Touch ID in-window, demo password
 "sesame". Next step when a consumer adopts: the compact in-field form
 (fingerprint inside a secret field) built on the same `DoorSensor`.
