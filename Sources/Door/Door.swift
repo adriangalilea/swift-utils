@@ -295,7 +295,7 @@ public struct Door: View {
 
 // The rejection shake: a damped horizontal wobble, geometry-only, so the
 // field trembles in place and the composition never reflows.
-private struct Shake: GeometryEffect {
+struct Shake: GeometryEffect {
     var times: CGFloat
     var animatableData: CGFloat {
         get { times }

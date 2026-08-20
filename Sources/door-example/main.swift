@@ -24,7 +24,7 @@ struct DemoView: View {
                     Divider().frame(width: 280).padding(.vertical, 8)
                     Text("the compact form: DoorField").font(.caption).foregroundStyle(.secondary)
                     DoorField(
-                        prompt: "type anything, or rest a finger",
+                        prompt: "type the secret",
                         text: $fieldSecret, key: $fieldKey,
                         door: ("authorize the demo field", { _ in "authorized" })
                     )

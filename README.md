@@ -133,8 +133,16 @@ How it works, and why there is no popup anywhere:
   `Door(title:subtitle:reason:judge:)` and nothing else.
 
 Demo: `swift run door-example` — real Touch ID in-window, demo password
-"sesame". Next step when a consumer adopts: the compact in-field form
-(fingerprint inside a secret field) built on the same `DoorSensor`.
+"sesame"; the open state shows the compact form.
+
+The compact form ships too: **`SecretField`** (reveal eye, AutoFill
+content types, validation border) and **`DoorField`** — a SecretField
+with the biometric door built in. Three ways through: type, REST A FINGER
+(the paired sensor rides invisibly over a quiet static glyph — red while
+armed, the sensor's own semantic — recognizes in place, bounces green;
+wrong finger shakes and re-arms), or click for the classic system prompt.
+Generic over the key type: success hands `unlock` the evaluated context,
+and `kSecUseAuthenticationContext` keychain reads prompt nothing.
 
 ## Colophon
 
