@@ -57,7 +57,7 @@ public struct Door: View {
     private let prompt: String
     private let reason: String
     private let ask: DoorAsk
-    private let backdrop: Color
+    private let backdrop: AnyShapeStyle
     private let judge: @MainActor (DoorVerdict) async -> DoorJudgment
 
     // One attempt = one fresh LAContext + one fresh sensor view (`.id`).
@@ -89,8 +89,9 @@ public struct Door: View {
     ///     embedded sensor, but mandatory and user-visible in Settings).
     ///   - ask: what a successful touch authorizes (`.biometry` default).
     ///   - backdrop: the disc behind the fingerprint badge - pass the
-    ///     surface color the door sits on, so the badge reads as a cutout
-    ///     of the lock's corner (Safari's trick), never a floating glyph.
+    ///     surface the door sits on (a color OR a material), so the badge
+    ///     reads as a cutout of the lock's corner (Safari's trick), never
+    ///     a floating glyph.
     ///   - judge: receives every verdict; return `.accepted` to pass or
     ///     `.rejected(message)` to keep the door up. The consumer owns
     ///     dismissal - on `.accepted`, swap the door out of the hierarchy.
@@ -102,7 +103,7 @@ public struct Door: View {
         prompt: String = "Enter password",
         reason: String,
         ask: DoorAsk = .biometry,
-        backdrop: Color = .black,
+        backdrop: AnyShapeStyle = AnyShapeStyle(Color.black),
         judge: @escaping @MainActor (DoorVerdict) async -> DoorJudgment
     ) {
         self.icon = icon

@@ -28,7 +28,7 @@ struct DemoView: View {
                     subtitle: "Touch ID or type \u{201c}sesame\u{201d} to open the demo.",
                     inactiveSubtitle: "Type \u{201c}sesame\u{201d} to open the demo.",
                     reason: "unlock the door demo",
-                    backdrop: Color(white: 0.16)
+                    backdrop: AnyShapeStyle(Color(white: 0.16))
                 ) { verdict in
                     switch verdict {
                     case .biometry:
