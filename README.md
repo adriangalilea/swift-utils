@@ -141,8 +141,13 @@ with the biometric door built in. Three ways through: type, REST A FINGER
 (the paired sensor rides invisibly over a quiet static glyph — red while
 armed, the sensor's own semantic — recognizes in place, bounces green;
 wrong finger shakes and re-arms), or click for the classic system prompt.
-Generic over the key type: success hands `unlock` the evaluated context,
-and `kSecUseAuthenticationContext` keychain reads prompt nothing.
+Generic over the key type: `DoorUnlock(reason:unlock:)` names the door (a
+nominal type - an inline tuple+closure defeats the type checker), success
+hands `unlock` the evaluated context, and `kSecUseAuthenticationContext`
+keychain reads prompt nothing. `LoginPassword.verify` rounds it out: the
+typed fallback for curtains that gate nothing keychain-bound - Safari's
+own semantics (the user's LOGIN password, via OpenDirectory; unsandboxed
+apps only).
 
 ## Colophon
 
