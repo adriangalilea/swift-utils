@@ -28,6 +28,11 @@ let package = Package(
         // The premium gate shape: one boolean the app reads, dev-toggleable
         // in every non-release build, compile-time sealed in release.
         .library(name: "Entitlement", targets: ["Entitlement"]),
+        // In-window authentication, no popup: the Safari-private-mode
+        // curtain (embedded Touch ID sensor + inline secret field) and the
+        // DoorSensor primitive. The evaluated LAContext rides the verdict,
+        // so biometry-gated keychain reads need no second prompt.
+        .library(name: "Door", targets: ["Door"]),
         // The library-grid product: framework-free layout + selection
         // kernels (justified rows, the 2D cursor walk, the 3-mode
         // selection verb) and the GalleryView shell. Cross-platform by
@@ -66,6 +71,8 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .target(name: "Entitlement", resources: [.process("Resources")]),
+        .target(name: "Door"),
+        .executableTarget(name: "door-example", dependencies: ["Door"]),
         .target(name: "Gallery", dependencies: ["Ink"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap"]),

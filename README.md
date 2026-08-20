@@ -68,45 +68,65 @@ status often flips the instant a prompt fires, and a row that sprouts a
 paragraph as you click reads as background mutation, not help. Reference:
 hollow `PermissionRow.showDenied`.
 
-## Door (a pending component — in-window authentication, no popup)
+## Door
 
-The disease: hollow's app curtain (and every gated surface after it)
-authenticates through a bare keychain read or `LAContext.evaluatePolicy`, so macOS throws its
-floating system alert ("hollow is trying to unlock hollow… Use Password /
-Cancel") over the app. Safari private mode proves the god-tier shape: the
-WINDOW is the prompt — lock glyph with a fingerprint badge, one title, one
-subtitle, an inline password field; resting a finger unlocks, typing is the
-fallback, nothing floats.
+In-window authentication, no popup. The disease it cures: a gated app that
+authenticates through a bare keychain read or `LAContext.evaluatePolicy`
+gets macOS's floating system alert ("<app> is trying to unlock <app>… Use
+Password / Cancel") thrown over its own window. Safari private mode proves
+the right shape: the WINDOW is the prompt — a glyph wearing a fingerprint
+badge, one title, one status line, an inline password field; resting a
+finger unlocks, typing is the fallback, nothing floats.
 
-The design, when built:
+```swift
+Door(
+    title: "This Vault Is Locked",
+    subtitle: "Touch ID or enter the password to open it.",
+    reason: "unlock the vault"
+) { verdict in
+    switch verdict {
+    case .biometry(let context):  // evaluated LAContext: keychain reads with
+        // kSecUseAuthenticationContext prompt nothing
+        unlock(with: context)
+        return .accepted
+    case .secret(let typed) where verify(typed):
+        unlock()
+        return .accepted
+    case .secret:
+        return .rejected("That password didn\u{2019}t match.")
+    }
+}
+```
 
-- **`LocalAuthenticationEmbeddedUI`** (macOS 12+) is the enabling API:
-  `LAAuthenticationView(context:)` hosts the Touch ID affordance inside our
-  own view; evaluating the policy on that context renders inline instead of
-  the system panel. Verify first; also evaluate `LARightStore` /
-  `LAPersistedRight` + `LAAuthenticationView(right:)` (macOS 13+) as the
-  modern keychain-backed path.
-- **Own the LAContext, return it.** Today's popup is thrown by the KEYCHAIN:
-  reading a `.biometryCurrentSet` item runs the system's own UI. The
-  component evaluates its embedded context first and hands it back on
-  success; the consumer passes it to `SecItemCopyMatching` via
-  `kSecUseAuthenticationContext`, so the gated key reads with NO second
-  prompt. Result type: authorized `LAContext` (biometry door) OR the typed
-  secret (password/recovery door) — the consumer decides which doors exist.
-- **Finger-first, typing-seamless.** Policy armed on appear: a resting
-  finger unlocks with zero clicks. The field is always focusable — no mode
-  switch, no "use password instead" ceremony.
-- **No layout shift, ever** (the presentation corollary above): wrong finger
-  shakes the affordance, wrong secret styles the field; the composition
-  never grows or reflows on failure.
-- **Two sizes, one component**: the full-window curtain (Safari's screen;
-  hollow's LockScreen) and the compact in-field form — hollow's
-  `DoorField`/`SecretBox`/`SecretField` (fingerprint inside the text field,
-  green authorized state, AutoFill content types) migrate here as that
-  compact form when this lands.
+How it works, and why there is no popup anywhere:
 
-Consumers waiting: hollow (curtain + unlock/key sheets) and every gated
-app after it. Build here, not per-app.
+- **`DoorSensor`** (the public primitive) wraps
+  `LocalAuthenticationEmbeddedUI.LAAuthenticationView` (macOS 12+): the
+  sensor pairs with ONE `LAContext`, and any `evaluatePolicy` /
+  `evaluateAccessControl` on that context renders the Touch ID (or Watch)
+  affordance inside the view instead of the system alert.
+- **Door owns the context and hands it back.** The classic popup is thrown
+  by the KEYCHAIN when it reads a `.biometryCurrentSet` item. Door
+  evaluates on the paired context (in-window) and delivers it in the
+  verdict; passing it to `SecItemCopyMatching` via
+  `kSecUseAuthenticationContext` reads the gated item with no second
+  prompt (LAContext.h states this contract verbatim). `DoorAsk` picks what
+  a touch authorizes: `.biometry` (a plain curtain) or
+  `.accessControl(SecAccessControl, .useItem)` (evaluate the item's own
+  ACL up front).
+- **Finger-first, typing-seamless.** The sensor arms on appear — a resting
+  finger authorizes with zero clicks; the field is focused from the start,
+  no mode switch. A cancel stays quiet (no surprise re-prompt); touching
+  the sensor glyph re-arms a fresh attempt; no biometry on the machine (or
+  lockout) hides the sensor and the door is password-only, Safari-style.
+- **No layout shift, ever** (the presentation corollary above): subtitle
+  and rejection messages share ONE fixed slot, a wrong secret shakes the
+  field in place (geometry-only) and clears it. The consumer judges every
+  verdict (`.accepted` / `.rejected(message)`) and owns dismissal.
+
+Demo: `swift run door-example` — real Touch ID in-window, demo password
+"sesame". Next step when a consumer adopts: the compact in-field form
+(fingerprint inside a secret field) built on the same `DoorSensor`.
 
 ## Colophon
 
