@@ -8,6 +8,8 @@ import SwiftUI
 
 struct DemoView: View {
     @State private var open = false
+    @State private var fieldSecret = ""
+    @State private var fieldKey: String?
 
     var body: some View {
         ZStack {
@@ -19,6 +21,14 @@ struct DemoView: View {
                         .foregroundStyle(.green)
                     Text("open").font(.title2.weight(.semibold))
                     Button("lock again") { open = false }
+                    Divider().frame(width: 280).padding(.vertical, 8)
+                    Text("the compact form: DoorField").font(.caption).foregroundStyle(.secondary)
+                    DoorField(
+                        prompt: "type anything, or rest a finger",
+                        text: $fieldSecret, key: $fieldKey,
+                        door: ("authorize the demo field", { _ in "authorized" })
+                    )
+                    .frame(width: 280)
                 }
             } else {
                 Door(
