@@ -33,6 +33,12 @@ let package = Package(
         // DoorSensor primitive. The evaluated LAContext rides the verdict,
         // so biometry-gated keychain reads need no second prompt.
         .library(name: "Door", targets: ["Door"]),
+        // Permission standing, split-brain-proof: every grant resolves to
+        // ONE Standing (good / askable / broken) that carries its own
+        // presentation, so no two surfaces can disagree on "is this a
+        // problem?". Ships the Claim proof machine (for capabilities
+        // whose system readout lies), the TCC probes, and the live row.
+        .library(name: "Grant", targets: ["Grant"]),
         // The library-grid product: framework-free layout + selection
         // kernels (justified rows, the 2D cursor walk, the 3-mode
         // selection verb) and the GalleryView shell. Cross-platform by
@@ -72,6 +78,7 @@ let package = Package(
         ),
         .target(name: "Entitlement", resources: [.process("Resources")]),
         .target(name: "Door"),
+        .target(name: "Grant"),
         .executableTarget(name: "door-example", dependencies: ["Door"]),
         .target(name: "Gallery", dependencies: ["Ink"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),

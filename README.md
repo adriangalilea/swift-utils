@@ -149,6 +149,47 @@ typed fallback for curtains that gate nothing keychain-bound - Safari's
 own semantics (the user's LOGIN password, via OpenDirectory; unsandboxed
 apps only).
 
+## Grant
+
+Permission standing, split-brain-proof. Every grant an app needs (a TCC
+grant, a system-extension enable, a capability claim) resolves to ONE
+`Standing` - `good` (checkmark, nothing warns) / `askable` (one click asks,
+an offer not a failure) / `broken` (every surface warns with the SAME note
+and action). The presentation rides the state: surfaces render a Standing
+mechanically and never re-derive "is this a problem?", so a settings row
+and a main-window banner can never disagree.
+
+```swift
+struct ScreenGrant: Grant {
+    let symbol = "rectangle.dashed.badge.record"
+    let title = "See the screen"
+    let why = "Live capture needs the screen-recording grant."
+    let required = true
+    var standing: Standing {
+        switch TCC.accessibility() {  // or any probe
+        case true: .good
+        case nil: .askable("Grant\u{2026}")
+        case false: .broken("Open Settings\u{2026}", note: "Re-grant in System Settings.")
+        }
+    }
+    func act() { TCC.requestAccessibility() }
+}
+
+GrantRow(ScreenGrant())          // the live row: self-observing + own heartbeat,
+                                 // a parent can never strand it stale
+if grant.blocking { banner }     // THE one banner/preflight predicate
+```
+
+`Claim<Reason>` is the proof machine for capabilities whose system readout
+can lie (a settings plist that records intent while the daemon serves
+nothing): intent is a claim, a real outcome is the only witness, the
+verdict reconciles them, and every prediction/reality disagreement is a
+journaled CONTRADICTION. An unproven claim renders `good` - trust the
+switch until reality contradicts it; proof is journal detail, never UI
+divergence. `TCC` wraps the accessibility + per-app automation probes and
+requests, including the per-process AE answer cache and the
+denied-means-deep-link rule.
+
 ## Colophon
 
 The about/support Settings tab, designed once: app identity (name, version, build, icon) derived from the running bundle so it can never drift, the author byline, external links, the support ask, and an optional check-for-updates hook (Sparkle stays app-side, pass a closure).
