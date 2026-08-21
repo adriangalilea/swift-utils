@@ -160,13 +160,13 @@ mechanically and never re-derive "is this a problem?", so a settings row
 and a main-window banner can never disagree.
 
 ```swift
-struct ScreenGrant: Grant {
-    let symbol = "rectangle.dashed.badge.record"
-    let title = "See the screen"
-    let why = "Live capture needs the screen-recording grant."
-    let required = true
+struct AXGrant: Grant {
+    let symbol = "doc.text.magnifyingglass"
+    let title = "See open documents"
+    let why = "Only the accessibility API can see documents apps hold open."
+    let required = false
     var standing: Standing {
-        switch TCC.accessibility() {  // or any probe
+        switch TCC.accessibility() {  // true / false / nil = never asked
         case true: .good
         case nil: .askable("Grant\u{2026}")
         case false: .broken("Open Settings\u{2026}", note: "Re-grant in System Settings.")

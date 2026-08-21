@@ -8,32 +8,44 @@ import Foundation
 /// anything rawer. Two surfaces answering that question with their own
 /// thresholds is the split-brain bug - Settings warning while the main
 /// window shrugs - and with Standing as the only readable vocabulary it
-/// is unwritable.
-public struct Standing: Equatable, Sendable {
-    public enum Grade: Equatable, Sendable {
-        /// Nothing to do. Checkmark; no surface warns, no banner, no note.
-        case good
-        /// Not yet granted, one click asks. An OFFER, never a failure:
-        /// onboarding and settings present it, nothing warns about it.
-        case askable
-        /// The user must fix something outside the app. EVERY surface
-        /// warns - row, banner, preflight - with this same note + action.
-        case broken
+/// is unwritable. An enum so the invalid states (a good with an action,
+/// a broken without its fix) are unrepresentable.
+public enum Standing: Equatable, Sendable {
+    /// Nothing to do. Checkmark; no surface warns, no banner, no note.
+    case good
+    /// Not yet granted, one click asks. An OFFER, never a failure:
+    /// onboarding and settings present it, nothing warns about it.
+    case askable(_ actionTitle: String, note: String? = nil)
+    /// The user must fix something outside the app. EVERY surface warns -
+    /// row, banner, preflight - with this same note + action.
+    case broken(_ actionTitle: String, note: String)
+
+    /// The payload-free shape, for the comparisons surfaces live on
+    /// (`grade != .good`, `grade == .broken`).
+    public enum Grade: Equatable, Sendable { case good, askable, broken }
+
+    public var grade: Grade {
+        switch self {
+        case .good: .good
+        case .askable: .askable
+        case .broken: .broken
+        }
     }
 
-    public let grade: Grade
-    public let actionTitle: String
-    public let note: String?
-
-    public static let good = Standing(grade: .good, actionTitle: "", note: nil)
-
-    public static func askable(_ actionTitle: String, note: String? = nil) -> Standing {
-        Standing(grade: .askable, actionTitle: actionTitle, note: note)
+    /// Never rendered for `.good` (the checkmark replaces the button).
+    public var actionTitle: String {
+        switch self {
+        case .good: ""
+        case .askable(let title, _), .broken(let title, note: _): title
+        }
     }
 
-    /// Broken always carries its fix: a note is required by construction.
-    public static func broken(_ actionTitle: String, note: String) -> Standing {
-        Standing(grade: .broken, actionTitle: actionTitle, note: note)
+    public var note: String? {
+        switch self {
+        case .good: nil
+        case .askable(_, let note): note
+        case .broken(_, let note): note
+        }
     }
 }
 

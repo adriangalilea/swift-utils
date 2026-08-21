@@ -86,13 +86,13 @@ public final class Claim<Reason: Equatable> {
     /// said. Call from the app's reconcile path (app-active + relevant
     /// system events - the liveness pattern) with the switch's current
     /// read and whether the capability is live right now.
-    public func evaluate(off: Bool, live: Bool) {
+    public func evaluate(on: Bool, live: Bool) {
         if live, !proven { observe(.witnessed) }
         let next: Verdict =
-            if off { .impossible(whenOff) } else if proven {
+            if !on { .impossible(whenOff) } else if proven {
                 .capable
             } else if lastFailure != nil { .impossible(whenFailing) } else { .unproven }
-        transition(to: next, cause: "evaluate(off: \(off))")
+        transition(to: next, cause: "evaluate(on: \(on))")
     }
 
     /// Reality reports. A contradiction is reality disagreeing with the
