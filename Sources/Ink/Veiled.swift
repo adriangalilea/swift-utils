@@ -1,16 +1,17 @@
 import SwiftUI
 
 /// A value that identifies its owner - a serial, an install id, a
-/// license - shown VEILED: the first few characters and a bullet per
-/// hidden one, so a shared screenshot brags without doxxing. A click
-/// peeks the real value and it veils itself again after a beat; the
-/// eye says which state it is in.
+/// license - shown VEILED: bullets, so a shared screenshot brags
+/// without doxxing. `keep` leading characters may stay legible
+/// (default 0: fully hidden). At rest it is just text: the eye that
+/// toggles a peek exists only under the pointer, and a peek veils
+/// itself again after a beat.
 ///
-/// The geometry is static BY CONSTRUCTION: the text renders monospaced,
-/// and a bullet's advance equals any glyph's, so the veiled and the
-/// revealed string are the same width and the swap can never reflow the
-/// line. VoiceOver never reads the hidden value: the accessibility
-/// value is "hidden" until the owner peeks.
+/// The geometry is static BY CONSTRUCTION: the text renders monospaced
+/// (a bullet's advance equals any glyph's) and the eye lives in a
+/// fixed slot whether or not it is visible, so neither hover nor the
+/// peek can reflow the line. VoiceOver never reads the hidden value:
+/// the accessibility value is "hidden" until the owner peeks.
 public struct Veiled: View {
     let text: String
     let keep: Int
@@ -18,13 +19,13 @@ public struct Veiled: View {
     @State private var hovering = false
     @State private var reveil: Task<Void, Never>?
 
-    public init(_ text: String, keep: Int = 4) {
+    public init(_ text: String, keep: Int = 0) {
         self.text = text
         self.keep = keep
     }
 
     private var veiled: String {
-        String(text.prefix(keep)) + String(repeating: "•", count: max(0, text.count - keep))
+        String(text.prefix(keep)) + String(repeating: "\u{2022}", count: max(0, text.count - keep))
     }
 
     public var body: some View {
@@ -45,7 +46,7 @@ public struct Veiled: View {
                     .font(.caption2.weight(.medium))
                     .contentTransition(.symbolEffect(.replace))
                     .frame(width: 14, height: 14)
-                    .opacity(hovering || shown ? 0.9 : 0.45)
+                    .opacity(hovering ? 0.9 : 0)
             }
             .contentShape(Rectangle())
         }
