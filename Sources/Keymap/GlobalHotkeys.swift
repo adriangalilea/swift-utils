@@ -17,16 +17,21 @@ package final class GlobalHotkey {
     // entry. Carbon delivers on the main run loop, so the static table is
     // touched main-thread-only.
     nonisolated(unsafe) private static var handlers: [UInt32: () -> Void] = [:]
+    nonisolated(unsafe) static var releaseHandlers: [UInt32: () -> Void] = [:]
     nonisolated(unsafe) private static var handlerInstalled = false
 
     private var hotKeyRef: EventHotKeyRef?
     private let id: UInt32
 
-    package init(keyCode: UInt16, modifiers: UInt32, handler: @escaping () -> Void) {
+    package init(
+        keyCode: UInt16, modifiers: UInt32, handler: @escaping () -> Void,
+        onRelease: (() -> Void)? = nil
+    ) {
         id = Self.nextID
         Self.nextID += 1
         Self.installHandlerIfNeeded()
         Self.handlers[id] = handler
+        if let onRelease { Self.releaseHandlers[id] = onRelease }
 
         // Four bytes of the bundle id: distinct enough per app, and the
         // signature only disambiguates in debugging tools anyway.
@@ -42,6 +47,7 @@ package final class GlobalHotkey {
         // the grid can say so instead of a binding silently not firing.
         if status != noErr || hotKeyRef == nil {
             Self.handlers[id] = nil
+            Self.releaseHandlers[id] = nil
         } else {
             registered = true
         }
@@ -50,30 +56,64 @@ package final class GlobalHotkey {
     deinit {
         if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
         Self.handlers[id] = nil
+        Self.releaseHandlers[id] = nil
     }
 
     private static func installHandlerIfNeeded() {
         guard !handlerInstalled else { return }
         handlerInstalled = true
-        var eventType = EventTypeSpec(
-            eventClass: OSType(kEventClassKeyboard),
-            eventKind: UInt32(kEventHotKeyPressed)
-        )
+        var eventTypes = [
+            EventTypeSpec(
+                eventClass: OSType(kEventClassKeyboard),
+                eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(
+                eventClass: OSType(kEventClassKeyboard),
+                eventKind: UInt32(kEventHotKeyReleased)),
+        ]
         InstallEventHandler(
             GetApplicationEventTarget(),
             { _, event, _ in
-                var pressed = EventHotKeyID()
+                var hotkey = EventHotKeyID()
                 GetEventParameter(
                     event, EventParamName(kEventParamDirectObject),
                     EventParamType(typeEventHotKeyID), nil,
-                    MemoryLayout<EventHotKeyID>.size, nil, &pressed
+                    MemoryLayout<EventHotKeyID>.size, nil, &hotkey
                 )
-                guard let handler = GlobalHotkey.handlers[pressed.id] else {
+                let kind = GetEventKind(event)
+                if kind == UInt32(kEventHotKeyReleased) {
+                    guard let handler = GlobalHotkey.releaseHandlers[hotkey.id] else {
+                        return OSStatus(eventNotHandledErr)
+                    }
+                    handler()
+                    return noErr
+                }
+                guard let handler = GlobalHotkey.handlers[hotkey.id] else {
                     return OSStatus(eventNotHandledErr)
                 }
                 handler()
                 return noErr
-            }, 1, &eventType, nil, nil)
+            }, 2, &eventTypes, nil, nil)
+    }
+}
+
+/// A single system-wide combo with press AND release delivery - the
+/// push-to-talk shape (Ink's `PushToTalk` consumes exactly this pair).
+/// Permission-free like every Carbon hotkey; `registered == false` means
+/// another app owns the combo and this instance is inert. For an app with a
+/// KeymapStore, prefer the store-driven `GlobalHotkeys`; this is the
+/// low-ceremony path for one standalone binding.
+@MainActor
+public final class PressReleaseHotkey {
+    private let hotkey: GlobalHotkey
+    public var registered: Bool { hotkey.registered }
+
+    public init(
+        keyCode: UInt16, carbonModifiers: UInt32,
+        onPress: @escaping () -> Void, onRelease: @escaping () -> Void
+    ) {
+        hotkey = GlobalHotkey(
+            keyCode: keyCode, modifiers: carbonModifiers, handler: onPress,
+            onRelease: onRelease)
     }
 }
 
