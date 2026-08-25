@@ -78,17 +78,19 @@ public final class PushToTalk: ObservableObject {
 }
 
 #if os(macOS)
-    /// The listening identity: a Siri-family gradient (blue -> violet ->
-    /// pink), deliberately NOT red - red is the error/danger register, and
-    /// a live microphone is a state, not a problem. One gradient everywhere
-    /// the affordance appears; alpha and amplitude are the only variables.
+    /// The listening identity: Siri-family stops (blue -> violet -> pink),
+    /// deliberately NOT red - red is the error/danger register, and a live
+    /// microphone is a state, not a problem. The ONE definition: the view
+    /// gradient, the Canvas shading, and the latch badge all derive from
+    /// this array; alpha and amplitude are the only variables.
+    public let micListeningColors: [Color] = [
+        Color(red: 0.24, green: 0.65, blue: 1.0),
+        Color(red: 0.56, green: 0.39, blue: 1.0),
+        Color(red: 1.0, green: 0.36, blue: 0.66),
+    ]
+
     public let micListeningGradient = LinearGradient(
-        colors: [
-            Color(red: 0.24, green: 0.65, blue: 1.0),
-            Color(red: 0.56, green: 0.39, blue: 1.0),
-            Color(red: 1.0, green: 0.36, blue: 0.66),
-        ],
-        startPoint: .leading, endPoint: .trailing)
+        colors: micListeningColors, startPoint: .leading, endPoint: .trailing)
 
     /// The button. Idle: a quiet circle with the mic glyph and its keycap
     /// hint. Engaged: the circle fills with the listening gradient and a
@@ -118,7 +120,6 @@ public final class PushToTalk: ObservableObject {
             self.size = size
         }
 
-        @State private var pressing = false
         @GestureState private var pressed = false
 
         public var body: some View {
@@ -162,25 +163,25 @@ public final class PushToTalk: ObservableObject {
                         .font(.system(size: size * 0.3, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(2)
-                        .background(Color(red: 0.56, green: 0.39, blue: 1.0), in: Circle())
+                        .background(micListeningColors[1], in: Circle())
                         .offset(x: 3, y: -3)
                         .transition(.scale)
                 }
             }
             .contentShape(Circle())
+            // Press state is @GestureState ALONE: it resets on gesture end
+            // AND on cancellation (view removed mid-press, another gesture
+            // claiming the touch), where .onEnded never fires - so every
+            // way a press can die reaches pressEnded and the mic cannot
+            // stay hot behind a vanished button.
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .updating($pressed) { _, state, _ in state = true }
-                    .onChanged { _ in
-                        guard !pressing else { return }
-                        pressing = true
-                        talk.pressBegan()
-                    }
-                    .onEnded { _ in
-                        pressing = false
-                        talk.pressEnded()
-                    }
             )
+            .onChange(of: pressed) { _, down in
+                down ? talk.pressBegan() : talk.pressEnded()
+            }
+            .onDisappear { talk.stop() }
             .help(
                 talk.engaged
                     ? (talk.latched ? "Recording (locked) - tap to stop" : "Recording while held")
@@ -201,14 +202,9 @@ public final class PushToTalk: ObservableObject {
                     let inset = CGRect(origin: .zero, size: canvasSize)
                         .insetBy(dx: 5, dy: 2)
                     let gain: CGFloat = hot ? 1.0 : 0.4
-                    let ribbon = Self.wavePath(
-                        bands: bands, in: inset, gain: gain, mirrored: true)
+                    let ribbon = Self.wavePath(bands: bands, in: inset, gain: gain)
                     let shading = GraphicsContext.Shading.linearGradient(
-                        Gradient(colors: [
-                            Color(red: 0.24, green: 0.65, blue: 1.0),
-                            Color(red: 0.56, green: 0.39, blue: 1.0),
-                            Color(red: 1.0, green: 0.36, blue: 0.66),
-                        ]),
+                        Gradient(colors: micListeningColors),
                         startPoint: CGPoint(x: inset.minX, y: 0),
                         endPoint: CGPoint(x: inset.maxX, y: 0))
                     // Glow under, ribbon over, core line on top: the Siri
@@ -220,8 +216,7 @@ public final class PushToTalk: ObservableObject {
                     }
                     context.opacity = hot ? 0.95 : 0.45
                     context.fill(ribbon, with: shading)
-                    let core = Self.wavePath(
-                        bands: bands, in: inset, gain: gain * 0.55, mirrored: true)
+                    let core = Self.wavePath(bands: bands, in: inset, gain: gain * 0.55)
                     context.opacity = hot ? 0.9 : 0.5
                     context.fill(core, with: .color(.white.opacity(0.55)))
                 }
@@ -234,9 +229,7 @@ public final class PushToTalk: ObservableObject {
         /// Catmull-Rom smoothed so speech reads as a wave, never as bars.
         /// Silence collapses to a hairline center - the resting state IS
         /// the visualization of "nothing to hear".
-        private static func wavePath(
-            bands: [Float], in rect: CGRect, gain: CGFloat, mirrored: Bool
-        ) -> Path {
+        private static func wavePath(bands: [Float], in rect: CGRect, gain: CGFloat) -> Path {
             let midY = rect.midY
             let halfHeight = rect.height / 2
             let count = max(bands.count, 2)
@@ -270,10 +263,8 @@ public final class PushToTalk: ObservableObject {
             }
             var path = Path()
             smooth(points, into: &path, flip: -1)
-            if mirrored {
-                smooth(points.reversed(), into: &path, flip: 1)
-                path.closeSubpath()
-            }
+            smooth(points.reversed(), into: &path, flip: 1)
+            path.closeSubpath()
             return path
         }
     }

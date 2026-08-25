@@ -6,21 +6,25 @@ import SwiftUI
 /// unlike NSEvent global monitors it needs no accessibility permission.
 /// Carbon is ancient but remains the ONLY permission-free path macOS
 /// offers; it is quarantined to this file.
+@MainActor
 package final class GlobalHotkey {
     /// Whether Carbon accepted the registration - false means another app
     /// (or the OS) owns the combo and this instance is inert.
     package private(set) var registered = false
 
-    nonisolated(unsafe) private static var nextID: UInt32 = 1
+    private static var nextID: UInt32 = 1
     // id → handler, the single routing table. One app-level Carbon handler
     // dispatches every press through it; instances add/remove their own
-    // entry. Carbon delivers on the main run loop, so the static table is
-    // touched main-thread-only.
-    nonisolated(unsafe) private static var handlers: [UInt32: () -> Void] = [:]
-    nonisolated(unsafe) static var releaseHandlers: [UInt32: () -> Void] = [:]
-    nonisolated(unsafe) private static var handlerInstalled = false
+    // entry.
+    private static var handlers: [UInt32: () -> Void] = [:]
+    static var releaseHandlers: [UInt32: () -> Void] = [:]
+    private static var handlerInstalled = false
 
-    private var hotKeyRef: EventHotKeyRef?
+    // UnsafeSendable wrapper: an EventHotKeyRef is a Carbon opaque pointer
+    // whose only post-init use is UnregisterEventHotKey on main; the box
+    // exists so the nonisolated deinit can hand it to the teardown hop.
+    private struct Ref: @unchecked Sendable { let value: EventHotKeyRef }
+    private var hotKeyRef: Ref?
     private let id: UInt32
 
     package init(
@@ -38,13 +42,15 @@ package final class GlobalHotkey {
         let signature = (Bundle.main.bundleIdentifier ?? "kmap").utf8.prefix(4)
             .reduce(OSType(0)) { $0 << 8 | OSType($1) }
         let hotKeyID = EventHotKeyID(signature: signature, id: id)
+        var raw: EventHotKeyRef?
         let status = RegisterEventHotKey(
-            UInt32(keyCode), modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef
+            UInt32(keyCode), modifiers, hotKeyID, GetApplicationEventTarget(), 0, &raw
         )
         // Another app may own this combo - that's their machine, not a bug.
         // The in-app combo still works; drop the dead routing entry so it
         // can't leak. The FAILURE is surfaced (GlobalHotkeys → store) so
         // the grid can say so instead of a binding silently not firing.
+        if let raw { hotKeyRef = Ref(value: raw) }
         if status != noErr || hotKeyRef == nil {
             Self.handlers[id] = nil
             Self.releaseHandlers[id] = nil
@@ -53,10 +59,21 @@ package final class GlobalHotkey {
         }
     }
 
+    // The last reference can drop on any thread, and the table writes must
+    // land where the Carbon callback reads - main. `isolated deinit` is the
+    // right tool but swift-frontend 6.3.3 crashes SILGen on it under
+    // coverage instrumentation (vigil's xcodebuild; emitIsolatingDestructor
+    // + MapRegionCounters) - so: capture by value, hop the teardown. The
+    // sub-millisecond window where a press can still find the table entry
+    // is harmless: ids are unique and never reused.
     deinit {
-        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
-        Self.handlers[id] = nil
-        Self.releaseHandlers[id] = nil
+        let ref = hotKeyRef
+        let id = id
+        Task { @MainActor in
+            if let ref { UnregisterEventHotKey(ref.value) }
+            GlobalHotkey.handlers[id] = nil
+            GlobalHotkey.releaseHandlers[id] = nil
+        }
     }
 
     private static func installHandlerIfNeeded() {
@@ -73,25 +90,29 @@ package final class GlobalHotkey {
         InstallEventHandler(
             GetApplicationEventTarget(),
             { _, event, _ in
-                var hotkey = EventHotKeyID()
-                GetEventParameter(
-                    event, EventParamName(kEventParamDirectObject),
-                    EventParamType(typeEventHotKeyID), nil,
-                    MemoryLayout<EventHotKeyID>.size, nil, &hotkey
-                )
-                let kind = GetEventKind(event)
-                if kind == UInt32(kEventHotKeyReleased) {
-                    guard let handler = GlobalHotkey.releaseHandlers[hotkey.id] else {
+                // Carbon delivers on the main run loop; assumeIsolated traps
+                // loudly if that ever stops holding.
+                MainActor.assumeIsolated {
+                    var hotkey = EventHotKeyID()
+                    GetEventParameter(
+                        event, EventParamName(kEventParamDirectObject),
+                        EventParamType(typeEventHotKeyID), nil,
+                        MemoryLayout<EventHotKeyID>.size, nil, &hotkey
+                    )
+                    let kind = GetEventKind(event)
+                    if kind == UInt32(kEventHotKeyReleased) {
+                        guard let handler = GlobalHotkey.releaseHandlers[hotkey.id] else {
+                            return OSStatus(eventNotHandledErr)
+                        }
+                        handler()
+                        return noErr
+                    }
+                    guard let handler = GlobalHotkey.handlers[hotkey.id] else {
                         return OSStatus(eventNotHandledErr)
                     }
                     handler()
                     return noErr
                 }
-                guard let handler = GlobalHotkey.handlers[hotkey.id] else {
-                    return OSStatus(eventNotHandledErr)
-                }
-                handler()
-                return noErr
             }, 2, &eventTypes, nil, nil)
     }
 }
