@@ -14,7 +14,7 @@ import SwiftUI
 // The audio itself is not this component's business: feed it a spectrum
 // provider (0-1 band magnitudes) and a voice-activity flag - in the studio
 // both come from listen's `AudioSpectrum` over a `MicCapture`
-// (github.com/adriangalilea/listen). This file owns the FEEL; listen owns
+// (github.com/adriangalilea/swift-senses). This file owns the FEEL; listen owns
 // the signal.
 
 /// The tap-vs-hold state machine. `pressBegan`/`pressEnded` from any input
