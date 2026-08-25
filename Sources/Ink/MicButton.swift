@@ -78,12 +78,25 @@ public final class PushToTalk: ObservableObject {
 }
 
 #if os(macOS)
+    /// The listening identity: a Siri-family gradient (blue -> violet ->
+    /// pink), deliberately NOT red - red is the error/danger register, and
+    /// a live microphone is a state, not a problem. One gradient everywhere
+    /// the affordance appears; alpha and amplitude are the only variables.
+    public let micListeningGradient = LinearGradient(
+        colors: [
+            Color(red: 0.24, green: 0.65, blue: 1.0),
+            Color(red: 0.56, green: 0.39, blue: 1.0),
+            Color(red: 1.0, green: 0.36, blue: 0.66),
+        ],
+        startPoint: .leading, endPoint: .trailing)
+
     /// The button. Idle: a quiet circle with the mic glyph and its keycap
-    /// hint. Engaged: the circle turns recording-red and a spectrum capsule
-    /// unfolds beside it - live band magnitudes, bright while voice is
-    /// detected, dim over silence, so "is it hearing ME" is answered by the
-    /// bars, not by faith. A latched capture wears a lock badge: the next
-    /// tap (or the same key) stops it.
+    /// hint. Engaged: the circle fills with the listening gradient and a
+    /// waveform capsule unfolds beside it - a smooth mirrored ribbon drawn
+    /// from live band magnitudes with a soft glow, full-amplitude and
+    /// saturated while voice is detected, low and dim over room tone, so
+    /// "is it hearing ME" is answered by the wave, not by faith. A latched
+    /// capture wears a lock badge: the next tap (or the same key) stops it.
     public struct MicButton: View {
         @ObservedObject var talk: PushToTalk
         let spectrum: () -> [Float]
@@ -130,7 +143,12 @@ public final class PushToTalk: ObservableObject {
         private var circle: some View {
             ZStack(alignment: .topTrailing) {
                 Circle()
-                    .fill(talk.engaged ? Color.red : .inkRest)
+                    .fill(.inkRest)
+                    .overlay {
+                        if talk.engaged {
+                            Circle().fill(micListeningGradient)
+                        }
+                    }
                     .frame(width: size, height: size)
                     .overlay {
                         Image(systemName: talk.engaged ? "mic.fill" : "mic")
@@ -144,7 +162,7 @@ public final class PushToTalk: ObservableObject {
                         .font(.system(size: size * 0.3, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(2)
-                        .background(Color.red, in: Circle())
+                        .background(Color(red: 0.56, green: 0.39, blue: 1.0), in: Circle())
                         .offset(x: 3, y: -3)
                         .transition(.scale)
                 }
@@ -169,34 +187,94 @@ public final class PushToTalk: ObservableObject {
                     : "Hold to talk; tap to lock on")
         }
 
-        /// The live spectrum: one red identity, alpha the only variable
-        /// (bright = voice detected, dim = room tone), bars centered like a
-        /// waveform. Data-driven animation only - it moves because the
-        /// AUDIO moves, and rests flat the instant capture stops.
+        /// The live waveform: a smooth mirrored ribbon through the band
+        /// magnitudes, gradient-filled with a soft glow beneath and a crisp
+        /// core line - full amplitude and opacity while voice is detected,
+        /// low and dim over room tone. Data-driven animation only: it moves
+        /// because the AUDIO moves, and rests flat the instant capture
+        /// stops.
         private var spectrumCapsule: some View {
             TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !talk.engaged)) { _ in
                 let bands = spectrum()
                 let hot = voiceActive()
                 Canvas { context, canvasSize in
-                    let count = max(bands.count, 1)
-                    let barWidth: CGFloat = 2.5
-                    let gap =
-                        (canvasSize.width - CGFloat(count) * barWidth) / CGFloat(count + 1)
-                    for (index, magnitude) in bands.enumerated() {
-                        let height = max(2, CGFloat(magnitude) * (canvasSize.height - 4))
-                        let rect = CGRect(
-                            x: gap + CGFloat(index) * (barWidth + gap),
-                            y: (canvasSize.height - height) / 2,
-                            width: barWidth,
-                            height: height)
-                        context.fill(
-                            Path(roundedRect: rect, cornerRadius: barWidth / 2),
-                            with: .color(.red.opacity(hot ? 0.95 : 0.35)))
+                    let inset = CGRect(origin: .zero, size: canvasSize)
+                        .insetBy(dx: 5, dy: 2)
+                    let gain: CGFloat = hot ? 1.0 : 0.4
+                    let ribbon = Self.wavePath(
+                        bands: bands, in: inset, gain: gain, mirrored: true)
+                    let shading = GraphicsContext.Shading.linearGradient(
+                        Gradient(colors: [
+                            Color(red: 0.24, green: 0.65, blue: 1.0),
+                            Color(red: 0.56, green: 0.39, blue: 1.0),
+                            Color(red: 1.0, green: 0.36, blue: 0.66),
+                        ]),
+                        startPoint: CGPoint(x: inset.minX, y: 0),
+                        endPoint: CGPoint(x: inset.maxX, y: 0))
+                    // Glow under, ribbon over, core line on top: the Siri
+                    // depth recipe, all one gradient.
+                    context.drawLayer { glow in
+                        glow.addFilter(.blur(radius: 3))
+                        glow.opacity = hot ? 0.7 : 0.3
+                        glow.fill(ribbon, with: shading)
                     }
+                    context.opacity = hot ? 0.95 : 0.45
+                    context.fill(ribbon, with: shading)
+                    let core = Self.wavePath(
+                        bands: bands, in: inset, gain: gain * 0.55, mirrored: true)
+                    context.opacity = hot ? 0.9 : 0.5
+                    context.fill(core, with: .color(.white.opacity(0.55)))
                 }
             }
             .frame(width: 74, height: size)
             .background(.inkRest, in: Capsule())
+        }
+
+        /// A closed, vertically mirrored ribbon through the magnitudes:
+        /// Catmull-Rom smoothed so speech reads as a wave, never as bars.
+        /// Silence collapses to a hairline center - the resting state IS
+        /// the visualization of "nothing to hear".
+        private static func wavePath(
+            bands: [Float], in rect: CGRect, gain: CGFloat, mirrored: Bool
+        ) -> Path {
+            let midY = rect.midY
+            let halfHeight = rect.height / 2
+            let count = max(bands.count, 2)
+            let points: [CGPoint] = (0..<count).map { index in
+                let magnitude = index < bands.count ? CGFloat(bands[index]) : 0
+                return CGPoint(
+                    x: rect.minX + rect.width * CGFloat(index) / CGFloat(count - 1),
+                    y: max(1.2, magnitude * halfHeight * gain))
+            }
+            func smooth(_ pts: [CGPoint], into path: inout Path, flip: CGFloat) {
+                let mapped = pts.map { CGPoint(x: $0.x, y: midY + flip * $0.y) }
+                guard let first = mapped.first else { return }
+                if flip > 0 {
+                    path.addLine(to: first)
+                } else {
+                    path.move(to: first)
+                }
+                for index in 1..<mapped.count {
+                    let previous = mapped[index - 1]
+                    let current = mapped[index]
+                    let before = mapped[max(0, index - 2)]
+                    let after = mapped[min(mapped.count - 1, index + 1)]
+                    let control1 = CGPoint(
+                        x: previous.x + (current.x - before.x) / 6,
+                        y: previous.y + (current.y - before.y) / 6)
+                    let control2 = CGPoint(
+                        x: current.x - (after.x - previous.x) / 6,
+                        y: current.y - (after.y - previous.y) / 6)
+                    path.addCurve(to: current, control1: control1, control2: control2)
+                }
+            }
+            var path = Path()
+            smooth(points, into: &path, flip: -1)
+            if mirrored {
+                smooth(points.reversed(), into: &path, flip: 1)
+                path.closeSubpath()
+            }
+            return path
         }
     }
 #endif
