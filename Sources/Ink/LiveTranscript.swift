@@ -68,6 +68,56 @@ public final class LiveTranscriptModel: ObservableObject {
     }
 }
 
+/// One transcript line - the grammar SHARED by live and MATERIALIZED
+/// rendering, so a transcript reads identically while it forms and years
+/// later in a historical view (a consumer persists text + locale +
+/// confidence per segment and renders these): solid text for committed
+/// words, `wet: true` for the in-progress register (italic, dim), and the
+/// quiet mono metadata pill - language prefix ("es", never "es-ES") with
+/// the confidence score, warming to orange below 0.7 (the ONE place that
+/// hue lives).
+public struct TranscriptLine: View {
+    public var text: String
+    public var locale: String?
+    public var confidence: Double?
+    public var wet: Bool
+
+    public init(
+        text: String, locale: String? = nil, confidence: Double? = nil, wet: Bool = false
+    ) {
+        self.text = text
+        self.locale = locale
+        self.confidence = confidence
+        self.wet = wet
+    }
+
+    public var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Group {
+                if wet {
+                    Text(text).font(.callout.italic()).foregroundStyle(.secondary)
+                } else {
+                    Text(text).font(.callout)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if locale != nil || confidence != nil {
+                pill
+            }
+        }
+    }
+
+    private var pill: some View {
+        let lang = locale.map { String($0.prefix(2)).lowercased() }
+        let score = confidence.map { String(format: "%.2f", $0) }
+        let label = [lang, score].compactMap { $0 }.joined(separator: " ")
+        let weak = (confidence ?? 1) < 0.7
+        return Text(label)
+            .font(.caption2.monospaced())
+            .foregroundStyle(weak ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
+    }
+}
+
 public struct LiveTranscript: View {
     @ObservedObject private var model: LiveTranscriptModel
     private let hint: String
@@ -86,42 +136,16 @@ public struct LiveTranscript: View {
                     .foregroundStyle(.tertiary)
             }
             ForEach(model.committed) { line in
-                row(
-                    text: Text(line.text).font(.callout),
-                    locale: line.locale, confidence: line.confidence
+                TranscriptLine(
+                    text: line.text, locale: line.locale, confidence: line.confidence
                 )
                 .transition(.opacity)
             }
             if !model.preview.isEmpty {
-                row(
-                    text: Text(model.preview).font(.callout.italic())
-                        .foregroundStyle(.secondary),
-                    locale: model.previewLocale, confidence: nil)
+                TranscriptLine(text: model.preview, locale: model.previewLocale, wet: true)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .clipped()
-    }
-
-    private func row(text: Text, locale: String?, confidence: Double?) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            text.frame(maxWidth: .infinity, alignment: .leading)
-            if locale != nil || confidence != nil {
-                pill(locale: locale, confidence: confidence)
-            }
-        }
-    }
-
-    private func pill(locale: String?, confidence: Double?) -> some View {
-        // Metadata voice: mono, lowercase, tiny. The language prefix alone
-        // ("es", never "es-ES") - the arbitration verdict at a glance; a
-        // sub-0.7 confidence warms the pill, the ONE place that hue lives.
-        let lang = locale.map { String($0.prefix(2)).lowercased() }
-        let score = confidence.map { String(format: "%.2f", $0) }
-        let label = [lang, score].compactMap { $0 }.joined(separator: " ")
-        let weak = (confidence ?? 1) < 0.7
-        return Text(label)
-            .font(.caption2.monospaced())
-            .foregroundStyle(weak ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
     }
 }
