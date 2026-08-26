@@ -5,19 +5,24 @@ import SwiftUI
 // readout. The words come from a speech session (in the studio, listen's
 // volatile + final segments); this file owns the FEEL.
 //
-// Two registers of truth, the ghost-text grammar:
-//   - the PREVIEW is wet ink: italic, slightly dimmed, mutating in place
-//     under the recognizer - undecided, never act on it. It updates with
-//     NO animation: wet ink must track the voice with zero added latency.
-//   - a COMMIT crystallizes: the text snaps solid at full weight, carries
-//     its locale + confidence as quiet mono metadata, and then FADES like
-//     a caption - the words already live where they were written (the
-//     consumer's pane/document), so the readout stays about the present,
-//     never an archive.
-// Confidence colors NOTHING unless it means something: below 0.7 the
-// metadata pill alone warms to orange (one hue, carrying meaning).
-// Layout-neutral and content-hugging - the host brings the chrome
-// (`hudGlass()` floating, or a list row in a historical view).
+// The grammar:
+//   - wet ink: italic, slightly dimmed, mutating in place - undecided,
+//     never act on it. Zero animation on updates (it must track the voice
+//     with no added latency); ink with no update inside `previewLinger`
+//     EVAPORATES with a fade - abandoned ink was never real, and stale
+//     wet ink lingering reads as the machine being stuck.
+//   - a COMMIT crystallizes: solid, full weight, confidence as quiet mono
+//     metadata (sub-0.7 warms to orange - the one hue, carrying meaning),
+//     then FADES like a caption: the words already live where they were
+//     written.
+//   - THE RACE: before any final, every candidate recognizer's preview
+//     shows, divided, each tagged with its flag - you watch the
+//     arbitration. A final CROWNS a winner: losers vanish and are ignored
+//     from then on; for a given stretch of audio there is one winner.
+//   - the FLAG SLOT is leading and RESERVED - it never travels with the
+//     text. Undecided shows the neutral glyph; the winner's flag lands
+//     with the first commit. (The slot is where the language
+//     toggle/dropdown lives later; autodetect today.)
 
 /// The state machine + caption decay. Feed it `preview`/`commit` from a
 /// speech session; the view renders whatever it holds.
@@ -30,52 +35,49 @@ public final class LiveTranscriptModel: ObservableObject {
         public let confidence: Double?
     }
 
+    public struct Race: Identifiable, Equatable {
+        public var id: String { locale ?? "" }
+        public let locale: String?
+        public let text: String
+        public let at: Date
+    }
+
     @Published public private(set) var committed: [Committed] = []
-    @Published public private(set) var preview = ""
-    @Published public private(set) var previewLocale: String?
-    /// The language on the air right now (last preview/commit that named
-    /// one) - the capsule's FIXED flag slot reads this, so the flag never
-    /// travels with the text.
-    @Published public private(set) var currentLocale: String?
+    /// One live preview per candidate recognizer, stable order.
+    @Published public private(set) var races: [Race] = []
+    /// The crowned language - set ONLY by a commit. nil = undecided (the
+    /// slot shows the neutral glyph, every race shows).
+    @Published public private(set) var winner: String?
 
     /// How long a committed line stays before fading - caption timing.
     public var linger: TimeInterval = 2.4
-    /// How long wet ink survives without an update before it EVAPORATES:
-    /// a preview the recognizer abandoned (or that lost the race) was
-    /// never real, and stale wet ink lingering forever reads as the
-    /// machine being stuck.
+    /// How long wet ink survives without an update before evaporating.
     public var previewLinger: TimeInterval = 2.0
 
-    private var previewGeneration = 0
+    private var pruner: Task<Void, Never>?
 
     public init() {}
 
     public func preview(_ text: String, locale: String? = nil) {
-        preview = text
-        previewLocale = locale
-        if let locale { currentLocale = locale }
-        previewGeneration += 1
-        let generation = previewGeneration
-        Task { [weak self] in
-            guard let self else { return }
-            try? await Task.sleep(for: .seconds(previewLinger))
-            guard previewGeneration == generation, !self.preview.isEmpty else { return }
-            withAnimation(.easeOut(duration: 0.45)) {
-                self.preview = ""
-                self.previewLocale = nil
-            }
+        // A crowned race silences the losers outright.
+        if let winner, let locale, locale != winner { return }
+        let race = Race(locale: locale, text: text, at: Date())
+        if let index = races.firstIndex(where: { $0.id == race.id }) {
+            races[index] = race
+        } else {
+            races.append(race)
+            races.sort { $0.id < $1.id }
         }
+        armPruner()
     }
 
-    /// The preview crystallized (or a final arrived unheralded). Clears
-    /// the wet ink it supersedes and schedules the caption fade.
+    /// A final crowned its locale. Clears every race and schedules the
+    /// caption fade.
     public func commit(_ text: String, locale: String? = nil, confidence: Double? = nil) {
         let line = Committed(text: text, locale: locale, confidence: confidence)
         committed.append(line)
-        preview = ""
-        previewLocale = nil
-        if let locale { currentLocale = locale }
-        previewGeneration += 1
+        races = []
+        if let locale { winner = locale }
         Task { [weak self] in
             guard let self else { return }
             try? await Task.sleep(for: .seconds(linger))
@@ -87,10 +89,30 @@ public final class LiveTranscriptModel: ObservableObject {
 
     public func reset() {
         committed = []
-        preview = ""
-        previewLocale = nil
-        currentLocale = nil
-        previewGeneration += 1
+        races = []
+        winner = nil
+        pruner?.cancel()
+        pruner = nil
+    }
+
+    private func armPruner() {
+        guard pruner == nil else { return }
+        pruner = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(0.5))
+                guard let self else { return }
+                let cutoff = Date().addingTimeInterval(-previewLinger)
+                if races.contains(where: { $0.at < cutoff }) {
+                    withAnimation(.easeOut(duration: 0.45)) {
+                        self.races.removeAll { $0.at < cutoff }
+                    }
+                }
+                if races.isEmpty {
+                    pruner = nil
+                    return
+                }
+            }
+        }
     }
 }
 
@@ -99,10 +121,9 @@ public final class LiveTranscriptModel: ObservableObject {
 /// later in a historical view (a consumer persists text + locale +
 /// confidence per segment and renders these): solid text for committed
 /// words, `wet: true` for the in-progress register, and the quiet mono
-/// metadata pill - language prefix ("es", never "es-ES") with the
-/// confidence score, warming to orange below 0.7 (the ONE place that hue
-/// lives). Layout-neutral: no greedy frames - the host decides whether
-/// rows hug (a floating capsule) or fill (a document view).
+/// metadata pill - the locale's FLAG (never a code) with the confidence
+/// score, warming to orange below 0.7. Layout-neutral: no greedy frames -
+/// the host decides whether rows hug or fill.
 public struct TranscriptLine: View {
     public var text: String
     public var locale: String?
@@ -139,8 +160,6 @@ public struct TranscriptLine: View {
     }
 
     private var pill: some View {
-        // Flag, never a code - codes are engineering leaking into the
-        // interface. Confidence stays a number; sub-0.7 warms it.
         let flag = LocaleFlag.emoji(locale)
         let score = confidence.map { String(format: "%.2f", $0) }
         let label = [flag, score].compactMap { $0 }.joined(separator: " ")
@@ -162,12 +181,10 @@ public struct LiveTranscript: View {
     }
 
     public var body: some View {
-        // The flag lives in a FIXED trailing slot - reserved even when
-        // empty, so it never travels with the text (autodetect today; the
-        // slot is where the language toggle/dropdown lands later).
         HStack(alignment: .top, spacing: 12) {
+            slot
             VStack(alignment: .leading, spacing: 5) {
-                if model.committed.isEmpty && model.preview.isEmpty {
+                if model.committed.isEmpty && model.races.isEmpty {
                     Text(hint)
                         .font(.system(size: 16))
                         .italic()
@@ -177,15 +194,41 @@ public struct LiveTranscript: View {
                     TranscriptLine(text: line.text, confidence: line.confidence)
                         .transition(.opacity)
                 }
-                if !model.preview.isEmpty {
-                    TranscriptLine(text: model.preview, wet: true)
+                if model.races.count > 1 {
+                    // The race, visible: every candidate's guess, divided,
+                    // each under its own flag - until a final crowns one.
+                    ForEach(Array(model.races.enumerated()), id: \.element.id) { index, race in
+                        if index > 0 {
+                            Divider().opacity(0.25)
+                        }
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(LocaleFlag.emoji(race.locale) ?? "·")
+                                .font(.system(size: 11))
+                                .opacity(0.8)
+                            TranscriptLine(text: race.text, wet: true)
+                        }
+                        .transition(.opacity)
+                    }
+                } else if let race = model.races.first {
+                    TranscriptLine(text: race.text, wet: true)
                         .transition(.opacity)
                 }
             }
-            Text(LocaleFlag.emoji(model.currentLocale) ?? " ")
-                .font(.system(size: 13))
-                .frame(width: 20, alignment: .trailing)
-                .opacity(0.9)
         }
+    }
+
+    /// The LEADING flag slot, always reserved - the flag never travels
+    /// with the text. Undecided = the neutral glyph.
+    private var slot: some View {
+        Group {
+            if let flag = LocaleFlag.emoji(model.winner) {
+                Text(flag).font(.system(size: 14))
+            } else {
+                Image(systemName: "globe")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary.opacity(0.35))
+            }
+        }
+        .frame(width: 20, height: 20)
     }
 }
