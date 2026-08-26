@@ -33,15 +33,38 @@ public final class LiveTranscriptModel: ObservableObject {
     @Published public private(set) var committed: [Committed] = []
     @Published public private(set) var preview = ""
     @Published public private(set) var previewLocale: String?
+    /// The language on the air right now (last preview/commit that named
+    /// one) - the capsule's FIXED flag slot reads this, so the flag never
+    /// travels with the text.
+    @Published public private(set) var currentLocale: String?
 
     /// How long a committed line stays before fading - caption timing.
     public var linger: TimeInterval = 2.4
+    /// How long wet ink survives without an update before it EVAPORATES:
+    /// a preview the recognizer abandoned (or that lost the race) was
+    /// never real, and stale wet ink lingering forever reads as the
+    /// machine being stuck.
+    public var previewLinger: TimeInterval = 2.0
+
+    private var previewGeneration = 0
 
     public init() {}
 
     public func preview(_ text: String, locale: String? = nil) {
         preview = text
         previewLocale = locale
+        if let locale { currentLocale = locale }
+        previewGeneration += 1
+        let generation = previewGeneration
+        Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .seconds(previewLinger))
+            guard previewGeneration == generation, !self.preview.isEmpty else { return }
+            withAnimation(.easeOut(duration: 0.45)) {
+                self.preview = ""
+                self.previewLocale = nil
+            }
+        }
     }
 
     /// The preview crystallized (or a final arrived unheralded). Clears
@@ -51,6 +74,8 @@ public final class LiveTranscriptModel: ObservableObject {
         committed.append(line)
         preview = ""
         previewLocale = nil
+        if let locale { currentLocale = locale }
+        previewGeneration += 1
         Task { [weak self] in
             guard let self else { return }
             try? await Task.sleep(for: .seconds(linger))
@@ -64,6 +89,8 @@ public final class LiveTranscriptModel: ObservableObject {
         committed = []
         preview = ""
         previewLocale = nil
+        currentLocale = nil
+        previewGeneration += 1
     }
 }
 
@@ -112,9 +139,11 @@ public struct TranscriptLine: View {
     }
 
     private var pill: some View {
-        let lang = locale.map { String($0.prefix(2)).lowercased() }
+        // Flag, never a code - codes are engineering leaking into the
+        // interface. Confidence stays a number; sub-0.7 warms it.
+        let flag = LocaleFlag.emoji(locale)
         let score = confidence.map { String(format: "%.2f", $0) }
-        let label = [lang, score].compactMap { $0 }.joined(separator: " ")
+        let label = [flag, score].compactMap { $0 }.joined(separator: " ")
         let weak = (confidence ?? 1) < 0.7
         return Text(label)
             .font(.caption.monospaced())
@@ -133,22 +162,30 @@ public struct LiveTranscript: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            if model.committed.isEmpty && model.preview.isEmpty {
-                Text(hint)
-                    .font(.system(size: 16))
-                    .italic()
-                    .foregroundStyle(.primary.opacity(0.5))
+        // The flag lives in a FIXED trailing slot - reserved even when
+        // empty, so it never travels with the text (autodetect today; the
+        // slot is where the language toggle/dropdown lands later).
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                if model.committed.isEmpty && model.preview.isEmpty {
+                    Text(hint)
+                        .font(.system(size: 16))
+                        .italic()
+                        .foregroundStyle(.primary.opacity(0.5))
+                }
+                ForEach(model.committed) { line in
+                    TranscriptLine(text: line.text, confidence: line.confidence)
+                        .transition(.opacity)
+                }
+                if !model.preview.isEmpty {
+                    TranscriptLine(text: model.preview, wet: true)
+                        .transition(.opacity)
+                }
             }
-            ForEach(model.committed) { line in
-                TranscriptLine(
-                    text: line.text, locale: line.locale, confidence: line.confidence
-                )
-                .transition(.opacity)
-            }
-            if !model.preview.isEmpty {
-                TranscriptLine(text: model.preview, locale: model.previewLocale, wet: true)
-            }
+            Text(LocaleFlag.emoji(model.currentLocale) ?? " ")
+                .font(.system(size: 13))
+                .frame(width: 20, alignment: .trailing)
+                .opacity(0.9)
         }
     }
 }
