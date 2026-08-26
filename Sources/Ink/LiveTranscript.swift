@@ -6,8 +6,9 @@ import SwiftUI
 // volatile + final segments); this file owns the FEEL.
 //
 // Two registers of truth, the ghost-text grammar:
-//   - the PREVIEW is wet ink: italic, dim, mutating in place under the
-//     recognizer - undecided, never act on it.
+//   - the PREVIEW is wet ink: italic, slightly dimmed, mutating in place
+//     under the recognizer - undecided, never act on it. It updates with
+//     NO animation: wet ink must track the voice with zero added latency.
 //   - a COMMIT crystallizes: the text snaps solid at full weight, carries
 //     its locale + confidence as quiet mono metadata, and then FADES like
 //     a caption - the words already live where they were written (the
@@ -15,8 +16,8 @@ import SwiftUI
 //     never an archive.
 // Confidence colors NOTHING unless it means something: below 0.7 the
 // metadata pill alone warms to orange (one hue, carrying meaning).
-// Embeddable anywhere; the host brings the chrome (panel, capsule,
-// sidebar).
+// Layout-neutral and content-hugging - the host brings the chrome
+// (`hudGlass()` floating, or a list row in a historical view).
 
 /// The state machine + caption decay. Feed it `preview`/`commit` from a
 /// speech session; the view renders whatever it holds.
@@ -47,15 +48,13 @@ public final class LiveTranscriptModel: ObservableObject {
     /// the wet ink it supersedes and schedules the caption fade.
     public func commit(_ text: String, locale: String? = nil, confidence: Double? = nil) {
         let line = Committed(text: text, locale: locale, confidence: confidence)
-        withAnimation(.easeOut(duration: 0.15)) {
-            committed.append(line)
-            preview = ""
-            previewLocale = nil
-        }
+        committed.append(line)
+        preview = ""
+        previewLocale = nil
         Task { [weak self] in
             guard let self else { return }
             try? await Task.sleep(for: .seconds(linger))
-            withAnimation(.easeOut(duration: 0.6)) {
+            withAnimation(.easeOut(duration: 0.5)) {
                 self.committed.removeAll { $0.id == line.id }
             }
         }
@@ -72,10 +71,11 @@ public final class LiveTranscriptModel: ObservableObject {
 /// rendering, so a transcript reads identically while it forms and years
 /// later in a historical view (a consumer persists text + locale +
 /// confidence per segment and renders these): solid text for committed
-/// words, `wet: true` for the in-progress register (italic, dim), and the
-/// quiet mono metadata pill - language prefix ("es", never "es-ES") with
-/// the confidence score, warming to orange below 0.7 (the ONE place that
-/// hue lives).
+/// words, `wet: true` for the in-progress register, and the quiet mono
+/// metadata pill - language prefix ("es", never "es-ES") with the
+/// confidence score, warming to orange below 0.7 (the ONE place that hue
+/// lives). Layout-neutral: no greedy frames - the host decides whether
+/// rows hug (a floating capsule) or fill (a document view).
 public struct TranscriptLine: View {
     public var text: String
     public var locale: String?
@@ -92,15 +92,19 @@ public struct TranscriptLine: View {
     }
 
     public var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
             Group {
                 if wet {
-                    Text(text).font(.callout.italic()).foregroundStyle(.secondary)
+                    Text(text)
+                        .font(.system(size: 16))
+                        .italic()
+                        .foregroundStyle(.primary.opacity(0.72))
                 } else {
-                    Text(text).font(.callout)
+                    Text(text)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.primary)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             if locale != nil || confidence != nil {
                 pill
             }
@@ -113,8 +117,9 @@ public struct TranscriptLine: View {
         let label = [lang, score].compactMap { $0 }.joined(separator: " ")
         let weak = (confidence ?? 1) < 0.7
         return Text(label)
-            .font(.caption2.monospaced())
-            .foregroundStyle(weak ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
+            .font(.caption.monospaced())
+            .foregroundStyle(
+                weak ? AnyShapeStyle(.orange) : AnyShapeStyle(.primary.opacity(0.45)))
     }
 }
 
@@ -128,12 +133,12 @@ public struct LiveTranscript: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 5) {
             if model.committed.isEmpty && model.preview.isEmpty {
                 Text(hint)
-                    .font(.callout.italic())
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 16))
+                    .italic()
+                    .foregroundStyle(.primary.opacity(0.5))
             }
             ForEach(model.committed) { line in
                 TranscriptLine(
@@ -145,7 +150,5 @@ public struct LiveTranscript: View {
                 TranscriptLine(text: model.preview, locale: model.previewLocale, wet: true)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .clipped()
     }
 }
