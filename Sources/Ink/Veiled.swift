@@ -52,7 +52,7 @@ public struct Veiled: View {
         }
         .buttonStyle(.plain)
         #if !os(tvOS)
-        .onHover { hovering = $0 }
+            .onHover { hovering = $0 }
         #endif
         .accessibilityLabel(Text("veiled value", bundle: .module))
         .accessibilityValue(Text(verbatim: shown ? text : "hidden"))
