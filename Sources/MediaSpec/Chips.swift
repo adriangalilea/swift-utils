@@ -291,8 +291,13 @@ struct Axis: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: .inkTight) {
                 ForEach(Array(glyphs.enumerated()), id: \.offset) { _, g in
+                    // A SYMBOL stands at the sticker's height (1.75 × h): a
+                    // glyph beside a two-panel badge, as a disc case prints
+                    // the Dolby D beside "4K ULTRA HD"; at h it was a speck.
                     SpecChip(
-                        g, emphasis: options.emphasis, height: options.height, tone: options.tone)
+                        g, emphasis: options.emphasis,
+                        height: symbolBeside(g) ? options.height * 1.75 : options.height,
+                        tone: options.tone)
                 }
                 if let trailing = options.trailing { trailing }
             }
@@ -305,6 +310,13 @@ struct Axis: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(kind.rawValue): \(accessibility)")
+    }
+
+    /// Artwork in symbol form, when the row's stickers still hold two
+    /// panels (below that the sticker is one line and the symbol stays at h).
+    private func symbolBeside(_ g: Glyph) -> Bool {
+        guard case .art = g, options.markForm == .symbol else { return false }
+        return options.height * 1.75 * 0.30 * 0.6 >= 5
     }
 }
 
