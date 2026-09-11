@@ -96,8 +96,8 @@ The file above is the canonical sourcing record shared with the web `@ag/media-s
 | dts | dts symbol | simple-icons | CC0 | symbol for every DTS value |
 | dtswordmark | dts 2020 wordmark | Commons `File:DTS (2020).svg` | PD | lockup (also DTS:X, with ":X" set in type: no DTS:X artwork exists) |
 | dtshdma | DTS-HD Master Audio lockup | Commons `File:DTS-HD-MA.svg` | PD | lockup |
-| hdr10 | HDR10 badge | Commons `File:HDR 10 logo (black).svg` | PD | symbol and lockup |
-| hdr10plus | HDR10+ badge | Commons `File:HDR 10 plus logo (black).svg` | PD | symbol and lockup |
+| hdr10 | HDR10 badge | Commons `File:HDR 10 logo (black).svg` | PD | reference only, not wired: HDR10 is a drawn badge |
+| hdr10plus | HDR10+ badge | Commons `File:HDR 10 plus logo (black).svg` | PD | reference only, not wired: HDR10+ is a drawn badge |
 | ultrahd | ULTRA HD wordmark | Commons `File:Ultra HD.svg` | PD | in the catalog, unbound since grammar v3 (the 4K badge took its place) |
 | flac | FLAC lockup | Commons `File:FLAC logo vector.svg` (Xiph) | PD | lockup |
 | opus | Opus lockup | Commons `File:Opus logo2.svg` (Xiph) | PD | lockup |
@@ -106,7 +106,7 @@ The file above is the canonical sourcing record shared with the web `@ag/media-s
 | ultrahdbluray | Ultra HD Blu-ray lockup | Commons `File:Ultra HD Blu-ray logo.svg` | PD | lockup at 2160p |
 | dvd | DVD logo | Commons `File:DVD logo.svg` | PD | symbol and lockup |
 | imax | IMAX wordmark | Commons `File:IMAX.svg` | PD | symbol and lockup |
-| badge4k / badge8k / badgehd / badgesd | 4K, 8K, HD, SD stroke badges | tabler icons via Iconify (`badge-4k`, `badge-8k`, `badge-hd`, `badge-sd`) | MIT | resolution, both rungs; template-rendered (the stroke survives) |
+| badge4k / badge8k / badgehd / badgesd | 4K, 8K, HD, SD stroke badges | tabler icons via Iconify (`badge-4k`, `badge-8k`, `badge-hd`, `badge-sd`) | MIT | reference only, not wired: resolutions are drawn badges (three stroke weights in one row read as three families) |
 | flages | Flag of Spain (civil) | Commons `File:Flag of Spain (civil).svg` | PD | original colours; es-ES |
 
 Rejected at review: the CC BY-SA HDR10+ file (embeds raster), the UHDTV

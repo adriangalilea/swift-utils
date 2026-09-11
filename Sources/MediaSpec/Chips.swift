@@ -3,17 +3,19 @@ import SwiftUI
 
 // GRAMMAR V3: ARTWORK FIRST. The whole point of the family is proper
 // iconography, so a chip is ONE MARK standing FRAMELESS - the artwork IS
-// the chip. Badge artwork (HDR10, HDR10+, 4K, 8K, HD, SD) keeps its own
-// box, a lockup keeps its shape, a symbol stands alone at the small rung.
-// No pill, no disc, no kind glyph around a mark.
+// the chip. A brand lockup keeps its shape, a brand symbol stands alone at
+// the small rung. No pill, no disc, no kind glyph around a mark.
 //
-// A DRAWN word-badge exists only for a value with no artwork anywhere:
-// 720p, HLG, channels (7.1), Remux, WEB-DL / WEBRip / HDTV / CAM, DTS:X,
-// TrueHD when the Atmos lockup is already shown, AAC / PCM / ALAC / MP3 /
-// MP2 / Vorbis, castellano / latino / a language code, every cut but IMAX.
-// Its geometry is the HDR10 badge's: box ≈ 1.5 × cap height (the word's
-// font is 0.62 × box, cap ≈ 0.7 × font), corner radius 0.25 × box, a
-// stroke of 0.08 × box, semibold.
+// EVERY BOXED VALUE IS ONE DRAWN BADGE. SD / HD / 4K / 8K / 720p, HDR10 /
+// HDR10+ / HLG, channels (7.1), Remux, WEB-DL / WEBRip / HTDV / CAM, DTS:X,
+// codec words (TrueHD beside the Atmos lockup, AAC / PCM / ALAC / MP3 / MP2
+// / Vorbis), castellano / latino / a code, every cut but IMAX - one
+// geometry, one stroke weight: box height = chip height h, corner radius
+// 0.25h, stroke 0.08h, side pad 0.26h, word 0.62h semibold (cap ≈ 0.7 ×
+// font, so box ≈ 1.5 × cap, the HDR10 badge's own proportion). Badge
+// ARTWORK from three sources put three stroke weights in one row and the
+// eye read three families; the artwork stays in the catalog as reference,
+// unbound.
 //
 // PROVENANCE sits ON the mark: claim is ghosted (0.55 opacity); verified is
 // full ink; measured is full ink over a soft `inkRest` wash capsule;
@@ -24,8 +26,8 @@ import SwiftUI
 // ignore tone by construction.
 //
 // Two rungs, one threshold (`SpecChip.rail` = 32): at and above it lockups,
-// below it the brand SYMBOLS (Dolby D, dts, the Blu-ray glyph, the flag)
-// and the small badges. A strip groups per axis: `.inkTight` within an
+// below it the brand SYMBOLS (Dolby D, dts, the Blu-ray glyph, the flag);
+// drawn badges are the same at both. A strip groups per axis: `.inkTight` within an
 // axis, `.inkGap` between axes; a delta trails the axis's last mark.
 
 /// One mark's content: artwork from the catalog, or a word that has none.

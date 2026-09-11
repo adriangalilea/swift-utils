@@ -133,22 +133,25 @@ struct DemoView: View {
                     }
                 }
             }
-            section("badges · artwork badges beside drawn word-badges, same geometry") {
+            section(
+                "badges · the one drawn geometry (wired) beside the retired artwork (reference)"
+            ) {
                 ForEach([24, 34, 44] as [CGFloat], id: \.self) { h in
                     HStack(spacing: .inkTight) {
+                        ForEach(
+                            [
+                                "SD", "HD", "4K", "8K", "720p", "HDR10", "HDR10+", "HLG", "7.1",
+                                "Remux", "WEB-DL", "DTS:X", "castellano",
+                            ],
+                            id: \.self
+                        ) { SpecChip($0, height: h) }
+                        Text("·").foregroundStyle(.tertiary)
                         SpecChip(.art(.badgesd), height: h)
                         SpecChip(.art(.badgehd), height: h)
                         SpecChip(.art(.badge4k), height: h)
                         SpecChip(.art(.badge8k), height: h)
                         SpecChip(.art(.hdr10), height: h)
                         SpecChip(.art(.hdr10plus), height: h)
-                        SpecChip("720p", height: h)
-                        SpecChip("HLG", height: h)
-                        SpecChip("7.1", height: h)
-                        SpecChip("Remux", height: h)
-                        SpecChip("WEB-DL", height: h)
-                        SpecChip("DTS:X", height: h)
-                        SpecChip("castellano", height: h)
                     }
                 }
             }

@@ -29,28 +29,23 @@ public struct Marks: Hashable, Sendable {
 }
 
 extension DynamicRange {
+    /// Only Dolby Vision is a brand mark. HDR10 and HDR10+ are boxed words
+    /// drawn in the family's one badge geometry (their Commons artwork stays
+    /// in the catalog as reference: a second stroke weight beside the drawn
+    /// family was the thing the eye caught).
     public var marks: Marks {
         switch self {
         case .dolbyVision: Marks(symbol: .dolby, lockup: .dolbyvision)
-        case .hdr10: Marks(symbol: .hdr10, lockup: .hdr10)
-        case .hdr10Plus: Marks(symbol: .hdr10plus, lockup: .hdr10plus)
-        case .sdr, .hlg: .none
+        case .sdr, .hlg, .hdr10, .hdr10Plus: .none
         }
     }
 }
 
 extension Resolution {
-    /// The tabler badges (MIT) at both rungs; 720p has no artwork anywhere
-    /// and is drawn. The ULTRA HD wordmark stays in the catalog unbound.
-    public var marks: Marks {
-        switch self {
-        case .sd: Marks(symbol: .badgesd, lockup: .badgesd)
-        case .p720: .none
-        case .p1080: Marks(symbol: .badgehd, lockup: .badgehd)
-        case .p2160: Marks(symbol: .badge4k, lockup: .badge4k)
-        case .p4320: Marks(symbol: .badge8k, lockup: .badge8k)
-        }
-    }
+    /// Every resolution is a boxed word in the one drawn badge geometry.
+    /// The tabler badges and the ULTRA HD wordmark stay in the catalog
+    /// unbound: three stroke weights in one row read as three families.
+    public var marks: Marks { .none }
 }
 
 extension ObjectAudio {
