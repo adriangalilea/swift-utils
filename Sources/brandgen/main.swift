@@ -20,6 +20,19 @@ import Foundation
 //   swift run brandgen add spotify --into Foo    # another target in-repo
 //   swift run brandgen add spotify \             # ...or any app, anywhere
 //     --catalog ~/app/Assets.xcassets --out ~/app/Brands.generated.swift
+//   swift run brandgen import dolbyvision \      # a mark simple-icons lacks
+//     --svg ~/marks/dolby-vision.svg --hex 000000 --title "Dolby Vision" \
+//     --source "Wikimedia Commons (PD)" --into MediaSpec --enum Mark
+//
+// LOCAL MARKS ride the same catalog. `import` copies a reviewed SVG into an
+// imageset and records {title, hex, source, original} in
+// `brandgen.local.json` beside the catalog (in the target's Resources dir;
+// exclude it in Package.swift so it never ships). `regenerate` resolves a
+// slug local-first, then upstream, else dies - one enum, two provenances,
+// each stated per case. `--original` keeps the artwork's own colours
+// (a flag is not a mark) instead of template rendering. `--enum` names the
+// generated type: a consumer importing two catalogs must not see two
+// `Brand`s.
 //
 // BRANDS LIVE WITH THEIR CONSUMER (see Ink/Brand.swift): resources cannot
 // be tree-shaken, so a brand added to a shared base layer ships to every
@@ -49,9 +62,13 @@ let target = flag("into") ?? "Scores"
 let catalog =
     flag("catalog").map { URL(filePath: ($0 as NSString).expandingTildeInPath) }
     ?? root.appending(path: "Sources/\(target)/Resources/Brands.xcassets")
+let enumName = flag("enum") ?? "Brand"
 let generated =
     flag("out").map { URL(filePath: ($0 as NSString).expandingTildeInPath) }
-    ?? root.appending(path: "Sources/\(target)/Brands.generated.swift")
+    ?? root.appending(
+        path: "Sources/\(target)/\(enumName == "Brand" ? "Brands" : enumName + "s").generated.swift"
+    )
+let localRecords = catalog.deletingLastPathComponent().appending(path: "brandgen.local.json")
 
 let iconsBase = "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/"
 let dataURL = URL(
@@ -144,6 +161,85 @@ func install(_ slug: String) async {
         """, to: dir.appending(path: "Contents.json"))
 }
 
+// ---- local marks ----
+
+/// A mark that is not upstream: everything `regenerate` needs that the
+/// simple-icons index would otherwise supply, plus `original` for artwork
+/// whose own colours are the point.
+struct LocalEntry: Codable {
+    let title: String
+    let hex: String
+    let source: String
+    let original: Bool
+}
+
+func readLocal() -> [String: LocalEntry] {
+    guard let data = try? Data(contentsOf: localRecords) else { return [:] }
+    guard let out = try? JSONDecoder().decode([String: LocalEntry].self, from: data) else {
+        die("\(localRecords.lastPathComponent) is not a slug -> {title, hex, source, original} map")
+    }
+    return out
+}
+
+func writeLocal(_ records: [String: LocalEntry]) {
+    let enc = JSONEncoder()
+    enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+    guard let data = try? enc.encode(records) else { die("cannot encode local records") }
+    write(String(decoding: data, as: UTF8.self) + "\n", to: localRecords)
+}
+
+/// Copy a reviewed local SVG into its imageset. Slugs obey the upstream
+/// rule (lowercase alphanumerics) so `caseName` needs no second path.
+func importLocal(_ slug: String, svg: URL, entry: LocalEntry) {
+    guard !slug.isEmpty, slug.allSatisfy({ $0.isLowercase || $0.isNumber }) else {
+        die("slug must be lowercase alphanumerics: \(slug)")
+    }
+    guard let data = try? Data(contentsOf: svg) else { die("cannot read \(svg.path())") }
+    guard UInt32(entry.hex, radix: 16) != nil, entry.hex.count == 6 else {
+        die("--hex wants RRGGBB, got \(entry.hex)")
+    }
+    let dir = catalog.appending(path: "\(slug).imageset")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    do { try data.write(to: dir.appending(path: "\(slug).svg")) } catch {
+        die("cannot write the svg for \(slug): \(error.localizedDescription)")
+    }
+    let intent = entry.original ? "original" : "template"
+    write(
+        """
+        {
+          "images" : [ { "filename" : "\(slug).svg", "idiom" : "universal" } ],
+          "info" : { "author" : "brandgen", "version" : 1 },
+          "properties" : { "preserves-vector-representation" : true, "template-rendering-intent" : "\(intent)" }
+        }
+
+        """, to: dir.appending(path: "Contents.json"))
+    var records = readLocal()
+    records[slug] = entry
+    writeLocal(records)
+}
+
+/// Width over height of the imageset's artwork, read from its viewBox (or
+/// width/height) at generation time. A consumer laying a mark inline
+/// needs its shape as a fact, not a guess: a 24×24 symbol sits in a disc,
+/// a 3:1 lockup runs with the text.
+func aspect(_ slug: String) -> Double {
+    let url = catalog.appending(path: "\(slug).imageset/\(slug).svg")
+    guard let svg = try? String(contentsOf: url, encoding: .utf8) else {
+        die("no artwork for \(slug)")
+    }
+    func attr(_ name: String) -> [Double]? {
+        guard let r = svg.range(of: "\(name)=\""),
+            let end = svg[r.upperBound...].firstIndex(of: "\"")
+        else { return nil }
+        let nums = svg[r.upperBound..<end].split(whereSeparator: { $0 == " " || $0 == "," })
+            .compactMap { Double($0) }
+        return nums.isEmpty ? nil : nums
+    }
+    if let vb = attr("viewBox"), vb.count == 4, vb[3] > 0 { return vb[2] / vb[3] }
+    if let w = attr("width")?.first, let h = attr("height")?.first, h > 0 { return w / h }
+    die("\(slug).svg carries neither a viewBox nor width/height")
+}
+
 // ---- codegen ----
 
 let swiftKeywords: Set<String> = [
@@ -168,35 +264,93 @@ func components(_ hex: String) -> (Double, Double, Double) {
 
 func fmt(_ v: Double) -> String { String(format: "%.3f", v) }
 
+/// One resolved row per installed imageset: local record first, else the
+/// upstream index, else the slug is a stranger in the catalog and the
+/// generator dies rather than shipping a blank.
+struct Resolved {
+    let title: String
+    let hex: String
+    let source: String
+    let original: Bool
+}
+
+func resolve(_ slug: String, _ index: [String: IconEntry], _ local: [String: LocalEntry])
+    -> Resolved
+{
+    if let l = local[slug] {
+        return Resolved(title: l.title, hex: l.hex, source: l.source, original: l.original)
+    }
+    if let e = index[slug] {
+        return Resolved(title: e.title, hex: e.hex, source: "simple-icons (CC0)", original: false)
+    }
+    die(
+        "\(slug) is in the catalog but neither local nor upstream - it was renamed or withdrawn; delete the imageset or fix the slug"
+    )
+}
+
 func regenerate(_ index: [String: IconEntry]) {
     let slugs = installed()
     guard !slugs.isEmpty else { die("the catalog holds no brands - `brandgen add <slug>` first") }
+    let local = readLocal()
     var cases: [String] = []
     var titles: [String] = []
     var colors: [String] = []
     var lums: [String] = []
+    var aspects: [String] = []
+    var originals: [String] = []
+    var sources: [String] = []
     for slug in slugs {
-        guard let e = index[slug] else {
-            die(
-                "\(slug) is in the catalog but not upstream - it was renamed or withdrawn; delete the imageset or fix the slug"
-            )
-        }
+        let e = resolve(slug, index, local)
         let (r, g, b) = components(e.hex)
-        cases.append("    case \(caseName(slug)) = \"\(slug)\"")
+        let name = caseName(slug)
+        cases.append("    case \(name) = \"\(slug)\"")
         titles.append(
-            "        case .\(caseName(slug)): \"\(e.title.replacingOccurrences(of: "\"", with: "\\\""))\""
-        )
+            "        case .\(name): \"\(e.title.replacingOccurrences(of: "\"", with: "\\\""))\"")
         colors.append(
-            "        case .\(caseName(slug)): Color(red: \(fmt(r)), green: \(fmt(g)), blue: \(fmt(b)))  // #\(e.hex)"
+            "        case .\(name): Color(red: \(fmt(r)), green: \(fmt(g)), blue: \(fmt(b)))  // #\(e.hex)"
         )
         // Rec. 709 relative luminance, resolved at generation time - the
         // fact a dark-surface consumer needs, stated instead of eyeballed.
-        lums.append("        case .\(caseName(slug)): \(fmt(0.2126 * r + 0.7152 * g + 0.0722 * b))")
+        lums.append("        case .\(name): \(fmt(0.2126 * r + 0.7152 * g + 0.0722 * b))")
+        aspects.append("        case .\(name): \(fmt(aspect(slug)))")
+        if e.original { originals.append(".\(name)") }
+        sources.append("//   \(slug): \(e.source)")
+    }
+    // Built line by line: nested multi-line literals fight the outer
+    // template's indentation stripping, and a generator that emits code
+    // must emit it exactly.
+    let imageBlock: String
+    if originals.isEmpty {
+        imageBlock = [
+            "",
+            "    /// The mark itself, template-rendered (untinted).",
+            "    public var image: Image {",
+            "        Image(rawValue, bundle: .module).renderingMode(.template)",
+            "    }",
+        ].joined(separator: "\n")
+    } else {
+        imageBlock = [
+            "",
+            "    /// Marks whose own colours ARE the mark (a flag, not a logo): rendered",
+            "    /// as authored, never template-tinted, whatever the caller passes.",
+            "    public var original: Bool {",
+            "        switch self {",
+            "        case \(originals.joined(separator: ", ")): true",
+            "        default: false",
+            "        }",
+            "    }",
+            "",
+            "    /// The mark itself; template-rendered unless `original`.",
+            "    public var image: Image {",
+            "        Image(rawValue, bundle: .module).renderingMode(original ? .original : .template)",
+            "    }",
+        ].joined(separator: "\n")
     }
     write(
         """
-        // GENERATED by `swift run brandgen`. Do not edit - add a brand and
-        // regenerate instead. Artwork + colors: simple-icons (CC0).
+        // GENERATED by `swift run brandgen`. Do not edit - add or import a mark
+        // and regenerate instead. Provenance per mark:
+        \(sources.joined(separator: "\n"))
         //
         // This enum belongs to the module that RENDERS these marks: resources
         // cannot be tree-shaken, so brands never live in a shared base layer
@@ -206,7 +360,7 @@ func regenerate(_ index: [String: IconEntry]) {
         import Ink
         import SwiftUI
 
-        public enum Brand: String, CaseIterable, Sendable, BrandMarkable {
+        public enum \(enumName): String, CaseIterable, Sendable, BrandMarkable {
         \(cases.joined(separator: "\n"))
 
             /// The brand's own name, as its owner writes it.
@@ -234,14 +388,18 @@ func regenerate(_ index: [String: IconEntry]) {
                 }
             }
 
-            /// The mark itself, template-rendered (untinted).
-            public var image: Image {
-                Image(rawValue, bundle: .module).renderingMode(.template)
+            /// Width over height of the artwork, from its viewBox. A symbol
+            /// (≈1) sits in a disc; a lockup (≫1) runs inline with text.
+            public var aspect: Double {
+                switch self {
+        \(aspects.joined(separator: "\n"))
+                }
             }
+        \(imageBlock)
         }
 
         """, to: generated)
-    print("brandgen: \(slugs.count) brands -> \(generated.lastPathComponent)")
+    print("brandgen: \(slugs.count) marks -> \(generated.lastPathComponent)")
 }
 
 // ---- verbs ----
@@ -249,7 +407,20 @@ func regenerate(_ index: [String: IconEntry]) {
 let args = Array(CommandLine.arguments.dropFirst())
 switch args.first {
 case "add":
-    let slugs = Array(args.dropFirst())
+    // Positional slugs only: a `--flag value` pair is never a brand.
+    var slugs: [String] = []
+    var skip = false
+    for a in args.dropFirst() {
+        if skip {
+            skip = false
+            continue
+        }
+        if a.hasPrefix("--") {
+            skip = true
+            continue
+        }
+        slugs.append(a)
+    }
     guard !slugs.isEmpty else { die("usage: brandgen add <slug>...") }
     let index = await brandIndex()
     for slug in slugs {
@@ -259,8 +430,26 @@ case "add":
     regenerate(index)
 case "sync":
     let index = await brandIndex()
-    for slug in installed() { await install(slug) }
+    let local = readLocal()
+    for slug in installed() where local[slug] == nil { await install(slug) }
     regenerate(index)
+case "import":
+    guard args.count >= 2, let svg = flag("svg"), let hex = flag("hex"), let title = flag("title")
+    else {
+        die(
+            "usage: brandgen import <slug> --svg <file> --hex RRGGBB --title \"<title>\" [--source \"<origin>\"] [--original]"
+        )
+    }
+    let slug = args[1]
+    importLocal(
+        slug, svg: URL(filePath: (svg as NSString).expandingTildeInPath),
+        entry: LocalEntry(
+            title: title, hex: hex.uppercased(), source: flag("source") ?? "local",
+            original: CommandLine.arguments.contains("--original")))
+    print("brandgen: + \(title) (local)")
+    regenerate(await brandIndex())
 default:
-    die("usage: brandgen add <slug>... | brandgen sync")
+    die(
+        "usage: brandgen add <slug>... | brandgen sync | brandgen import <slug> --svg <file> --hex RRGGBB --title <title>"
+    )
 }
