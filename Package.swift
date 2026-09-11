@@ -54,14 +54,14 @@ let package = Package(
         // with their CONSUMER, never in Ink - an app that shows no ratings
         // links no ratings logos.
         .library(name: "Scores", targets: ["Scores"]),
-        // The media-format vocabulary, typed: picture, sound, source tier,
-        // language and cut as VALUES the chips know how to say, with
-        // provenance worn as weight and the real marks (Dolby, DTS, HDR10+,
-        // Blu-ray, IMAX…) in its own catalog - brands ship with their
-        // consumer, and this is the consumer. Owns labels, marks and
-        // glyphs, never ranking (the daemon's ladder). `swift run
-        // mediaspec-example --check` pins the wire literals shared with the
-        // React twin and the catalog against the manifest.
+        // Generic media format chips: picture, sound, source tier, language
+        // and cut as VALUES the chips know how to say, with the real marks
+        // (Dolby, DTS, Blu-ray, IMAX…) in its own catalog - brands ship
+        // with their consumer, and this is the consumer. Owns labels and
+        // marks; meaning (certainty, comparison, house spellings) is the
+        // consumer's mapping. `swift run mediaspec-example --check` pins the
+        // wire literals shared with the React twin and the catalog against
+        // its manifest.
         .library(name: "MediaSpec", targets: ["MediaSpec"]),
         // Any brand mark, natively: fetches simple-icons artwork (CC0) -
         // or imports a reviewed local SVG - into a target's catalog and

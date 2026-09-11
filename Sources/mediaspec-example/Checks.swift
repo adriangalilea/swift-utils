@@ -4,8 +4,8 @@ import MediaSpec
 // The vocabulary gate. Every literal below is ALSO pinned by the React
 // `media-spec` item's own check; the two renderers share a wire and this
 // is how a rename on either side fails a gate instead of drawing a wrong
-// chip. Then the label rules, the provenance order, the lenient-decode law
-// and the mark catalog against the reviewed manifest.
+// chip. Then the label rules, the lenient-decode law and the mark catalog
+// against its manifest.
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data(("mediaspec-example check FAILED: " + message + "\n").utf8))
@@ -29,21 +29,12 @@ func runChecks() -> Never {
     vocabulary("channels", Channels.self, want: "1.0,2.0,5.1,6.1,7.1")
     vocabulary("object-audio", ObjectAudio.self, want: "atmos,dts-x")
     vocabulary("tier", Tier.self, want: "remux,bluray,webdl,webrip,hdtv,dvd,cam")
-    vocabulary("provenance", Provenance.self, want: "claim,verified,measured,delivered")
-    vocabulary("delta", Delta.self, want: "better,same,worse")
+    vocabulary("emphasis", Emphasis.self, want: "ghost,plain,washed,ringed")
     vocabulary("kind", Kind.self, want: "picture,sound,tier,lang,cut")
     let cuts = Cut.known.map(\.rawValue).joined(separator: ",")
     print("cut: \(cuts)")
     if cuts != "theatrical,extended,directors,unrated,uncut,final,imax,remastered" {
         fail("cut vocabulary is `\(cuts)`")
-    }
-
-    // ---- provenance is ordered by certainty ----
-    if !(Provenance.claim < .verified && .verified < .measured && .measured < .delivered) {
-        fail("provenance must ascend claim < verified < measured < delivered")
-    }
-    if Provenance.allCases.sorted() != Provenance.allCases {
-        fail("provenance declaration order must be its sort order")
     }
 
     // ---- lossless is a fact of the codec ----
@@ -90,10 +81,15 @@ func runChecks() -> Never {
             fail("soundLabel short = `\(soundLabel(a, short: true))`, want `\(short)`")
         }
     }
-    if Lang("es-ES").label != "castellano" || Lang("es-419").label != "latino"
-        || Lang("fr-FR").label != "fr-FR"
-    {
-        fail("Lang labels")
+    // A language labels itself through the system's display names; a tag
+    // the system does not know is its own label; the region subtag is read
+    // off the tag.
+    if Lang("es-ES").label.isEmpty || Lang("es-ES").label == "es-ES" {
+        fail("Lang(es-ES) should resolve to a display name")
+    }
+    if Lang("zz-QQ").label != "zz-QQ" { fail("an unknown tag is its own label") }
+    if Lang("es-ES").region != "ES" || Lang("es").region != nil || Lang("es-419").region != nil {
+        fail("Lang.region")
     }
     if Cut(rawValue: "directors").label != "director's cut"
         || Cut(rawValue: "fan edit").label != "fan edit"
@@ -152,9 +148,7 @@ func runChecks() -> Never {
         "dolbytruehd", "dolbyvision", "dts", "dtshdma", "dtswordmark", "dvd", "flac", "flages",
         "hdr10", "hdr10plus", "imax", "opus", "ultrahd", "ultrahdbluray",
     ]
-    if generated != wantMarks { fail("the mark catalog drifted from the reviewed manifest") }
-    // Every value that claims artwork names a mark that exists (the enum
-    // makes this a compile-time fact; the aspect rule is the runtime one).
+    if generated != wantMarks { fail("the mark catalog drifted from its manifest") }
     for m in Mark.allCases where m.aspect <= 0 { fail("\(m.rawValue) has no aspect") }
     if Mark.flages.original == false { fail("the flag keeps its own colours") }
     if Mark.dolby.original { fail("a logo is template-rendered") }
@@ -162,9 +156,9 @@ func runChecks() -> Never {
     if Mark.badge4k.aspect != 1 || Mark.badge4k.original {
         fail("the tabler badges are square templates")
     }
-    // The value → mark binding, the manifest's own table.
-    // Resolutions wear tabler's badges (both rungs, stroke matched to the
-    // drawn family); 720p, HDR10 and HDR10+ are drawn.
+    // The value → mark binding, the manifest's own table. Resolutions wear
+    // tabler's badges at both rungs (stroke matched to the drawn family);
+    // 720p, HDR10 and HDR10+ are drawn.
     if DynamicRange.dolbyVision.marks != Marks(symbol: .dolby, lockup: .dolbyvision)
         || DynamicRange.hdr10Plus.marks != .none || DynamicRange.hdr10.marks != .none
         || DynamicRange.sdr.marks != .none || DynamicRange.hlg.marks != .none
@@ -183,7 +177,7 @@ func runChecks() -> Never {
         || Tier.bluray.marks(at: .p1080) != Marks(symbol: .blurayglyph, lockup: .bluray)
         || Tier.webdl.marks(at: .p2160) != .none
         || Lang("es-ES").marks != Marks(symbol: .flages, lockup: .flages)
-        || Lang("es-419").marks != .none
+        || Lang("es-419").marks != .none || Lang("es").marks != .none
         || Cut.imax.marks != Marks(symbol: .imax, lockup: .imax) || Cut.extended.marks != .none
     {
         fail("value → mark binding drifted from the manifest")

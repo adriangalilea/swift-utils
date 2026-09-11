@@ -1,11 +1,12 @@
 import Foundation
 
-// The MEDIA FORMAT vocabulary, typed: what a copy of a film carries
-// (picture, sound, source tier, language, cut) as values, the way Scores
-// knows what IMDb is. An app passes VALUES, never label strings; this
-// product owns every label, short form, glyph and weight. It knows
-// nothing about RANKING - which of two copies is better is the daemon's
-// ladder, config-as-data on its side - and it renders one value honestly.
+// The MEDIA FORMAT vocabulary, typed: picture, sound, source tier,
+// language and cut as values, the way Scores knows what IMDb is. An app
+// passes VALUES, never label strings; this product owns every label, short
+// form and mark. It is generic media visuals only: a consumer that needs
+// MEANING - what a value's certainty is, how two values compare, a house
+// spelling for a language - maps it in its own code onto `Emphasis`, a
+// trailing slot, or a label override.
 //
 // The raw values are the WIRE spellings. A React `media-spec` item renders
 // the same vocabulary with the identical literals; `mediaspec-example
@@ -123,9 +124,8 @@ public enum ObjectAudio: String, Codable, CaseIterable, Sendable, Hashable {
     }
 }
 
-/// The SOURCE tier - where the bits came from. A name-derived fact beside
-/// the container-derived picture and sound, kept as its own chip so a
-/// claim about provenance never masquerades as a measurement of pixels.
+/// The SOURCE tier - where the bits came from - as its own axis beside
+/// picture and sound.
 public enum Tier: String, Codable, CaseIterable, Sendable, Hashable {
     case remux
     case bluray
@@ -148,8 +148,10 @@ public enum Tier: String, Codable, CaseIterable, Sendable, Hashable {
     }
 }
 
-/// A BCP-47 tag. The two Spanish editions the house tells apart get their
-/// house names; every other tag renders as itself.
+/// A BCP-47 tag. Its label is the system's display name for the tag in
+/// the current locale, region-aware ("Spanish (Spain)"), falling back to
+/// the tag itself; a consumer with its own spelling passes `label:` to
+/// `LangChip`.
 public struct Lang: RawRepresentable, Codable, Hashable, Sendable {
     public let rawValue: String
 
@@ -166,11 +168,19 @@ public struct Lang: RawRepresentable, Codable, Hashable, Sendable {
     }
 
     public var label: String {
-        switch rawValue {
-        case "es-ES": "castellano"
-        case "es-419": "latino"
-        default: rawValue
+        let id = rawValue.replacingOccurrences(of: "-", with: "_")
+        if let name = Locale.current.localizedString(forIdentifier: id), !name.isEmpty {
+            return name
         }
+        return rawValue
+    }
+
+    /// The region subtag (ISO 3166-1 alpha-2), when the tag carries one.
+    public var region: String? {
+        let parts = rawValue.split(separator: "-")
+        guard parts.count >= 2 else { return nil }
+        let r = parts[1]
+        return r.count == 2 && r.allSatisfy(\.isLetter) ? r.uppercased() : nil
     }
 }
 
@@ -235,35 +245,15 @@ public enum Cut: Codable, Hashable, Sendable {
     }
 }
 
-/// HOW a value is known, ascending: a release name's promise · the
-/// container states it · the pixels or the meter say so · what this
-/// session on this screen actually gets. A chip wears it as WEIGHT, never
-/// as a color: the eye reads certainty without learning a legend.
-public enum Provenance: String, Codable, CaseIterable, Sendable, Hashable, Comparable {
-    case claim
-    case verified
-    case measured
-    case delivered
-
-    public static func < (a: Provenance, b: Provenance) -> Bool {
-        let order = Provenance.allCases
-        return order.firstIndex(of: a)! < order.firstIndex(of: b)!
-    }
-}
-
-/// A candidate's standing against the copy you own, per axis.
-public enum Delta: String, Codable, CaseIterable, Sendable, Hashable {
-    case better
-    case same
-    case worse
-
-    public var glyph: String {
-        switch self {
-        case .better: "▲"
-        case .same: "="
-        case .worse: "▼"
-        }
-    }
+/// How much a chip stands out, named for the look alone: `ghost` is the
+/// mark at 0.55 opacity; `plain` is full ink on no ground; `washed` is full
+/// ink over a soft `inkRest` capsule; `ringed` is the wash plus an
+/// `inkEdge` ring. What any of it means is the consumer's mapping.
+public enum Emphasis: String, Codable, CaseIterable, Sendable, Hashable {
+    case ghost
+    case plain
+    case washed
+    case ringed
 }
 
 /// The five axes a spec renders, in the order a strip composes them.
@@ -289,8 +279,8 @@ public enum Kind: String, Codable, CaseIterable, Sendable, Hashable {
 
 /// THE VOCABULARY BOUNDARY LAW: an unknown raw value decodes the field to
 /// nil, never throws, never logs. A wire that grows a word this build does
-/// not know must blank one chip, not the whole row - the tvOS lesson,
-/// paid twice, applied at the enum instead of at every consumer.
+/// not know must blank one chip, not the whole row - applied at the enum
+/// instead of at every consumer.
 @propertyWrapper
 public struct Lenient<Value: Codable & Hashable & Sendable>: Codable, Hashable, Sendable {
     public var wrappedValue: Value?
@@ -328,8 +318,8 @@ public struct Audio: Codable, Hashable, Sendable {
     }
 }
 
-/// A copy's spec: every axis optional, because the wire carries whatever
-/// subset it has verified.
+/// A media spec: every axis optional, because a wire carries whatever
+/// subset it knows.
 public struct MediaSpec: Codable, Hashable, Sendable {
     @Lenient public var resolution: Resolution?
     @Lenient public var range: DynamicRange?

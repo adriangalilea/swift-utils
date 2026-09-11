@@ -1,6 +1,6 @@
 # Media marks: where every vector came from
 
-The brand marks the media-spec chips wear (web: `@ag/media-spec`, Swift: `MediaSpec`),
+The brand marks the media-spec chips wear (web: `@ag/media-spec`, Swift: `MediaSpec`), generic components for any media app,
 how they were sourced, what could not be sourced, and how to fetch them again.
 Every mark here is artwork that is free to vendor; the names and shapes are
 registered trademarks of their owners and are used nominatively: a chip says what a
@@ -50,7 +50,7 @@ the record, not the CDN.
 | UHD Alliance "Ultra HD Premium" | Members only, by request. | Not represented. |
 | IMAX Enhanced | Partner login on brand.imax.com. | The IMAX wordmark. |
 | HDR10, HLG | No official mark exists; HDR10 is a spec, HLG a broadcast standard. Commons carries a fan-drawn HDR10 badge that matches the HDR10+ one. | HDR10 badge (fan-drawn, PD), HLG as text. |
-| es-419 (Latin American Spanish) | No flag can stand for a continent; the `es-mx` language flag is the convention and is wrong for the house. | Text: `latino`. |
+| Regional language variants (e.g. es-419) | No flag can stand for a continent; the `es-mx` language flag is a convention, not a fact. | Text label from the platform's language display names. |
 
 Non-commercial material seen and deliberately not vendored: Iconify `cbi:*`
 (dts-x, dolby-atmos, bluray, dvd; CC BY-NC-SA 4.0), the Aeon Nox SiLVO and Arctic
@@ -107,7 +107,7 @@ The file above is the canonical sourcing record shared with the web `@ag/media-s
 | dvd | DVD logo | Commons `File:DVD logo.svg` | PD | symbol and lockup |
 | imax | IMAX wordmark | Commons `File:IMAX.svg` | PD | symbol and lockup |
 | badge4k / badge8k / badgehd / badgesd | 4K, 8K, HD, SD stroke badges | tabler icons via Iconify (`badge-4k`, `badge-8k`, `badge-hd`, `badge-sd`) | MIT | resolution, both rungs; stroke 2→1.12 on the 24-grid to match the drawn family (1.12 / the 14-unit box = 0.08h); the chip renders the file 24/14 taller so the box is h |
-| flages | Flag of Spain (civil) | Commons `File:Flag of Spain (civil).svg` | PD | original colours; es-ES |
+| flages | Flag of Spain (civil) | Commons `File:Flag of Spain (civil).svg` | PD | original colours; region subtag ES |
 
 Rejected at review: the CC BY-SA HDR10+ file (embeds raster), the UHDTV
 file (live text), the two-tone Ultra HD box and the older DTS badge (black

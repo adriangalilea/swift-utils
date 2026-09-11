@@ -1,35 +1,36 @@
 import Ink
 import SwiftUI
 
-// GRAMMAR V3: ARTWORK FIRST. The whole point of the family is proper
-// iconography, so a chip is ONE MARK standing FRAMELESS - the artwork IS
-// the chip. A brand lockup keeps its shape, a brand symbol stands alone at
-// the small rung. No pill, no disc, no kind glyph around a mark.
+// ARTWORK FIRST. The whole point of the family is proper iconography, so a
+// chip is ONE MARK standing FRAMELESS - the artwork IS the chip. A brand
+// lockup keeps its shape, a brand symbol stands alone at the small rung.
+// No pill, no disc, no kind glyph around a mark.
 //
 // EVERY BOXED VALUE IS ONE WEIGHT. 720p, HDR10 / HDR10+ / HLG, channels
 // (7.1), Remux, WEB-DL / WEBRip / HDTV / CAM, DTS:X, codec words (TrueHD
-// beside the Atmos lockup, AAC / PCM / ALAC / MP3 / MP2 / Vorbis),
-// castellano / latino / a code, every cut but IMAX are DRAWN: box height =
-// chip height h, corner radius 0.25h, stroke 0.08h, side pad 0.26h, word
-// 0.62h semibold (cap ≈ 0.7 × font, so box ≈ 1.5 × cap, the HDR10 badge's
-// own proportion). SD / HD / 4K / 8K are tabler's badge ARTWORK, because 4K
+// beside the Atmos lockup, AAC / PCM / ALAC / MP3 / MP2 / Vorbis), a
+// language's display name, every cut but IMAX are DRAWN: box height = chip
+// height h, corner radius 0.25h, stroke 0.08h, side pad 0.26h, word 0.62h
+// semibold (cap ≈ 0.7 × font, so box ≈ 1.5 × cap, the HDR10 badge's own
+// proportion). SD / HD / 4K / 8K are tabler's badge ARTWORK, because 4K
 // and 8K need real distinction and its letterforms give it - restroked to
 // 1.12 on the 24-grid (1.12 / the 14-unit box = 0.08h) and rendered with
 // the box at h (`Mark.boxScale`), so the drawn and the drawn-by-tabler
 // badge are one weight by construction.
 //
-// PROVENANCE sits ON the mark: claim is ghosted (0.55 opacity); verified is
-// full ink; measured is full ink over a soft `inkRest` wash capsule;
-// delivered is the wash plus an `inkEdge` ring. Tone: `ink` follows the
-// axis's foreground, `brand` paints a mark its official hex - unfilled
-// weights only, never a near-black official colour (black on dark is a
-// missing logo, not a brand statement); original-colour marks (the flag)
-// ignore tone by construction.
+// EMPHASIS sits ON the mark and is named for the look alone: ghost (0.55
+// opacity), plain (full ink, no ground), washed (an `inkRest` capsule
+// behind), ringed (the wash plus an `inkEdge` ring). TONE: `ink` follows
+// the axis's foreground, `brand` paints a mark its official hex - on the
+// unwashed emphases only, and never a near-black official colour (black on
+// dark is a missing logo, not a brand statement); original-colour marks
+// (the flag) ignore tone by construction. A TRAILING slot after an axis's
+// last mark takes any view the consumer wants there.
 //
 // Two rungs, one threshold (`SpecChip.rail` = 32): at and above it lockups,
 // below it the brand SYMBOLS (Dolby D, dts, the Blu-ray glyph, the flag);
-// drawn badges are the same at both. A strip groups per axis: `.inkTight` within an
-// axis, `.inkGap` between axes; a delta trails the axis's last mark.
+// drawn badges are the same at both. A strip groups per axis: `.inkTight`
+// within an axis, `.inkGap` between axes.
 
 /// One mark's content: artwork from the catalog, or a word that has none.
 public enum Glyph: Hashable, Sendable {
@@ -37,7 +38,7 @@ public enum Glyph: Hashable, Sendable {
     case word(String)
 }
 
-/// One glyph standing frameless, wearing its provenance. Public so a
+/// One glyph standing frameless, wearing its emphasis. Public so a
 /// consumer with an axis this product does not name (a container, a frame
 /// rate) can still render it in the family's grammar.
 public struct SpecChip: View {
@@ -45,40 +46,38 @@ public struct SpecChip: View {
     public static let rail: CGFloat = 32
 
     let glyph: Glyph
-    let provenance: Provenance
+    let emphasis: Emphasis
     let height: CGFloat
     let tone: Tone
 
     public init(
-        _ glyph: Glyph, provenance: Provenance = .verified, height: CGFloat = 34,
-        tone: Tone = .ink
+        _ glyph: Glyph, emphasis: Emphasis = .plain, height: CGFloat = 34, tone: Tone = .ink
     ) {
         self.glyph = glyph
-        self.provenance = provenance
+        self.emphasis = emphasis
         self.height = height
         self.tone = tone
     }
 
     /// The drawn word-badge - the one shape a value without artwork takes.
     public init(
-        _ word: String, provenance: Provenance = .verified, height: CGFloat = 34,
-        tone: Tone = .ink
+        _ word: String, emphasis: Emphasis = .plain, height: CGFloat = 34, tone: Tone = .ink
     ) {
-        self.init(.word(word), provenance: provenance, height: height, tone: tone)
+        self.init(.word(word), emphasis: emphasis, height: height, tone: tone)
     }
 
     public var body: some View {
         content
-            .opacity(provenance == .claim ? 0.55 : 1)
+            .opacity(emphasis == .ghost ? 0.55 : 1)
             .padding(.horizontal, washed ? height * 0.18 : 0)
             .padding(.vertical, washed ? height * 0.12 : 0)
             .background {
                 if washed { Capsule().fill(Color.inkRest) }
             }
             .overlay {
-                if provenance == .delivered { Capsule().strokeBorder(Color.inkEdge, lineWidth: 1) }
+                if emphasis == .ringed { Capsule().strokeBorder(Color.inkEdge, lineWidth: 1) }
             }
-            .accessibilityLabel("\(accessibility), \(provenance.rawValue)")
+            .accessibilityLabel(accessibility)
     }
 
     @ViewBuilder
@@ -111,10 +110,10 @@ public struct SpecChip: View {
     }
 
     private var ink: Color { .primary }
-    private var washed: Bool { provenance == .measured || provenance == .delivered }
+    private var washed: Bool { emphasis == .washed || emphasis == .ringed }
 
     /// THE TONE RULE. `ink` follows the axis. `brand` paints the mark its
-    /// official hex on the unfilled weights only, and never a near-black
+    /// official hex on the unwashed emphases only, and never a near-black
     /// one (luminance under 0.15 - Dolby, HDR10, DVD): black on a dark
     /// ground is a missing logo. The flag renders as authored regardless.
     private func markTint(_ m: Mark) -> Color {
@@ -124,10 +123,10 @@ public struct SpecChip: View {
 }
 
 /// The per-axis options every value chip and the strip share.
-public struct ChipOptions: Sendable {
-    public var provenance: Provenance = .verified
+public struct ChipOptions {
+    public var emphasis: Emphasis = .plain
     public var height: CGFloat = 34
-    public var delta: Delta? = nil
+    public var trailing: AnyView? = nil
     public var detail: String? = nil
     public var tone: Tone = .ink
 
@@ -137,8 +136,8 @@ public struct ChipOptions: Sendable {
     }
 }
 
-/// One axis: its glyphs tight in a row, the delta trailing, the detail
-/// beneath. Every value chip is this over its own glyph list.
+/// One axis: its glyphs tight in a row, the trailing slot after them, the
+/// detail beneath. Every value chip is this over its own glyph list.
 struct Axis: View {
     let kind: Kind
     let glyphs: [Glyph]
@@ -150,15 +149,9 @@ struct Axis: View {
             HStack(spacing: .inkTight) {
                 ForEach(Array(glyphs.enumerated()), id: \.offset) { _, g in
                     SpecChip(
-                        g, provenance: options.provenance, height: options.height,
-                        tone: options.tone)
+                        g, emphasis: options.emphasis, height: options.height, tone: options.tone)
                 }
-                if let delta = options.delta {
-                    Text(delta.glyph)
-                        .font(.system(size: options.height * 0.4, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(delta.rawValue)
-                }
+                if let trailing = options.trailing { trailing }
             }
             if let detail = options.detail, !detail.isEmpty {
                 Text(detail)
@@ -167,8 +160,8 @@ struct Axis: View {
                     .lineLimit(1)
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(kind.rawValue): \(accessibility), \(options.provenance.rawValue)")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(kind.rawValue): \(accessibility)")
     }
 }
 
@@ -178,13 +171,13 @@ public struct PictureChip: View {
     let options: ChipOptions
 
     public init(
-        resolution: Resolution?, range: DynamicRange?, provenance: Provenance = .verified,
-        height: CGFloat = 34, delta: Delta? = nil, detail: String? = nil, tone: Tone = .ink
+        resolution: Resolution?, range: DynamicRange?, emphasis: Emphasis = .plain,
+        height: CGFloat = 34, trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink
     ) {
         self.resolution = resolution
         self.range = range
         self.options = ChipOptions(
-            provenance: provenance, height: height, delta: delta, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
     }
 
     public var body: some View {
@@ -202,12 +195,12 @@ public struct SoundChip: View {
     let options: ChipOptions
 
     public init(
-        audio: Audio, provenance: Provenance = .verified, height: CGFloat = 34,
-        delta: Delta? = nil, detail: String? = nil, tone: Tone = .ink
+        audio: Audio, emphasis: Emphasis = .plain, height: CGFloat = 34,
+        trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink
     ) {
         self.audio = audio
         self.options = ChipOptions(
-            provenance: provenance, height: height, delta: delta, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
     }
 
     public var body: some View {
@@ -235,16 +228,16 @@ public struct TierChip: View {
     let resolution: Resolution?
     let options: ChipOptions
 
-    /// `resolution` lets a Blu-ray-sourced 4K copy wear the Ultra HD
+    /// `resolution` lets a Blu-ray-sourced 4K spec wear the Ultra HD
     /// Blu-ray mark; the strip passes it, a lone chip may.
     public init(
-        tier: Tier, resolution: Resolution? = nil, provenance: Provenance = .verified,
-        height: CGFloat = 34, delta: Delta? = nil, detail: String? = nil, tone: Tone = .ink
+        tier: Tier, resolution: Resolution? = nil, emphasis: Emphasis = .plain,
+        height: CGFloat = 34, trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink
     ) {
         self.tier = tier
         self.resolution = resolution
         self.options = ChipOptions(
-            provenance: provenance, height: height, delta: delta, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
     }
 
     public var body: some View {
@@ -261,26 +254,31 @@ public struct TierChip: View {
 
 public struct LangChip: View {
     let lang: Lang
+    let label: String?
     let options: ChipOptions
 
+    /// `label` overrides the system display name with the consumer's own
+    /// spelling.
     public init(
-        lang: Lang, provenance: Provenance = .verified, height: CGFloat = 34,
-        delta: Delta? = nil, detail: String? = nil, tone: Tone = .ink
+        lang: Lang, label: String? = nil, emphasis: Emphasis = .plain, height: CGFloat = 34,
+        trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink
     ) {
         self.lang = lang
+        self.label = label
         self.options = ChipOptions(
-            provenance: provenance, height: height, delta: delta, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
     }
 
     public var body: some View {
+        let word = label ?? lang.label
         var glyphs: [Glyph] = []
         if let flag = options.glyph(lang.marks) {
             glyphs.append(flag)
-            if options.atRail { glyphs.append(.word(lang.label)) }
+            if options.atRail { glyphs.append(.word(word)) }
         } else {
-            glyphs.append(.word(lang.label))
+            glyphs.append(.word(word))
         }
-        return Axis(kind: .lang, glyphs: glyphs, accessibility: lang.label, options: options)
+        return Axis(kind: .lang, glyphs: glyphs, accessibility: word, options: options)
     }
 }
 
@@ -289,12 +287,12 @@ public struct CutChip: View {
     let options: ChipOptions
 
     public init(
-        cut: Cut, provenance: Provenance = .verified, height: CGFloat = 34,
-        delta: Delta? = nil, detail: String? = nil, tone: Tone = .ink
+        cut: Cut, emphasis: Emphasis = .plain, height: CGFloat = 34, trailing: AnyView? = nil,
+        detail: String? = nil, tone: Tone = .ink
     ) {
         self.cut = cut
         self.options = ChipOptions(
-            provenance: provenance, height: height, delta: delta, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
     }
 
     public var body: some View {
@@ -306,29 +304,31 @@ public struct CutChip: View {
 
 /// The spec as a row, fixed order picture · sound · tier · lang · cut,
 /// absent axes omitted, `.inkGap` between axes (each axis packs its own
-/// marks at `.inkTight`). One provenance and one tone for the strip: a
-/// spec is one observation, not five. `deltas` trail a candidate's axes
-/// against the owned copy; `omit` is for surfaces that state an axis
+/// marks at `.inkTight`). One emphasis and one tone for the strip.
+/// `adornments` are trailing views per axis; `labels` overrides the
+/// language's display name; `omit` is for surfaces that state an axis
 /// elsewhere. The tier chip is handed the resolution so a 4K disc wears
 /// the Ultra HD Blu-ray mark.
 public struct MediaSpecStrip: View {
     let spec: MediaSpec
-    let provenance: Provenance
+    let emphasis: Emphasis
     let height: CGFloat
-    let deltas: [Kind: Delta]
+    let adornments: [Kind: AnyView]
+    let langLabel: String?
     let omit: Set<Kind>
     let spacing: CGFloat
     let tone: Tone
 
     public init(
-        spec: MediaSpec, provenance: Provenance = .verified, height: CGFloat = 34,
-        deltas: [Kind: Delta] = [:], omit: Set<Kind> = [], spacing: CGFloat = .inkGap,
-        tone: Tone = .ink
+        spec: MediaSpec, emphasis: Emphasis = .plain, height: CGFloat = 34,
+        adornments: [Kind: AnyView] = [:], langLabel: String? = nil, omit: Set<Kind> = [],
+        spacing: CGFloat = .inkGap, tone: Tone = .ink
     ) {
         self.spec = spec
-        self.provenance = provenance
+        self.emphasis = emphasis
         self.height = height
-        self.deltas = deltas
+        self.adornments = adornments
+        self.langLabel = langLabel
         self.omit = omit
         self.spacing = spacing
         self.tone = tone
@@ -338,27 +338,27 @@ public struct MediaSpecStrip: View {
         HStack(spacing: spacing) {
             if !omit.contains(.picture), spec.resolution != nil || spec.range != nil {
                 PictureChip(
-                    resolution: spec.resolution, range: spec.range, provenance: provenance,
-                    height: height, delta: deltas[.picture], tone: tone)
+                    resolution: spec.resolution, range: spec.range, emphasis: emphasis,
+                    height: height, trailing: adornments[.picture], tone: tone)
             }
             if !omit.contains(.sound), let audio = spec.audio {
                 SoundChip(
-                    audio: audio, provenance: provenance, height: height, delta: deltas[.sound],
-                    tone: tone)
+                    audio: audio, emphasis: emphasis, height: height,
+                    trailing: adornments[.sound], tone: tone)
             }
             if !omit.contains(.tier), let tier = spec.tier {
                 TierChip(
-                    tier: tier, resolution: spec.resolution, provenance: provenance,
-                    height: height, delta: deltas[.tier], tone: tone)
+                    tier: tier, resolution: spec.resolution, emphasis: emphasis, height: height,
+                    trailing: adornments[.tier], tone: tone)
             }
             if !omit.contains(.lang), let lang = spec.lang {
                 LangChip(
-                    lang: lang, provenance: provenance, height: height, delta: deltas[.lang],
-                    tone: tone)
+                    lang: lang, label: langLabel, emphasis: emphasis, height: height,
+                    trailing: adornments[.lang], tone: tone)
             }
             if !omit.contains(.cut), let cut = spec.cut {
                 CutChip(
-                    cut: cut, provenance: provenance, height: height, delta: deltas[.cut],
+                    cut: cut, emphasis: emphasis, height: height, trailing: adornments[.cut],
                     tone: tone)
             }
         }
@@ -367,20 +367,20 @@ public struct MediaSpecStrip: View {
 
 #Preview("MediaSpec") {
     VStack(alignment: .leading, spacing: .inkLane) {
-        ForEach(Provenance.allCases, id: \.self) { p in
+        ForEach(Emphasis.allCases, id: \.self) { e in
             MediaSpecStrip(
                 spec: MediaSpec(
                     resolution: .p2160, range: .dolbyVision,
                     audio: Audio(codec: .trueHD, channels: .surround71, object: .atmos),
                     tier: .remux, lang: Lang("es-ES"), cut: .imax),
-                provenance: p)
+                emphasis: e)
         }
         MediaSpecStrip(
             spec: MediaSpec(
                 resolution: .p2160, range: .hdr10,
                 audio: Audio(codec: .dtsHDMA, channels: .surround51), tier: .webdl),
-            provenance: .claim,
-            deltas: [.picture: .worse, .sound: .same, .tier: .worse])
+            emphasis: .ghost,
+            adornments: [.picture: AnyView(Text("▼")), .sound: AnyView(Text("="))])
         MediaSpecStrip(
             spec: MediaSpec(
                 resolution: .p2160, range: .dolbyVision,

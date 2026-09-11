@@ -32,7 +32,7 @@ extension DynamicRange {
     /// Only Dolby Vision is a brand mark. HDR10 and HDR10+ are boxed words
     /// drawn in the family's one badge geometry (their Commons artwork stays
     /// in the catalog as reference: a second stroke weight beside the drawn
-    /// family was the thing the eye caught).
+    /// family reads as a second family).
     public var marks: Marks {
         switch self {
         case .dolbyVision: Marks(symbol: .dolby, lockup: .dolbyvision)
@@ -115,10 +115,10 @@ extension Tier {
 }
 
 extension Lang {
-    /// The two Spanishes the house tells apart: Spain wears its flag; Latin
-    /// America has no single flag and stays a word.
+    /// Flags are keyed by the REGION subtag, never the language: a language
+    /// is not a country. Only Spain ships today.
     public var marks: Marks {
-        rawValue == "es-ES" ? Marks(symbol: .flages, lockup: .flages) : .none
+        region == "ES" ? Marks(symbol: .flages, lockup: .flages) : .none
     }
 }
 
