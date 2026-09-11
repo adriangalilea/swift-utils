@@ -6,31 +6,32 @@ import SwiftUI
 // lockup keeps its shape, a brand symbol stands alone at the small rung.
 // No pill, no disc, no kind glyph around a mark.
 //
-// EVERY BOXED VALUE IS ONE WEIGHT. HDR10 / HDR10+ / HLG, channels (7.1),
-// Remux, WEB-DL / WEBRip / HDTV / CAM, DTS:X, codec words (TrueHD beside
-// the Atmos lockup, AAC / PCM / ALAC / MP3 / MP2 / Vorbis), a language's
-// name, every cut but IMAX are DRAWN one-line badges: box height = chip
-// height h, corner radius 0.25h, stroke 0.08h, side pad 0.26h, word 0.62h
-// semibold (cap ≈ 0.7 × font, so box ≈ 1.5 × cap, the HDR10 badge's own
-// proportion). RESOLUTIONS are the disc-case badge, drawn (no free vector
-// exists; it is typography below the originality threshold): the same
-// stroke, radius and side pad in a box 1.75h tall centred on the row, a
-// primary line ("4K") at 0.9h in the heaviest weight with tight tracking
-// over a secondary line ("ULTRA HD") at 55 % of it, uppercase, wide
-// tracking. Below `rail` the two lines hold while the primary stays ≥ 7pt
-// (h ≥ 7.8), else the primary alone in the one-line box. FULL HD, HD and
-// SD are one-line badges.
+// EVERY DRAWN BADGE IS THE DISC-CASE STICKER, one weight. A one-panel
+// badge (HDR10 / HDR10+ / HLG, channels, Remux, WEB-DL / WEBRip / HDTV /
+// CAM, DTS:X, codec words, a language's name, every cut but IMAX, HD, SD)
+// is a frame stroked in the badge ink at 0.12h (1.5 × the 0.08h hairline)
+// around a near-black ground panel carrying the word at 0.62h semibold;
+// box height = chip height h, radius 0.25h, side pad 0.26h. A two-panel
+// badge (4K / 8K / 1080p, the "4K ULTRA HD" sticker - no free vector
+// exists; it is typography below the originality threshold) is the same
+// frame, 1.75h tall and centred on the row: an upper ground panel carrying
+// the primary in the badge ink at 0.55 × box, `.black` weight, tight
+// tracking, over a lower band 30 % of the box FILLED with the badge ink
+// carrying the secondary in the ground colour, uppercase, wide tracking,
+// flush to the frame's inner edge. Below `rail` the two panels hold while
+// the band text stays ≥ 5pt (h ≥ 15.9), else the primary alone.
 //
 // EMPHASIS sits ON the mark and is named for the look alone: ghost (0.55
 // opacity), plain (full ink, no ground), washed (an `inkRest` capsule
 // behind), ringed (the wash plus an `inkEdge` ring). TONE: `ink` follows
 // the axis's foreground; `brand` paints a mark its official hex - on the
 // unwashed emphases only, and never a near-black official colour (black on
-// dark is a missing logo, not a brand statement); `gold` is the disc-case
-// sticker - the box filled `Gold.ground`, stroke 1.5 × the hairline and
-// letters in the `Gold` gradient, marks filled with the same gradient,
-// flat `Gold.flat` below the rail. Original-colour marks (the flag) ignore
-// tone by construction. A TRAILING slot after an axis's
+// dark is a missing logo, not a brand statement); `gold` is the metallic
+// sticker and it is FOR THE DRAWN BADGES ONLY - frame, letters and band in
+// the `Gold` gradient (flat `Gold.flat` below the rail), the ground
+// `Gold.ground` - while brand marks stay in ink, white on dark, as disc
+// cases print them beside gold stickers. Original-colour marks (the flag)
+// ignore tone by construction. A TRAILING slot after an axis's
 // last mark takes any view the consumer wants there.
 //
 // Two rungs, one threshold (`SpecChip.rail` = 32): at and above it lockups,
@@ -47,13 +48,13 @@ public enum Glyph: Hashable, Sendable {
 }
 
 extension Resolution {
-    /// The disc-case badge each resolution is drawn as. 1080p is "FULL HD"
-    /// (the disc-case word for it; "HD" is 720p's), one line.
+    /// The disc-case sticker each resolution is drawn as: two panels for
+    /// 4K, 8K and 1080p ("1080p" over "FULL HD"), one for HD (720p) and SD.
     public var glyph: Glyph {
         switch self {
         case .sd: .word("SD")
         case .p720: .word("HD")
-        case .p1080: .word("FULL HD")
+        case .p1080: .badge(primary: "1080p", secondary: "FULL HD")
         case .p2160: .badge(primary: "4K", secondary: "ULTRA HD")
         case .p4320: .badge(primary: "8K", secondary: "ULTRA HD")
         }
@@ -66,6 +67,9 @@ extension Resolution {
 public struct SpecChip: View {
     /// The height at and above which a chip wears lockups; below it, symbols.
     public static let rail: CGFloat = 32
+    /// The drawn badges' ground panel under `ink` and `brand` (gold has its
+    /// own, `Gold.ground`).
+    nonisolated(unsafe) public static var ground = Color(white: 0.07)
 
     let glyph: Glyph
     let emphasis: Emphasis
@@ -117,27 +121,23 @@ public struct SpecChip: View {
                 .accessibilityLabel(m.title)
                 .frame(height: height)
         case .word(let w):
-            boxed(height: height) {
+            sticker(box: height, band: nil) {
                 Text(w)
                     .font(.system(size: height * 0.62, weight: .semibold))
                     .lineLimit(1)
             }
         case .badge(let primary, let secondary):
-            let big = height * 0.9
-            if big >= 7 {
-                boxed(height: height * 1.75) {
-                    VStack(spacing: height * 0.04) {
-                        Text(primary)
-                            .font(.system(size: big, weight: .black))
-                            .tracking(-0.03 * big)
-                        Text(secondary.uppercased())
-                            .font(.system(size: big * 0.55, weight: .semibold))
-                            .tracking(0.14 * big * 0.55)
-                    }
-                    .lineLimit(1)
+            let box = height * 1.75
+            let bandText = box * 0.30 * 0.6
+            if bandText >= 5 {
+                sticker(box: box, band: secondary) {
+                    Text(primary)
+                        .font(.system(size: box * 0.55, weight: .black))
+                        .tracking(-0.03 * box * 0.55)
+                        .lineLimit(1)
                 }
             } else {
-                boxed(height: height) {
+                sticker(box: height, band: nil) {
                     Text(primary)
                         .font(.system(size: height * 0.62, weight: .black))
                         .tracking(-0.03 * height * 0.62)
@@ -147,24 +147,41 @@ public struct SpecChip: View {
         }
     }
 
-    /// The one box every drawn badge sits in: side pad 0.26h, radius
-    /// 0.25h, stroke 0.08h - h being the CHIP height, so a taller badge
-    /// keeps the family's corner and weight.
-    private func boxed(height box: CGFloat, @ViewBuilder _ text: () -> some View) -> some View {
-        text()
-            .foregroundStyle(ink)
-            .padding(.horizontal, height * 0.26)
-            .frame(height: box)
-            .background {
-                if tone == .gold {
-                    RoundedRectangle(cornerRadius: height * 0.25).fill(Gold.ground)
-                }
+    /// THE STICKER. A frame in the badge ink at 0.12h around a ground
+    /// panel; the text in the badge ink; with `band`, the lower 30 % of the
+    /// box is filled with the ink and carries the band text in the ground
+    /// colour, flush to the frame's inner edge. h is the CHIP height, so a
+    /// taller sticker keeps the family's corner, weight and side pad.
+    private func sticker(box: CGFloat, band: String?, @ViewBuilder _ text: () -> some View)
+        -> some View
+    {
+        let bandHeight = band == nil ? 0 : box * 0.30
+        let radius = height * 0.25
+        return ZStack(alignment: .bottom) {
+            text()
+                .foregroundStyle(ink)
+                .padding(.horizontal, height * 0.26)
+                .frame(height: box - bandHeight)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, bandHeight)
+            if let band {
+                Text(band.uppercased())
+                    .font(.system(size: bandHeight * 0.6, weight: .semibold))
+                    .tracking(0.14 * bandHeight * 0.6)
+                    .foregroundStyle(ground)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: bandHeight)
+                    .background(ink)
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: height * 0.25)
-                    .strokeBorder(
-                        ink, lineWidth: height * 0.08 * (tone == .gold ? Gold.strokeScale : 1))
-            }
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(height: box)
+        .background(ground)
+        .clipShape(RoundedRectangle(cornerRadius: radius))
+        .overlay {
+            RoundedRectangle(cornerRadius: radius).strokeBorder(ink, lineWidth: height * 0.12)
+        }
     }
 
     private var accessibility: String {
@@ -175,27 +192,26 @@ public struct SpecChip: View {
         }
     }
 
-    /// The letters' and strokes' style: gold's gradient at the rail, flat
-    /// gold below it, else the primary ink.
+    /// The drawn badges' ink: gold's gradient at the rail, flat gold below
+    /// it, else the primary ink.
     private var ink: AnyShapeStyle {
         guard tone == .gold else { return AnyShapeStyle(Color.primary) }
         return height >= SpecChip.rail ? AnyShapeStyle(Gold.gradient) : AnyShapeStyle(Gold.flat)
     }
 
+    private var ground: Color { tone == .gold ? Gold.ground : SpecChip.ground }
+
     private var washed: Bool { emphasis == .washed || emphasis == .ringed }
 
-    /// THE TONE RULE. `ink` follows the axis. `brand` paints the mark its
-    /// official hex on the unwashed emphases only, and never a near-black
-    /// one (luminance under 0.15 - Dolby, HDR10, DVD): black on a dark
-    /// ground is a missing logo. `gold` fills the mark with the sticker's
-    /// gradient (flat below the rail). The flag renders as authored
-    /// regardless.
+    /// THE TONE RULE for marks. `ink` follows the axis. `brand` paints the
+    /// mark its official hex on the unwashed emphases only, and never a
+    /// near-black one (luminance under 0.15 - Dolby, HDR10, DVD): black on
+    /// a dark ground is a missing logo. `gold` is for the drawn badges
+    /// only: a mark stays in ink beside a gold sticker, as disc cases print
+    /// them. The flag renders as authored regardless.
     private func markStyle(_ m: Mark) -> AnyShapeStyle {
-        switch tone {
-        case .gold: return ink
-        case .brand where !washed && m.luminance >= 0.15: return AnyShapeStyle(m.color)
-        default: return AnyShapeStyle(Color.primary)
-        }
+        if tone == .brand, !washed, m.luminance >= 0.15 { return AnyShapeStyle(m.color) }
+        return AnyShapeStyle(Color.primary)
     }
 }
 

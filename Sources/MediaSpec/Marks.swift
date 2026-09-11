@@ -7,12 +7,13 @@ import SwiftUI
 // with an entry is drawn, never written; a value with no entry becomes a
 // drawn word-badge, the one shape words take in this family (Chips.swift).
 
-/// How a mark is coloured. `ink` follows the chip's foreground (one ink,
-/// the flare rule); `brand` uses the mark's official hex; `gold` is the
-/// disc-case metallic sticker (`Gold`): a near-black box, stroke and
-/// letters in the metallic gradient, marks filled with the same gradient
-/// as disc cases print them, flat gold below the rail. A mark with
-/// intrinsic colours (the flag) ignores tone by construction.
+/// How a chip is coloured. `ink` follows the chip's foreground (one ink,
+/// the flare rule); `brand` paints a mark its official hex; `gold` is the
+/// disc-case metallic sticker (`Gold`) for the DRAWN badges only - frame,
+/// letters and band in the metallic gradient over the near-black ground,
+/// flat gold below the rail - while brand marks stay in ink beside it, as
+/// disc cases print them. A mark with intrinsic colours (the flag) ignores
+/// tone by construction.
 public enum Tone: String, Codable, CaseIterable, Sendable, Hashable {
     case ink
     case brand
@@ -36,9 +37,6 @@ public enum Gold {
     nonisolated(unsafe) public static var flat = Color(red: 0.902, green: 0.706, blue: 0.133)
     /// The sticker's ground.
     nonisolated(unsafe) public static var ground = Color(white: 0.07)
-    /// Stroke, relative to the family's 0.08h hairline.
-    public static let strokeScale: CGFloat = 1.5
-
     public static var gradient: LinearGradient {
         LinearGradient(stops: stops, startPoint: .topLeading, endPoint: .bottomTrailing)
     }

@@ -166,7 +166,9 @@ struct DemoView: View {
                     }
                 }
             }
-            section("gold · the disc-case sticker at 28 / 34 / 44") {
+            section(
+                "gold · the sticker at 28 / 34 / 44: drawn badges take the metal, marks stay in ink"
+            ) {
                 VStack(alignment: .leading, spacing: .inkGap) {
                     ForEach([28, 34, 44] as [CGFloat], id: \.self) { h in
                         MediaSpecStrip(
@@ -235,7 +237,9 @@ struct DemoView: View {
                     LangChip(lang: Lang("es-ES"), label: "Peninsular")
                 }
             }
-            section("recipe · a premium shelf — gold is a tone, the shelf decides who wears it") {
+            section(
+                "recipe · a premium shelf — gold is a tone for the drawn badges; the marks beside them stay white"
+            ) {
                 HStack(spacing: .inkLane) {
                     MediaSpecStrip(
                         spec: MediaSpec(

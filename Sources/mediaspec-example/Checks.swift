@@ -172,7 +172,8 @@ func runChecks() -> Never {
     if Resolution.allCases.contains(where: { $0.marks != .none })
         || Resolution.p2160.glyph != .badge(primary: "4K", secondary: "ULTRA HD")
         || Resolution.p4320.glyph != .badge(primary: "8K", secondary: "ULTRA HD")
-        || Resolution.p1080.glyph != .word("FULL HD") || Resolution.p720.glyph != .word("HD")
+        || Resolution.p1080.glyph != .badge(primary: "1080p", secondary: "FULL HD")
+        || Resolution.p720.glyph != .word("HD")
         || Resolution.sd.glyph != .word("SD")
     {
         fail("resolution badges")
