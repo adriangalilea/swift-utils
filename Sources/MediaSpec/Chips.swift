@@ -6,16 +6,17 @@ import SwiftUI
 // the chip. A brand lockup keeps its shape, a brand symbol stands alone at
 // the small rung. No pill, no disc, no kind glyph around a mark.
 //
-// EVERY BOXED VALUE IS ONE DRAWN BADGE. SD / HD / 4K / 8K / 720p, HDR10 /
-// HDR10+ / HLG, channels (7.1), Remux, WEB-DL / WEBRip / HTDV / CAM, DTS:X,
-// codec words (TrueHD beside the Atmos lockup, AAC / PCM / ALAC / MP3 / MP2
-// / Vorbis), castellano / latino / a code, every cut but IMAX - one
-// geometry, one stroke weight: box height = chip height h, corner radius
-// 0.25h, stroke 0.08h, side pad 0.26h, word 0.62h semibold (cap ≈ 0.7 ×
-// font, so box ≈ 1.5 × cap, the HDR10 badge's own proportion). Badge
-// ARTWORK from three sources put three stroke weights in one row and the
-// eye read three families; the artwork stays in the catalog as reference,
-// unbound.
+// EVERY BOXED VALUE IS ONE WEIGHT. 720p, HDR10 / HDR10+ / HLG, channels
+// (7.1), Remux, WEB-DL / WEBRip / HDTV / CAM, DTS:X, codec words (TrueHD
+// beside the Atmos lockup, AAC / PCM / ALAC / MP3 / MP2 / Vorbis),
+// castellano / latino / a code, every cut but IMAX are DRAWN: box height =
+// chip height h, corner radius 0.25h, stroke 0.08h, side pad 0.26h, word
+// 0.62h semibold (cap ≈ 0.7 × font, so box ≈ 1.5 × cap, the HDR10 badge's
+// own proportion). SD / HD / 4K / 8K are tabler's badge ARTWORK, because 4K
+// and 8K need real distinction and its letterforms give it - restroked to
+// 1.12 on the 24-grid (1.12 / the 14-unit box = 0.08h) and rendered with
+// the box at h (`Mark.boxScale`), so the drawn and the drawn-by-tabler
+// badge are one weight by construction.
 //
 // PROVENANCE sits ON the mark: claim is ghosted (0.55 opacity); verified is
 // full ink; measured is full ink over a soft `inkRest` wash capsule;
@@ -84,7 +85,10 @@ public struct SpecChip: View {
     private var content: some View {
         switch glyph {
         case .art(let m):
-            BrandMark(m, height: height, tint: markTint(m))
+            // A file whose drawn box is smaller than its grid renders taller
+            // so the BOX, not the grid, lands at the chip height.
+            BrandMark(m, height: height * m.boxScale, tint: markTint(m))
+                .frame(height: height)
         case .word(let w):
             Text(w)
                 .font(.system(size: height * 0.62, weight: .semibold))

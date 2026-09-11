@@ -42,10 +42,34 @@ extension DynamicRange {
 }
 
 extension Resolution {
-    /// Every resolution is a boxed word in the one drawn badge geometry.
-    /// The tabler badges and the ULTRA HD wordmark stay in the catalog
-    /// unbound: three stroke weights in one row read as three families.
-    public var marks: Marks { .none }
+    /// The tabler badges at both rungs: 4K and 8K need real distinction and
+    /// tabler's letterforms give it. Their stroke is 1.12 on the 24-grid,
+    /// which over the badge's 14-unit box is the drawn family's 0.08h - one
+    /// weight by construction. The chip scales the file so the BOX is h
+    /// (see `Mark.boxScale`). 720p has no artwork and is drawn; the ULTRA
+    /// HD wordmark stays in the catalog unbound.
+    public var marks: Marks {
+        switch self {
+        case .sd: Marks(symbol: .badgesd, lockup: .badgesd)
+        case .p720: .none
+        case .p1080: Marks(symbol: .badgehd, lockup: .badgehd)
+        case .p2160: Marks(symbol: .badge4k, lockup: .badge4k)
+        case .p4320: Marks(symbol: .badge8k, lockup: .badge8k)
+        }
+    }
+}
+
+extension Mark {
+    /// How much taller than the chip a mark's FILE must render so its
+    /// drawn box lands at the chip height. The tabler badges draw a 14-unit
+    /// box inside a 24-unit grid (24/14); every other mark fills its
+    /// viewBox and renders at the chip height as is.
+    public var boxScale: CGFloat {
+        switch self {
+        case .badge4k, .badge8k, .badgehd, .badgesd: 24.0 / 14.0
+        default: 1
+        }
+    }
 }
 
 extension ObjectAudio {

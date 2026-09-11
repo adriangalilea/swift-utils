@@ -163,12 +163,17 @@ func runChecks() -> Never {
         fail("the tabler badges are square templates")
     }
     // The value → mark binding, the manifest's own table.
-    // Boxed values are DRAWN, one geometry: no resolution and no HDR10/HDR10+
-    // binds artwork; the catalog keeps the files as reference only.
+    // Resolutions wear tabler's badges (both rungs, stroke matched to the
+    // drawn family); 720p, HDR10 and HDR10+ are drawn.
     if DynamicRange.dolbyVision.marks != Marks(symbol: .dolby, lockup: .dolbyvision)
         || DynamicRange.hdr10Plus.marks != .none || DynamicRange.hdr10.marks != .none
         || DynamicRange.sdr.marks != .none || DynamicRange.hlg.marks != .none
-        || Resolution.allCases.contains(where: { $0.marks != .none })
+        || Resolution.sd.marks != Marks(symbol: .badgesd, lockup: .badgesd)
+        || Resolution.p720.marks != .none
+        || Resolution.p1080.marks != Marks(symbol: .badgehd, lockup: .badgehd)
+        || Resolution.p2160.marks != Marks(symbol: .badge4k, lockup: .badge4k)
+        || Resolution.p4320.marks != Marks(symbol: .badge8k, lockup: .badge8k)
+        || Mark.badge4k.boxScale != 24.0 / 14.0 || Mark.dolby.boxScale != 1
         || ObjectAudio.atmos.marks != Marks(symbol: .dolby, lockup: .dolbyatmos)
         || ObjectAudio.dtsX.marks != .none
         || AudioCodec.trueHD.marks != Marks(symbol: .dolby, lockup: .dolbytruehd)
