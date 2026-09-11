@@ -32,6 +32,9 @@
 // `color` stays the brand's own official hex.
 import Ink
 import SwiftUI
+#if canImport(AppKit)
+    import AppKit
+#endif
 
 public enum Mark: String, CaseIterable, Sendable, BrandMarkable {
     case badge4k = "badge4k"
@@ -193,8 +196,30 @@ public enum Mark: String, CaseIterable, Sendable, BrandMarkable {
         }
     }
 
+    #if canImport(AppKit)
+        /// The artwork as AppKit sees it. Under Xcode the catalog is compiled
+        /// and the named lookup answers; under `swift build` the catalog rides
+        /// the bundle as a RAW folder (no actool), so the SVG is read straight
+        /// from `Marks.xcassets/<slug>.imageset/<slug>.svg` - macOS renders SVG natively.
+        public var nsImage: NSImage? {
+            if let compiled = Bundle.module.image(forResource: rawValue) { return compiled }
+            guard
+                let url = Bundle.module.url(
+                    forResource: rawValue, withExtension: "svg",
+                    subdirectory: "Marks.xcassets/\(rawValue).imageset"),
+                let loaded = NSImage(contentsOf: url)
+            else { return nil }
+            loaded.isTemplate = !original
+            return loaded
+        }
+    #endif
+
     /// The mark itself; template-rendered unless `original`.
     public var image: Image {
-        Image(rawValue, bundle: .module).renderingMode(original ? .original : .template)
+        let mode: Image.TemplateRenderingMode = original ? .original : .template
+        #if canImport(AppKit)
+            if let ns = nsImage { return Image(nsImage: ns).renderingMode(mode) }
+        #endif
+        return Image(rawValue, bundle: .module).renderingMode(mode)
     }
 }
