@@ -35,6 +35,18 @@ Marks are template images: they carry shape, never color. `luminance` is the fac
 
 The media-ratings vocabulary and the only place the ratings brands ship: `ScoreChip` / `ScoreStrip`, one chip per source with each value in that source's own scale (IMDb 0-10, RT and Metacritic 0-100, Letterboxd pre-scaled 0-10). Two sources get shape-based chips rather than a logo, and they are exactly the two whose official color is unusable on dark: Metacritic's colored box that IS the number, and Letterboxd's tri-color dots. An app that shows no ratings links no ratings logos.
 
+## MediaSpec
+
+The media-format vocabulary, typed - what a copy of a film CARRIES, the way Scores knows what IMDb is. An app passes values, never label strings: `Resolution`, `DynamicRange`, `Audio` (codec + channels + object audio), `Tier`, `Lang`, `Cut`, and the chips (`PictureChip` / `SoundChip` / `TierChip` / `LangChip` / `CutChip`, composed by `MediaSpecStrip`) own every label, short form and glyph. `pictureLabel`/`soundLabel` are the one spelling ("4K · Dolby Vision", "TrueHD Atmos 7.1"; SDR is the unmarked case and stays silent).
+
+**Provenance is worn as WEIGHT, never as a color** (the flare rule): `claim` (a release name's promise) is a stroke with nothing inside; `verified` (the container states it) rests; `measured` (the pixels or the meter say so) is raised; `delivered` (what this session on this screen gets) is raised, edged, its disc lit - the only chip that speaks about the room right now. `Provenance` is `Comparable` in that order. `Delta` decorates a candidate's axes against the owned copy (▲ = ▼) and `detail` is the quiet second line ("Dolby Vision source · HDR10 here").
+
+What it deliberately does NOT own: **ranking** - which of two copies is better is the daemon's ladder, config-as-data on its side; a chip renders one value honestly and knows nothing about order. And **brand marks**: Dolby and DTS are licensed marks (not the CC0 nominative use Scores makes of IMDb), and at 10 ft the words "Dolby Vision" read where a 22 pt double-D does not - so MediaSpec ships zero resources, asserted by its gate.
+
+**The lenient-decode law**: every axis on `MediaSpec` is `@Lenient` - an unknown raw value decodes that ONE field to nil, never throws, never blanks the row. A wire that grows a word this build does not know costs one chip. `Cut` is the exception by design: an unknown cut is carried verbatim as `.other`, because a cut is whatever the disc's spine says.
+
+The raw values are the wire spellings, shared with the React `media-spec` item. `swift run mediaspec-example --check` prints every enum's vocabulary in declaration order and asserts it equals the pinned literal (the React item pins the same literal on its side, so a rename fails a gate instead of drawing a wrong chip), the label rules, the provenance order and the lenient-decode law; without the flag it opens the sweep window - every resolution × range, every codec, the four weights, three heights, details, deltas.
+
 ## Gallery
 
 The library-grid product: a framework-free layout kernel plus the SwiftUI shell, cross-platform by design - macOS binds keyboards to the kernels, tvOS lets the focus engine drive the same geometry.

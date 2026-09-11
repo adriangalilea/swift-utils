@@ -54,6 +54,13 @@ let package = Package(
         // with their CONSUMER, never in Ink - an app that shows no ratings
         // links no ratings logos.
         .library(name: "Scores", targets: ["Scores"]),
+        // The media-format vocabulary, typed: picture, sound, source tier,
+        // language and cut as VALUES the chips know how to say, with
+        // provenance worn as weight. Owns labels and glyphs, never ranking
+        // (the daemon's ladder) and never brand marks (licensed; words
+        // read at 10 ft). `swift run mediaspec-example --check` pins the
+        // wire literals shared with the React twin.
+        .library(name: "MediaSpec", targets: ["MediaSpec"]),
         // Any brand mark, natively: fetches simple-icons artwork (CC0)
         // into a target's catalog and regenerates its typed `Brand` enum
         // with each brand's OFFICIAL color. `swift run brandgen add <slug>`.
@@ -63,6 +70,10 @@ let package = Package(
         // without the flag it opens a demo window with the keyboard walk
         // wired. The tvOS gate is the first tvOS consumer app.
         .executable(name: "gallery-example", targets: ["gallery-example"]),
+        // MediaSpec's gate + demo: `--check` pins the vocabulary, the label
+        // rules and the lenient-decode law; without the flag, every chip
+        // variant in a window on black.
+        .executable(name: "mediaspec-example", targets: ["mediaspec-example"]),
     ],
     targets: [
         .target(name: "Ink", resources: [.process("Resources")]),
@@ -84,6 +95,8 @@ let package = Package(
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap"]),
         .executableTarget(name: "gallery-example", dependencies: ["Gallery"]),
+        .target(name: "MediaSpec", dependencies: ["Ink"]),
+        .executableTarget(name: "mediaspec-example", dependencies: ["MediaSpec"]),
         .executableTarget(name: "brandgen"),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
     ]
