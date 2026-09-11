@@ -132,19 +132,18 @@ struct DemoView: View {
                 }
             }
             section(
-                "badges · the one drawn geometry beside the tabler artwork (both wired), then the retired Commons badges"
+                "badges · drawn resolution badges beside the Ultra HD Blu-ray lockup and the one-line family; then the retired artwork"
             ) {
-                ForEach([24, 34, 44] as [CGFloat], id: \.self) { h in
+                ForEach([7, 12, 24, 34, 44] as [CGFloat], id: \.self) { h in
                     HStack(spacing: .inkTight) {
-                        ForEach(
-                            ["720p", "HDR10", "HDR10+", "HLG", "7.1", "Remux", "WEB-DL", "DTS:X"],
-                            id: \.self
-                        ) { SpecChip($0, height: h) }
-                        SpecChip(.art(.badgesd), height: h)
-                        SpecChip(.art(.badgehd), height: h)
+                        ForEach(Resolution.allCases, id: \.self) { SpecChip($0.glyph, height: h) }
+                        SpecChip(.art(.ultrahdbluray), height: h)
+                        ForEach(["HDR10", "HDR10+", "HLG", "7.1", "Remux", "DTS:X"], id: \.self) {
+                            SpecChip($0, height: h)
+                        }
+                        Text("·").foregroundStyle(.tertiary)
                         SpecChip(.art(.badge4k), height: h)
                         SpecChip(.art(.badge8k), height: h)
-                        Text("·").foregroundStyle(.tertiary)
                         SpecChip(.art(.hdr10), height: h)
                         SpecChip(.art(.hdr10plus), height: h)
                     }

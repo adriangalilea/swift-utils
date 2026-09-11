@@ -106,7 +106,7 @@ The file above is the canonical sourcing record shared with the web `@ag/media-s
 | ultrahdbluray | Ultra HD Blu-ray lockup | Commons `File:Ultra HD Blu-ray logo.svg` | PD | lockup at 2160p |
 | dvd | DVD logo | Commons `File:DVD logo.svg` | PD | symbol and lockup |
 | imax | IMAX wordmark | Commons `File:IMAX.svg` | PD | symbol and lockup |
-| badge4k / badge8k / badgehd / badgesd | 4K, 8K, HD, SD stroke badges | tabler icons via Iconify (`badge-4k`, `badge-8k`, `badge-hd`, `badge-sd`) | MIT | resolution, both rungs; stroke 2→1.12 on the 24-grid to match the drawn family (1.12 / the 14-unit box = 0.08h); the chip renders the file 24/14 taller so the box is h |
+| badge4k / badge8k / badgehd / badgesd | 4K, 8K, HD, SD stroke badges | tabler icons via Iconify (`badge-4k`, `badge-8k`, `badge-hd`, `badge-sd`) | MIT | reference only, not wired: resolutions are drawn as two-line disc-case badges (stroke kept at 1.12 for the comparison row) |
 | flages | Flag of Spain (civil) | Commons `File:Flag of Spain (civil).svg` | PD | original colours; region subtag ES |
 
 Rejected at review: the CC BY-SA HDR10+ file (embeds raster), the UHDTV
