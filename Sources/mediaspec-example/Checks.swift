@@ -164,6 +164,19 @@ func runChecks() -> Never {
     ]
     if generated != wantMarks { fail("the mark catalog drifted from its manifest") }
     for m in Mark.allCases where m.aspect <= 0 { fail("\(m.rawValue) has no aspect") }
+    // Every catalog SVG parses clean: a stray editor namespace prefix
+    // (inkscape:, sodipodi:, an undeclared xlink:) is an XML error NSImage
+    // shouts to stderr at every draw - it fails here instead.
+    for m in Mark.allCases {
+        let url = catalog.appendingPathComponent("\(m.rawValue).imageset/\(m.rawValue).svg")
+        let parser = XMLParser(contentsOf: url)!
+        parser.shouldProcessNamespaces = true
+        if !parser.parse() || parser.parserError != nil {
+            fail(
+                "\(m.rawValue).svg does not parse: \(parser.parserError?.localizedDescription ?? "unknown")"
+            )
+        }
+    }
     // Every mark resolves to real pixels under THIS bundle: under `swift
     // run` the catalog is a raw folder and the SVG is read from it.
     #if canImport(AppKit)
