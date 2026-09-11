@@ -165,17 +165,20 @@ func runChecks() -> Never {
     if Mark.badge4k.aspect != 1 || Mark.badge4k.original {
         fail("the tabler badges are square templates")
     }
-    // The value → mark binding, the manifest's own table. Resolutions wear
-    // tabler's badges at both rungs (stroke matched to the drawn family);
-    // 720p, HDR10 and HDR10+ are drawn.
+    // The value → mark binding, the manifest's own table. Resolutions are
+    // drawn disc-case badges and bind no artwork; HDR10 and HDR10+ are
+    // drawn too.
+    if Resolution.allCases.contains(where: { $0.marks != .none })
+        || Resolution.p2160.glyph != .badge(primary: "4K", secondary: "ULTRA HD")
+        || Resolution.p4320.glyph != .badge(primary: "8K", secondary: "ULTRA HD")
+        || Resolution.p1080.glyph != .word("FULL HD") || Resolution.p720.glyph != .word("HD")
+        || Resolution.sd.glyph != .word("SD")
+    {
+        fail("resolution badges")
+    }
     if DynamicRange.dolbyVision.marks != Marks(symbol: .dolby, lockup: .dolbyvision)
         || DynamicRange.hdr10Plus.marks != .none || DynamicRange.hdr10.marks != .none
         || DynamicRange.sdr.marks != .none || DynamicRange.hlg.marks != .none
-        || Resolution.sd.marks != Marks(symbol: .badgesd, lockup: .badgesd)
-        || Resolution.p720.marks != .none
-        || Resolution.p1080.marks != Marks(symbol: .badgehd, lockup: .badgehd)
-        || Resolution.p2160.marks != Marks(symbol: .badge4k, lockup: .badge4k)
-        || Resolution.p4320.marks != Marks(symbol: .badge8k, lockup: .badge8k)
         || Mark.badge4k.boxScale != 24.0 / 14.0 || Mark.dolby.boxScale != 1
         || ObjectAudio.atmos.marks != Marks(symbol: .dolby, lockup: .dolbyatmos)
         || ObjectAudio.dtsX.marks != .none

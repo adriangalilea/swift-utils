@@ -42,21 +42,11 @@ extension DynamicRange {
 }
 
 extension Resolution {
-    /// The tabler badges at both rungs: 4K and 8K need real distinction and
-    /// tabler's letterforms give it. Their stroke is 1.12 on the 24-grid,
-    /// which over the badge's 14-unit box is the drawn family's 0.08h - one
-    /// weight by construction. The chip scales the file so the BOX is h
-    /// (see `Mark.boxScale`). 720p has no artwork and is drawn; the ULTRA
-    /// HD wordmark stays in the catalog unbound.
-    public var marks: Marks {
-        switch self {
-        case .sd: Marks(symbol: .badgesd, lockup: .badgesd)
-        case .p720: .none
-        case .p1080: Marks(symbol: .badgehd, lockup: .badgehd)
-        case .p2160: Marks(symbol: .badge4k, lockup: .badge4k)
-        case .p4320: Marks(symbol: .badge8k, lockup: .badge8k)
-        }
-    }
+    /// Resolutions are DRAWN as disc-case badges (`Resolution.glyph` in
+    /// Chips.swift): no free vector of the "4K ULTRA HD" badge exists and
+    /// it is typography below the originality threshold. The tabler badges
+    /// and the ULTRA HD wordmark stay in the catalog unbound.
+    public var marks: Marks { .none }
 }
 
 extension Mark {

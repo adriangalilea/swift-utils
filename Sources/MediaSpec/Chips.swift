@@ -6,17 +6,20 @@ import SwiftUI
 // lockup keeps its shape, a brand symbol stands alone at the small rung.
 // No pill, no disc, no kind glyph around a mark.
 //
-// EVERY BOXED VALUE IS ONE WEIGHT. 720p, HDR10 / HDR10+ / HLG, channels
-// (7.1), Remux, WEB-DL / WEBRip / HDTV / CAM, DTS:X, codec words (TrueHD
-// beside the Atmos lockup, AAC / PCM / ALAC / MP3 / MP2 / Vorbis), a
-// language's display name, every cut but IMAX are DRAWN: box height = chip
+// EVERY BOXED VALUE IS ONE WEIGHT. HDR10 / HDR10+ / HLG, channels (7.1),
+// Remux, WEB-DL / WEBRip / HDTV / CAM, DTS:X, codec words (TrueHD beside
+// the Atmos lockup, AAC / PCM / ALAC / MP3 / MP2 / Vorbis), a language's
+// name, every cut but IMAX are DRAWN one-line badges: box height = chip
 // height h, corner radius 0.25h, stroke 0.08h, side pad 0.26h, word 0.62h
 // semibold (cap ≈ 0.7 × font, so box ≈ 1.5 × cap, the HDR10 badge's own
-// proportion). SD / HD / 4K / 8K are tabler's badge ARTWORK, because 4K
-// and 8K need real distinction and its letterforms give it - restroked to
-// 1.12 on the 24-grid (1.12 / the 14-unit box = 0.08h) and rendered with
-// the box at h (`Mark.boxScale`), so the drawn and the drawn-by-tabler
-// badge are one weight by construction.
+// proportion). RESOLUTIONS are the disc-case badge, drawn (no free vector
+// exists; it is typography below the originality threshold): the same
+// stroke, radius and side pad in a box 1.75h tall centred on the row, a
+// primary line ("4K") at 0.9h in the heaviest weight with tight tracking
+// over a secondary line ("ULTRA HD") at 55 % of it, uppercase, wide
+// tracking. Below `rail` the two lines hold while the primary stays ≥ 7pt
+// (h ≥ 7.8), else the primary alone in the one-line box. FULL HD, HD and
+// SD are one-line badges.
 //
 // EMPHASIS sits ON the mark and is named for the look alone: ghost (0.55
 // opacity), plain (full ink, no ground), washed (an `inkRest` capsule
@@ -32,10 +35,26 @@ import SwiftUI
 // drawn badges are the same at both. A strip groups per axis: `.inkTight`
 // within an axis, `.inkGap` between axes.
 
-/// One mark's content: artwork from the catalog, or a word that has none.
+/// One mark's content: artwork from the catalog, a word that has none, or
+/// the two-line disc-case badge.
 public enum Glyph: Hashable, Sendable {
     case art(Mark)
     case word(String)
+    case badge(primary: String, secondary: String)
+}
+
+extension Resolution {
+    /// The disc-case badge each resolution is drawn as. 1080p is "FULL HD"
+    /// (the disc-case word for it; "HD" is 720p's), one line.
+    public var glyph: Glyph {
+        switch self {
+        case .sd: .word("SD")
+        case .p720: .word("HD")
+        case .p1080: .word("FULL HD")
+        case .p2160: .badge(primary: "4K", secondary: "ULTRA HD")
+        case .p4320: .badge(primary: "8K", secondary: "ULTRA HD")
+        }
+    }
 }
 
 /// One glyph standing frameless, wearing its emphasis. Public so a
@@ -89,23 +108,55 @@ public struct SpecChip: View {
             BrandMark(m, height: height * m.boxScale, tint: markTint(m))
                 .frame(height: height)
         case .word(let w):
-            Text(w)
-                .font(.system(size: height * 0.62, weight: .semibold))
-                .foregroundStyle(ink)
-                .lineLimit(1)
-                .padding(.horizontal, height * 0.26)
-                .frame(height: height)
-                .overlay {
-                    RoundedRectangle(cornerRadius: height * 0.25)
-                        .strokeBorder(ink, lineWidth: height * 0.08)
+            boxed(height: height) {
+                Text(w)
+                    .font(.system(size: height * 0.62, weight: .semibold))
+                    .lineLimit(1)
+            }
+        case .badge(let primary, let secondary):
+            let big = height * 0.9
+            if big >= 7 {
+                boxed(height: height * 1.75) {
+                    VStack(spacing: height * 0.04) {
+                        Text(primary)
+                            .font(.system(size: big, weight: .black))
+                            .tracking(-0.03 * big)
+                        Text(secondary.uppercased())
+                            .font(.system(size: big * 0.55, weight: .semibold))
+                            .tracking(0.14 * big * 0.55)
+                    }
+                    .lineLimit(1)
                 }
+            } else {
+                boxed(height: height) {
+                    Text(primary)
+                        .font(.system(size: height * 0.62, weight: .black))
+                        .tracking(-0.03 * height * 0.62)
+                        .lineLimit(1)
+                }
+            }
         }
+    }
+
+    /// The one box every drawn badge sits in: side pad 0.26h, radius
+    /// 0.25h, stroke 0.08h - h being the CHIP height, so a taller badge
+    /// keeps the family's corner and weight.
+    private func boxed(height box: CGFloat, @ViewBuilder _ text: () -> some View) -> some View {
+        text()
+            .foregroundStyle(ink)
+            .padding(.horizontal, height * 0.26)
+            .frame(height: box)
+            .overlay {
+                RoundedRectangle(cornerRadius: height * 0.25)
+                    .strokeBorder(ink, lineWidth: height * 0.08)
+            }
     }
 
     private var accessibility: String {
         switch glyph {
         case .art(let m): m.title
         case .word(let w): w
+        case .badge(let p, let s): "\(p) \(s)"
         }
     }
 
@@ -182,7 +233,7 @@ public struct PictureChip: View {
 
     public var body: some View {
         var glyphs: [Glyph] = []
-        if let r = resolution { glyphs.append(options.glyph(r.marks) ?? .word(r.label)) }
+        if let r = resolution { glyphs.append(options.glyph(r.marks) ?? r.glyph) }
         if let g = range, g != .sdr { glyphs.append(options.glyph(g.marks) ?? .word(g.label)) }
         return Axis(
             kind: .picture, glyphs: glyphs, accessibility: pictureLabel(resolution, range),
