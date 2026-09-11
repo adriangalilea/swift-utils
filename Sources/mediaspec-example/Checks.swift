@@ -1,6 +1,10 @@
 import Foundation
 import MediaSpec
 
+#if canImport(AppKit)
+    import AppKit
+#endif
+
 // The vocabulary gate. Every literal below is ALSO pinned by the React
 // `media-spec` item's own check; the two renderers share a wire and this
 // is how a rename on either side fails a gate instead of drawing a wrong
@@ -160,6 +164,13 @@ func runChecks() -> Never {
     ]
     if generated != wantMarks { fail("the mark catalog drifted from its manifest") }
     for m in Mark.allCases where m.aspect <= 0 { fail("\(m.rawValue) has no aspect") }
+    // Every mark resolves to real pixels under THIS bundle: under `swift
+    // run` the catalog is a raw folder and the SVG is read from it.
+    #if canImport(AppKit)
+        for m in Mark.allCases where m.nsImage == nil {
+            fail("\(m.rawValue) does not load from the running bundle")
+        }
+    #endif
     if Mark.flages.original == false { fail("the flag keeps its own colours") }
     if Mark.dolby.original { fail("a logo is template-rendered") }
     if Mark.dolby.aspect != 1 || Mark.dts.aspect != 1 { fail("simple-icons symbols are square") }

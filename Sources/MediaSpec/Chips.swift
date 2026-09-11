@@ -6,20 +6,22 @@ import SwiftUI
 // lockup keeps its shape, a brand symbol stands alone at the small rung.
 // No pill, no disc, no kind glyph around a mark.
 //
-// EVERY DRAWN BADGE IS THE DISC-CASE STICKER, one weight. A one-panel
+// EVERY DRAWN BADGE IS THE DISC-CASE STICKER, sized by layout. A one-panel
 // badge (HDR10 / HDR10+ / HLG, channels, Remux, WEB-DL / WEBRip / HDTV /
 // CAM, DTS:X, codec words, a language's name, every cut but IMAX, HD, SD)
-// is a frame stroked in the badge ink at 0.12h (1.5 × the 0.08h hairline)
-// around a near-black ground panel carrying the word at 0.62h semibold;
-// box height = chip height h, radius 0.25h, side pad 0.26h. A two-panel
-// badge (4K / 8K / 1080p, the "4K ULTRA HD" sticker - no free vector
-// exists; it is typography below the originality threshold) is the same
-// frame, 1.75h tall and centred on the row: an upper ground panel carrying
-// the primary in the badge ink at 0.55 × box, `.black` weight, tight
-// tracking, over a lower band 30 % of the box FILLED with the badge ink
-// carrying the secondary in the ground colour, uppercase, wide tracking,
-// flush to the frame's inner edge. Below `rail` the two panels hold while
-// the band text stays ≥ 5pt (h ≥ 15.9), else the primary alone.
+// is a near-black ground panel carrying the word at 0.62h semibold inside
+// a true hairline: 0.05h in the badge ink at 70 % opacity (≈ 1.7pt at 34)
+// - the frame present, never the loudest thing; box height = chip height
+// h, radius 0.25h, side pad 0.26h. A two-panel badge (4K / 8K / 1080p, the
+// "4K ULTRA HD" sticker - no free vector exists; it is typography below
+// the originality threshold) is 1.75h tall, centred on the row, framed at
+// 0.08h in full ink: an upper ground panel carrying the primary in the
+// badge ink at 0.55 × box, `.black` weight, tight tracking, over a lower
+// band 30 % of the box FILLED in full ink carrying the secondary in the
+// ground colour, uppercase, wide tracking, flush to the frame's inner
+// edge. The box is as wide as its widest line plus 2 × side pad - measured
+// by layout, never estimated. Below `rail` the two panels hold while the
+// band text stays ≥ 5pt (h ≥ 15.9), else the primary alone.
 //
 // EMPHASIS sits ON the mark and is named for the look alone: ghost (0.55
 // opacity), plain (full ink, no ground), washed (an `inkRest` capsule
@@ -147,29 +149,35 @@ public struct SpecChip: View {
         }
     }
 
-    /// THE STICKER. A frame in the badge ink at 0.12h around a ground
-    /// panel; the text in the badge ink; with `band`, the lower 30 % of the
-    /// box is filled with the ink and carries the band text in the ground
-    /// colour, flush to the frame's inner edge. h is the CHIP height, so a
-    /// taller sticker keeps the family's corner, weight and side pad.
+    /// THE STICKER, sized by its content. A ground panel with the text;
+    /// with `band`, the lower 30 % of the box is filled with the ink and
+    /// carries the band text in the ground colour, flush to the frame's
+    /// inner edge; both lines are `fixedSize` so the box is as wide as the
+    /// wider one plus the side pad. The frame is a true hairline on a
+    /// one-panel badge (0.05h, ink at 70 %) and 0.08h in full ink on the
+    /// two-panel sticker. h is the CHIP height, so a taller sticker keeps
+    /// the family's corner and side pad.
     private func sticker(box: CGFloat, band: String?, @ViewBuilder _ text: () -> some View)
         -> some View
     {
         let bandHeight = band == nil ? 0 : box * 0.30
         let radius = height * 0.25
-        return ZStack(alignment: .bottom) {
+        let frameWidth = band == nil ? height * 0.05 : height * 0.08
+        let frameOpacity = band == nil ? 0.7 : 1.0
+        return VStack(spacing: 0) {
             text()
+                .fixedSize()
                 .foregroundStyle(ink)
                 .padding(.horizontal, height * 0.26)
-                .frame(height: box - bandHeight)
                 .frame(maxWidth: .infinity)
-                .padding(.bottom, bandHeight)
+                .frame(height: box - bandHeight)
             if let band {
                 Text(band.uppercased())
                     .font(.system(size: bandHeight * 0.6, weight: .semibold))
                     .tracking(0.14 * bandHeight * 0.6)
+                    .fixedSize()
                     .foregroundStyle(ground)
-                    .lineLimit(1)
+                    .padding(.horizontal, height * 0.26)
                     .frame(maxWidth: .infinity)
                     .frame(height: bandHeight)
                     .background(ink)
@@ -180,7 +188,9 @@ public struct SpecChip: View {
         .background(ground)
         .clipShape(RoundedRectangle(cornerRadius: radius))
         .overlay {
-            RoundedRectangle(cornerRadius: radius).strokeBorder(ink, lineWidth: height * 0.12)
+            RoundedRectangle(cornerRadius: radius)
+                .strokeBorder(ink, lineWidth: frameWidth)
+                .opacity(frameOpacity)
         }
     }
 
