@@ -23,12 +23,16 @@ import SwiftUI
 // by layout, never estimated. Below `rail` the two panels hold while the
 // band text stays ≥ 5pt (h ≥ 15.9), else the primary alone.
 //
-// EMPHASIS sits ON the mark and is named for the look alone: ghost (0.55
-// opacity), plain (full ink, no ground), washed (an `inkRest` capsule
-// behind), ringed (the wash plus an `inkEdge` ring). TONE: `ink` follows
-// the axis's foreground; `brand` paints a mark its official hex - on the
-// unwashed emphases only, and never a near-black official colour (black on
-// dark is a missing logo, not a brand statement); `gold` is the metallic
+// EMPHASIS IS LIGHT, NEVER GEOMETRY: ghost (0.55 opacity), plain (the
+// resting look), lit (a soft glow behind the chip in the badge ink,
+// radius 0.25h at 45 %), vivid (a stronger glow, radius 0.45h at 70 %,
+// with the ink at full brightness - white under `ink`, the gradient's
+// highlight under `gold`). No capsule, no ring, no added shape at any
+// level; marks, stickers, word badges and the flag glow the same way (the
+// flag glows white). TONE: `ink` follows
+// the axis's foreground; `brand` paints a mark its official hex - never a
+// near-black official colour (black on dark is a missing logo, not a brand
+// statement); `gold` is the metallic
 // sticker and it is FOR THE DRAWN BADGES ONLY - frame, letters and band in
 // the `Gold` gradient (flat `Gold.flat` below the rail), the ground
 // `Gold.ground` - while brand marks stay in ink, white on dark, as disc
@@ -97,16 +101,29 @@ public struct SpecChip: View {
     public var body: some View {
         content
             .opacity(emphasis == .ghost ? 0.55 : 1)
-            .padding(.horizontal, washed ? height * 0.18 : 0)
-            .padding(.vertical, washed ? height * 0.12 : 0)
-            .background {
-                if washed { Capsule().fill(Color.inkRest) }
-            }
-            .overlay {
-                if emphasis == .ringed { Capsule().strokeBorder(Color.inkEdge, lineWidth: 1) }
-            }
+            .shadow(color: glow, radius: glowRadius)
             .accessibilityLabel(accessibility)
     }
+
+    /// The glow behind a lit or vivid chip: the badge ink's own colour
+    /// (white under `ink`, the flat gold under `gold`), never a shape.
+    private var glow: Color {
+        switch emphasis {
+        case .ghost, .plain: .clear
+        case .lit: glowInk.opacity(0.45)
+        case .vivid: glowInk.opacity(0.7)
+        }
+    }
+
+    private var glowRadius: CGFloat {
+        switch emphasis {
+        case .ghost, .plain: 0
+        case .lit: height * 0.25
+        case .vivid: height * 0.45
+        }
+    }
+
+    private var glowInk: Color { tone == .gold ? Gold.flat : .white }
 
     @ViewBuilder
     private var content: some View {
@@ -203,25 +220,26 @@ public struct SpecChip: View {
     }
 
     /// The drawn badges' ink: gold's gradient at the rail, flat gold below
-    /// it, else the primary ink.
+    /// it, else the primary ink; at full brightness when vivid (white, or
+    /// the gradient's highlight stop).
     private var ink: AnyShapeStyle {
-        guard tone == .gold else { return AnyShapeStyle(Color.primary) }
+        let vivid = emphasis == .vivid
+        guard tone == .gold else { return AnyShapeStyle(vivid ? Color.white : Color.primary) }
+        if vivid { return AnyShapeStyle(Gold.stops.first?.color ?? Gold.flat) }
         return height >= SpecChip.rail ? AnyShapeStyle(Gold.gradient) : AnyShapeStyle(Gold.flat)
     }
 
     private var ground: Color { tone == .gold ? Gold.ground : SpecChip.ground }
 
-    private var washed: Bool { emphasis == .washed || emphasis == .ringed }
-
     /// THE TONE RULE for marks. `ink` follows the axis. `brand` paints the
-    /// mark its official hex on the unwashed emphases only, and never a
-    /// near-black one (luminance under 0.15 - Dolby, HDR10, DVD): black on
-    /// a dark ground is a missing logo. `gold` is for the drawn badges
-    /// only: a mark stays in ink beside a gold sticker, as disc cases print
-    /// them. The flag renders as authored regardless.
+    /// mark its official hex, and never a near-black one (luminance under
+    /// 0.15 - Dolby, HDR10, DVD): black on a dark ground is a missing logo.
+    /// `gold` is for the drawn badges only: a mark stays in ink beside a
+    /// gold sticker, as disc cases print them. Vivid lifts ink to white.
+    /// The flag renders as authored regardless.
     private func markStyle(_ m: Mark) -> AnyShapeStyle {
-        if tone == .brand, !washed, m.luminance >= 0.15 { return AnyShapeStyle(m.color) }
-        return AnyShapeStyle(Color.primary)
+        if tone == .brand, m.luminance >= 0.15 { return AnyShapeStyle(m.color) }
+        return AnyShapeStyle(emphasis == .vivid ? Color.white : Color.primary)
     }
 }
 

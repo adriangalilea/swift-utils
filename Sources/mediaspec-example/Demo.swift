@@ -89,10 +89,10 @@ struct DemoView: View {
             section("detail · the quiet second line") {
                 HStack(spacing: .inkGap) {
                     PictureChip(
-                        resolution: .p2160, range: .hdr10, emphasis: .ringed, height: 44,
+                        resolution: .p2160, range: .hdr10, emphasis: .vivid, height: 44,
                         detail: "source says more than this")
                     SoundChip(
-                        audio: Audio(codec: .aac, channels: .surround51), emphasis: .ringed,
+                        audio: Audio(codec: .aac, channels: .surround51), emphasis: .lit,
                         height: 44, detail: "re-encoded")
                 }
             }
@@ -196,7 +196,7 @@ struct DemoView: View {
 
     /// A consumer's own scale of certainty, mapped onto the four looks.
     let emphasisFor: [(String, Emphasis)] = [
-        ("rumoured", .ghost), ("stated", .plain), ("checked", .washed), ("playing", .ringed),
+        ("rumoured", .ghost), ("stated", .plain), ("checked", .lit), ("playing", .vivid),
     ]
 
     var recipes: some View {
@@ -260,24 +260,39 @@ struct DemoView: View {
                         height: 34, omit: [.lang, .cut])
                 }
             }
-            section("recipe · a poster corner — the small rung, two marks, a scrim") {
+            section("recipe · a poster corner — two marks over art, a scrim that fades into it") {
                 ZStack(alignment: .topLeading) {
+                    // The art: a deep colour falling to near-black on the diagonal
+                    // with a soft highlight, the shape of a real poster.
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
                             LinearGradient(
-                                colors: [Color(white: 0.25), Color(white: 0.08)], startPoint: .top,
-                                endPoint: .bottom)
+                                colors: [
+                                    Color(red: 0.36, green: 0.10, blue: 0.32),
+                                    Color(red: 0.06, green: 0.04, blue: 0.10),
+                                ], startPoint: .topTrailing, endPoint: .bottomLeading)
                         )
-                        .frame(width: 160, height: 240)
-                    MediaSpecStrip(
-                        spec: MediaSpec(
-                            resolution: .p2160, range: .dolbyVision,
-                            audio: Audio(codec: .trueHD, channels: .surround71, object: .atmos)),
-                        height: 20, omit: [.tier, .lang, .cut], spacing: .inkTight
+                        .overlay {
+                            RadialGradient(
+                                colors: [Color.white.opacity(0.22), .clear],
+                                center: .init(x: 0.7, y: 0.3),
+                                startRadius: 0, endRadius: 140
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .frame(width: 180, height: 270)
+                    // The scrim: transparent to black 60 %, fading into the art.
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.6), .clear], startPoint: .top,
+                        endPoint: .bottom
                     )
-                    .padding(6)
-                    .background(Color.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
-                    .padding(8)
+                    .frame(width: 180, height: 110)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    HStack(spacing: 3) {
+                        SpecChip(Resolution.p2160.glyph, height: 18)
+                        SpecChip(.art(.dolby), height: 18)
+                    }
+                    .padding(10)
                 }
             }
         }

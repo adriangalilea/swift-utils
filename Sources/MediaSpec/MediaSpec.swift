@@ -257,15 +257,16 @@ public enum Cut: Codable, Hashable, Sendable {
     }
 }
 
-/// How much a chip stands out, named for the look alone: `ghost` is the
-/// mark at 0.55 opacity; `plain` is full ink on no ground; `washed` is full
-/// ink over a soft `inkRest` capsule; `ringed` is the wash plus an
-/// `inkEdge` ring. What any of it means is the consumer's mapping.
+/// How much a chip stands out, named for the look alone and made of
+/// LIGHT, never geometry: `ghost` is the chip at 0.55 opacity; `plain` is
+/// the resting look; `lit` adds a soft glow behind the chip in its own
+/// ink; `vivid` a stronger glow with the ink at full brightness. No added
+/// shape at any level. What any of it means is the consumer's mapping.
 public enum Emphasis: String, Codable, CaseIterable, Sendable, Hashable {
     case ghost
     case plain
-    case washed
-    case ringed
+    case lit
+    case vivid
 }
 
 /// The five axes a spec renders, in the order a strip composes them.
