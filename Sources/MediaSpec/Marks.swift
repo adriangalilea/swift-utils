@@ -8,11 +8,40 @@ import SwiftUI
 // drawn word-badge, the one shape words take in this family (Chips.swift).
 
 /// How a mark is coloured. `ink` follows the chip's foreground (one ink,
-/// the flare rule); `brand` uses the mark's official hex. A mark with
+/// the flare rule); `brand` uses the mark's official hex; `gold` is the
+/// disc-case metallic sticker (`Gold`): a near-black box, stroke and
+/// letters in the metallic gradient, marks filled with the same gradient
+/// as disc cases print them, flat gold below the rail. A mark with
 /// intrinsic colours (the flag) ignores tone by construction.
 public enum Tone: String, Codable, CaseIterable, Sendable, Hashable {
     case ink
     case brand
+    case gold
+}
+
+/// The metallic gold of a disc-case sticker, retunable by a consumer:
+/// the gradient's stops (about 135°, light to dark with a thin highlight
+/// near the bottom edge), the flat gold used below the rail, and the box
+/// ground.
+public enum Gold {
+    nonisolated(unsafe) public static var stops: [Gradient.Stop] = [
+        .init(color: Color(red: 1.000, green: 0.945, blue: 0.659), location: 0),  // #FFF1A8
+        .init(color: Color(red: 0.902, green: 0.706, blue: 0.133), location: 0.45),  // #E6B422
+        .init(color: Color(red: 0.612, green: 0.478, blue: 0.106), location: 0.86),  // #9C7A1B
+        .init(color: Color(red: 1.000, green: 0.902, blue: 0.502), location: 0.96),  // #FFE680
+        .init(color: Color(red: 0.612, green: 0.478, blue: 0.106), location: 1),  // #9C7A1B
+    ]
+    /// The one gold below the rail, where a gradient has no room to read
+    /// (#E6B422).
+    nonisolated(unsafe) public static var flat = Color(red: 0.902, green: 0.706, blue: 0.133)
+    /// The sticker's ground.
+    nonisolated(unsafe) public static var ground = Color(white: 0.07)
+    /// Stroke, relative to the family's 0.08h hairline.
+    public static let strokeScale: CGFloat = 1.5
+
+    public static var gradient: LinearGradient {
+        LinearGradient(stops: stops, startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
 }
 
 /// A value's artwork at both rungs. Either half may be absent.

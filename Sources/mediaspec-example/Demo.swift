@@ -166,6 +166,20 @@ struct DemoView: View {
                     }
                 }
             }
+            section("gold · the disc-case sticker at 28 / 34 / 44") {
+                VStack(alignment: .leading, spacing: .inkGap) {
+                    ForEach([28, 34, 44] as [CGFloat], id: \.self) { h in
+                        MediaSpecStrip(
+                            spec: MediaSpec(
+                                resolution: .p2160, range: .dolbyVision,
+                                audio: Audio(codec: .trueHD, channels: .surround71, object: .atmos),
+                                tier: .remux),
+                            height: h, tone: .gold)
+                    }
+                }
+                .padding(.inkLane)
+                .background(Color.black, in: RoundedRectangle(cornerRadius: 12))
+            }
             recipes
         }
     }
@@ -219,6 +233,21 @@ struct DemoView: View {
                     LangChip(lang: Lang("de-CH"), label: "Swiss German")
                     LangChip(lang: Lang("pt-BR"), label: "Brazilian")
                     LangChip(lang: Lang("es-ES"), label: "Peninsular")
+                }
+            }
+            section("recipe · a premium shelf — gold is a tone, the shelf decides who wears it") {
+                HStack(spacing: .inkLane) {
+                    MediaSpecStrip(
+                        spec: MediaSpec(
+                            resolution: .p2160, range: .dolbyVision,
+                            audio: Audio(codec: .trueHD, channels: .surround71, object: .atmos),
+                            tier: .bluray),
+                        height: 34, omit: [.lang, .cut], tone: .gold)
+                    MediaSpecStrip(
+                        spec: MediaSpec(
+                            resolution: .p1080, audio: Audio(codec: .aac, channels: .stereo),
+                            tier: .webdl),
+                        height: 34, omit: [.lang, .cut])
                 }
             }
             section("recipe · a poster corner — the small rung, two marks, a scrim") {

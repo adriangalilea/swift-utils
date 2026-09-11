@@ -30,6 +30,7 @@ func runChecks() -> Never {
     vocabulary("object-audio", ObjectAudio.self, want: "atmos,dts-x")
     vocabulary("tier", Tier.self, want: "remux,bluray,webdl,webrip,hdtv,dvd,cam")
     vocabulary("emphasis", Emphasis.self, want: "ghost,plain,washed,ringed")
+    vocabulary("tone", Tone.self, want: "ink,brand,gold")
     vocabulary("kind", Kind.self, want: "picture,sound,tier,lang,cut")
     let cuts = Cut.known.map(\.rawValue).joined(separator: ",")
     print("cut: \(cuts)")

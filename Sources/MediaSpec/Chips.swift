@@ -24,10 +24,13 @@ import SwiftUI
 // EMPHASIS sits ON the mark and is named for the look alone: ghost (0.55
 // opacity), plain (full ink, no ground), washed (an `inkRest` capsule
 // behind), ringed (the wash plus an `inkEdge` ring). TONE: `ink` follows
-// the axis's foreground, `brand` paints a mark its official hex - on the
+// the axis's foreground; `brand` paints a mark its official hex - on the
 // unwashed emphases only, and never a near-black official colour (black on
-// dark is a missing logo, not a brand statement); original-colour marks
-// (the flag) ignore tone by construction. A TRAILING slot after an axis's
+// dark is a missing logo, not a brand statement); `gold` is the disc-case
+// sticker - the box filled `Gold.ground`, stroke 1.5 × the hairline and
+// letters in the `Gold` gradient, marks filled with the same gradient,
+// flat `Gold.flat` below the rail. Original-colour marks (the flag) ignore
+// tone by construction. A TRAILING slot after an axis's
 // last mark takes any view the consumer wants there.
 //
 // Two rungs, one threshold (`SpecChip.rail` = 32): at and above it lockups,
@@ -104,8 +107,14 @@ public struct SpecChip: View {
         switch glyph {
         case .art(let m):
             // A file whose drawn box is smaller than its grid renders taller
-            // so the BOX, not the grid, lands at the chip height.
-            BrandMark(m, height: height * m.boxScale, tint: markTint(m))
+            // so the BOX, not the grid, lands at the chip height. Template
+            // images take any shape style, so gold is a gradient fill.
+            m.image
+                .resizable()
+                .scaledToFit()
+                .frame(height: height * m.boxScale)
+                .foregroundStyle(markStyle(m))
+                .accessibilityLabel(m.title)
                 .frame(height: height)
         case .word(let w):
             boxed(height: height) {
@@ -146,9 +155,15 @@ public struct SpecChip: View {
             .foregroundStyle(ink)
             .padding(.horizontal, height * 0.26)
             .frame(height: box)
+            .background {
+                if tone == .gold {
+                    RoundedRectangle(cornerRadius: height * 0.25).fill(Gold.ground)
+                }
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: height * 0.25)
-                    .strokeBorder(ink, lineWidth: height * 0.08)
+                    .strokeBorder(
+                        ink, lineWidth: height * 0.08 * (tone == .gold ? Gold.strokeScale : 1))
             }
     }
 
@@ -160,16 +175,27 @@ public struct SpecChip: View {
         }
     }
 
-    private var ink: Color { .primary }
+    /// The letters' and strokes' style: gold's gradient at the rail, flat
+    /// gold below it, else the primary ink.
+    private var ink: AnyShapeStyle {
+        guard tone == .gold else { return AnyShapeStyle(Color.primary) }
+        return height >= SpecChip.rail ? AnyShapeStyle(Gold.gradient) : AnyShapeStyle(Gold.flat)
+    }
+
     private var washed: Bool { emphasis == .washed || emphasis == .ringed }
 
     /// THE TONE RULE. `ink` follows the axis. `brand` paints the mark its
     /// official hex on the unwashed emphases only, and never a near-black
     /// one (luminance under 0.15 - Dolby, HDR10, DVD): black on a dark
-    /// ground is a missing logo. The flag renders as authored regardless.
-    private func markTint(_ m: Mark) -> Color {
-        guard tone == .brand, !washed, m.luminance >= 0.15 else { return ink }
-        return m.color
+    /// ground is a missing logo. `gold` fills the mark with the sticker's
+    /// gradient (flat below the rail). The flag renders as authored
+    /// regardless.
+    private func markStyle(_ m: Mark) -> AnyShapeStyle {
+        switch tone {
+        case .gold: return ink
+        case .brand where !washed && m.luminance >= 0.15: return AnyShapeStyle(m.color)
+        default: return AnyShapeStyle(Color.primary)
+        }
     }
 }
 
