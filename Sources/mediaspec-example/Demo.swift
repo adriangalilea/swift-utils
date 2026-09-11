@@ -57,7 +57,7 @@ struct DemoView: View {
                     ForEach(Tier.allCases, id: \.self) { TierChip(tier: $0, resolution: .p1080) }
                 }
                 HStack(spacing: .inkGap) {
-                    ForEach(["es-ES", "es-419", "en", "fr-CA", "de-CH", "ja"], id: \.self) {
+                    ForEach(["es-ES", "es-419", "es-MX", "en", "fr-CA", "ja"], id: \.self) {
                         LangChip(lang: Lang($0))
                     }
                 }

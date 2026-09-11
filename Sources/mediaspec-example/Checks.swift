@@ -81,11 +81,20 @@ func runChecks() -> Never {
             fail("soundLabel short = `\(soundLabel(a, short: true))`, want `\(short)`")
         }
     }
-    // A language labels itself through the system's display names; a tag
-    // the system does not know is its own label; the region subtag is read
-    // off the tag.
-    if Lang("es-ES").label.isEmpty || Lang("es-ES").label == "es-ES" {
-        fail("Lang(es-ES) should resolve to a display name")
+    // A language names its variety when a generic name exists, else the
+    // language of its subtag alone (never "European Spanish"), else the tag;
+    // the region subtag is read off the tag.
+    if Lang("es-ES").label != "Castilian" || Lang("es-419").label != "Latin American Spanish" {
+        fail("the variety table")
+    }
+    let es = Locale.current.localizedString(forLanguageCode: "es") ?? ""
+    if es.isEmpty || Lang("es").label != es || Lang("es-MX").label != es {
+        fail("a tag without a variety name labels its language alone: \(Lang("es-MX").label)")
+    }
+    if Lang("es-MX").label.localizedCaseInsensitiveContains("mex")
+        || Lang("es-ES").label.localizedCaseInsensitiveContains("european")
+    {
+        fail("a label must never carry the region")
     }
     if Lang("zz-QQ").label != "zz-QQ" { fail("an unknown tag is its own label") }
     if Lang("es-ES").region != "ES" || Lang("es").region != nil || Lang("es-419").region != nil {

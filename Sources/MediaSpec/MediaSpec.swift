@@ -148,10 +148,12 @@ public enum Tier: String, Codable, CaseIterable, Sendable, Hashable {
     }
 }
 
-/// A BCP-47 tag. Its label is the system's display name for the tag in
-/// the current locale, region-aware ("Spanish (Spain)"), falling back to
-/// the tag itself; a consumer with its own spelling passes `label:` to
-/// `LangChip`.
+/// A BCP-47 tag. Its label names the VARIETY when a generic English name
+/// for it exists ("Castilian", "Latin American Spanish"), else the
+/// LANGUAGE of the language subtag alone in the current locale ("Spanish"
+/// for es-MX) - never the region-qualified form, the flag carries the
+/// region - else the tag itself. A consumer with its own spelling passes
+/// `label:` to `LangChip`.
 public struct Lang: RawRepresentable, Codable, Hashable, Sendable {
     public let rawValue: String
 
@@ -167,9 +169,19 @@ public struct Lang: RawRepresentable, Codable, Hashable, Sendable {
         try c.encode(rawValue)
     }
 
+    /// The generic English variety names: the two whose system display
+    /// names ("European Spanish") are wrong as defaults.
+    public static let varieties: [String: String] = [
+        "es-ES": "Castilian",
+        "es-419": "Latin American Spanish",
+    ]
+
     public var label: String {
-        let id = rawValue.replacingOccurrences(of: "-", with: "_")
-        if let name = Locale.current.localizedString(forIdentifier: id), !name.isEmpty {
+        if let v = Lang.varieties[rawValue] { return v }
+        let code = String(rawValue.split(separator: "-").first ?? Substring(rawValue))
+        if !code.isEmpty, let name = Locale.current.localizedString(forLanguageCode: code),
+            !name.isEmpty
+        {
             return name
         }
         return rawValue
