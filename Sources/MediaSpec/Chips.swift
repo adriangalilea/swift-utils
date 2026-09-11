@@ -45,6 +45,15 @@ import SwiftUI
 // drawn badges are the same at both. A strip groups per axis: `.inkTight`
 // within an axis, `.inkGap` between axes.
 
+/// The form a mark takes: its symbol (the Dolby D, the Blu-ray glyph) or
+/// its lockup (symbol and wordmark). The rail picks one; a consumer may
+/// name the form outright - a poster corner wants symbols beside the
+/// sticker at any height, a rail wants lockups.
+public enum MarkForm: Sendable {
+    case symbol
+    case lockup
+}
+
 /// One mark's content: artwork from the catalog, a word that has none, or
 /// the two-line disc-case badge.
 public enum Glyph: Hashable, Sendable {
@@ -250,10 +259,16 @@ public struct ChipOptions {
     public var trailing: AnyView? = nil
     public var detail: String? = nil
     public var tone: Tone = .ink
+    /// The marks' form when the consumer names it; nil = the rail's rule.
+    public var form: MarkForm? = nil
 
     var atRail: Bool { height >= SpecChip.rail }
+    /// The form the marks take: named outright (a poster corner wants
+    /// symbols beside the sticker at any height), else lockups at and
+    /// above the rail, symbols below it.
+    var markForm: MarkForm { form ?? (atRail ? .lockup : .symbol) }
     func glyph(_ marks: Marks) -> Glyph? {
-        (atRail ? marks.lockup : marks.symbol).map(Glyph.art)
+        (markForm == .lockup ? marks.lockup : marks.symbol).map(Glyph.art)
     }
 }
 
@@ -293,12 +308,14 @@ public struct PictureChip: View {
 
     public init(
         resolution: Resolution?, range: DynamicRange?, emphasis: Emphasis = .plain,
-        height: CGFloat = 34, trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink
+        height: CGFloat = 34, trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink,
+        form: MarkForm? = nil
     ) {
         self.resolution = resolution
         self.range = range
         self.options = ChipOptions(
-            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone,
+            form: form)
     }
 
     public var body: some View {
@@ -317,11 +334,13 @@ public struct SoundChip: View {
 
     public init(
         audio: Audio, emphasis: Emphasis = .plain, height: CGFloat = 34,
-        trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink
+        trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink,
+        form: MarkForm? = nil
     ) {
         self.audio = audio
         self.options = ChipOptions(
-            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone,
+            form: form)
     }
 
     public var body: some View {
@@ -357,12 +376,14 @@ public struct TierChip: View {
     /// Blu-ray mark; the strip passes it, a lone chip may.
     public init(
         tier: Tier, resolution: Resolution? = nil, emphasis: Emphasis = .plain,
-        height: CGFloat = 34, trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink
+        height: CGFloat = 34, trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink,
+        form: MarkForm? = nil
     ) {
         self.tier = tier
         self.resolution = resolution
         self.options = ChipOptions(
-            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone,
+            form: form)
     }
 
     public var body: some View {
@@ -386,12 +407,14 @@ public struct LangChip: View {
     /// spelling.
     public init(
         lang: Lang, label: String? = nil, emphasis: Emphasis = .plain, height: CGFloat = 34,
-        trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink
+        trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink,
+        form: MarkForm? = nil
     ) {
         self.lang = lang
         self.label = label
         self.options = ChipOptions(
-            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone,
+            form: form)
     }
 
     public var body: some View {
@@ -399,7 +422,8 @@ public struct LangChip: View {
         var glyphs: [Glyph] = []
         if let flag = options.glyph(lang.marks) {
             glyphs.append(flag)
-            if options.atRail { glyphs.append(.word(word)) }
+            // The flag alone in symbol form; the name beside it where lockups go.
+            if options.markForm == .lockup { glyphs.append(.word(word)) }
         } else {
             glyphs.append(.word(word))
         }
@@ -413,11 +437,12 @@ public struct CutChip: View {
 
     public init(
         cut: Cut, emphasis: Emphasis = .plain, height: CGFloat = 34, trailing: AnyView? = nil,
-        detail: String? = nil, tone: Tone = .ink
+        detail: String? = nil, tone: Tone = .ink, form: MarkForm? = nil
     ) {
         self.cut = cut
         self.options = ChipOptions(
-            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone)
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone,
+            form: form)
     }
 
     public var body: some View {
@@ -443,11 +468,12 @@ public struct MediaSpecStrip: View {
     let omit: Set<Kind>
     let spacing: CGFloat
     let tone: Tone
+    let form: MarkForm?
 
     public init(
         spec: MediaSpec, emphasis: Emphasis = .plain, height: CGFloat = 34,
         adornments: [Kind: AnyView] = [:], langLabel: String? = nil, omit: Set<Kind> = [],
-        spacing: CGFloat = .inkGap, tone: Tone = .ink
+        spacing: CGFloat = .inkGap, tone: Tone = .ink, form: MarkForm? = nil
     ) {
         self.spec = spec
         self.emphasis = emphasis
@@ -457,6 +483,7 @@ public struct MediaSpecStrip: View {
         self.omit = omit
         self.spacing = spacing
         self.tone = tone
+        self.form = form
     }
 
     public var body: some View {
@@ -464,27 +491,27 @@ public struct MediaSpecStrip: View {
             if !omit.contains(.picture), spec.resolution != nil || spec.range != nil {
                 PictureChip(
                     resolution: spec.resolution, range: spec.range, emphasis: emphasis,
-                    height: height, trailing: adornments[.picture], tone: tone)
+                    height: height, trailing: adornments[.picture], tone: tone, form: form)
             }
             if !omit.contains(.sound), let audio = spec.audio {
                 SoundChip(
                     audio: audio, emphasis: emphasis, height: height,
-                    trailing: adornments[.sound], tone: tone)
+                    trailing: adornments[.sound], tone: tone, form: form)
             }
             if !omit.contains(.tier), let tier = spec.tier {
                 TierChip(
                     tier: tier, resolution: spec.resolution, emphasis: emphasis, height: height,
-                    trailing: adornments[.tier], tone: tone)
+                    trailing: adornments[.tier], tone: tone, form: form)
             }
             if !omit.contains(.lang), let lang = spec.lang {
                 LangChip(
                     lang: lang, label: langLabel, emphasis: emphasis, height: height,
-                    trailing: adornments[.lang], tone: tone)
+                    trailing: adornments[.lang], tone: tone, form: form)
             }
             if !omit.contains(.cut), let cut = spec.cut {
                 CutChip(
                     cut: cut, emphasis: emphasis, height: height, trailing: adornments[.cut],
-                    tone: tone)
+                    tone: tone, form: form)
             }
         }
     }
