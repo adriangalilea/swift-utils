@@ -16,6 +16,12 @@ struct DemoApp: App {
             }
             .background(Color.black)
             .frame(minWidth: 1400, minHeight: 800)
+            .onAppear {
+                // A package executable is not a bundled app: without this it
+                // opens behind the terminal with nothing in the Dock.
+                NSApplication.shared.setActivationPolicy(.regular)
+                NSApplication.shared.activate()
+            }
         }
     }
 }
