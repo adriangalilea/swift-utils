@@ -2,14 +2,10 @@ import SwiftUI
 
 // WHICH MARK A VALUE WEARS. `Mark` (generated) is the catalog of artworks;
 // this file is the one place a vocabulary value is bound to a symbol (the
-// poster rung: a disc-sized glyph) and a lockup (the rail rung: the full
-// logotype, run inline with the text). A value with no entry renders as
-// words, exactly as before the catalog existed.
-//
-// The manifest rule: a mark REPLACES the word it stands for, the rest of
-// the label stays text. "4K" + the Dolby Vision lockup; the Dolby Atmos
-// lockup + "TrueHD 7.1"; the Blu-ray lockup + "Remux". DTS:X has no
-// artwork anywhere - it is the dts wordmark + ":X" set in the chip's type.
+// poster rung: the brand's own glyph or a small badge) and a lockup (the
+// rail rung: the full logotype or the same badge). ARTWORK FIRST: a value
+// with an entry is drawn, never written; a value with no entry becomes a
+// drawn word-badge, the one shape words take in this family (Chips.swift).
 
 /// How a mark is coloured. `ink` follows the chip's foreground (one ink,
 /// the flare rule); `brand` uses the mark's official hex. A mark with
@@ -44,21 +40,26 @@ extension DynamicRange {
 }
 
 extension Resolution {
-    /// Only 4K has a mark, and only at the rail: the poster rung keeps the
-    /// text "4K", which reads where a 23:4 wordmark would be a hairline.
+    /// The tabler badges (MIT) at both rungs; 720p has no artwork anywhere
+    /// and is drawn. The ULTRA HD wordmark stays in the catalog unbound.
     public var marks: Marks {
         switch self {
-        case .p2160: Marks(lockup: .ultrahd)
-        default: .none
+        case .sd: Marks(symbol: .badgesd, lockup: .badgesd)
+        case .p720: .none
+        case .p1080: Marks(symbol: .badgehd, lockup: .badgehd)
+        case .p2160: Marks(symbol: .badge4k, lockup: .badge4k)
+        case .p4320: Marks(symbol: .badge8k, lockup: .badge8k)
         }
     }
 }
 
 extension ObjectAudio {
+    /// DTS:X has no free vector anywhere (the only one is CC BY-NC-SA):
+    /// it is drawn.
     public var marks: Marks {
         switch self {
         case .atmos: Marks(symbol: .dolby, lockup: .dolbyatmos)
-        case .dtsX: Marks(symbol: .dts, lockup: .dtswordmark)
+        case .dtsX: .none
         }
     }
 }
@@ -75,18 +76,6 @@ extension AudioCodec {
         case .flac: Marks(lockup: .flac)
         case .opus: Marks(lockup: .opus)
         case .aac, .pcm, .alac, .mp3, .mp2, .vorbis: .none
-        }
-    }
-
-    /// The word left over once the brand's symbol has said its part:
-    /// "TrueHD" beside the double-D, "HD MA" beside dts, nothing beside dts
-    /// for plain DTS. Codecs without a symbol keep their whole label.
-    var wordBesideSymbol: String {
-        switch self {
-        case .dts: ""
-        case .dtsHDMA: "HD MA"
-        case .dtsHDHRA: "HD HRA"
-        default: label
         }
     }
 }

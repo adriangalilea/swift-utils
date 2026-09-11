@@ -1,4 +1,28 @@
 {
+  "badge4k" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "tabler icons via Iconify (MIT)",
+    "title" : "4K"
+  },
+  "badge8k" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "tabler icons via Iconify (MIT)",
+    "title" : "8K"
+  },
+  "badgehd" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "tabler icons via Iconify (MIT)",
+    "title" : "HD"
+  },
+  "badgesd" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "tabler icons via Iconify (MIT)",
+    "title" : "SD"
+  },
   "bluray" : {
     "hex" : "0095D5",
     "original" : false,

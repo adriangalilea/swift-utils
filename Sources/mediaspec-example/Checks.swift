@@ -147,6 +147,7 @@ func runChecks() -> Never {
         fail("catalog \(onDisk) and Mark \(generated) disagree - run brandgen sync")
     }
     let wantMarks = [
+        "badge4k", "badge8k", "badgehd", "badgesd",
         "bluray", "blurayglyph", "dolby", "dolbyatmos", "dolbydigital", "dolbydigitalplus",
         "dolbytruehd", "dolbyvision", "dts", "dtshdma", "dtswordmark", "dvd", "flac", "flages",
         "hdr10", "hdr10plus", "imax", "opus", "ultrahd", "ultrahdbluray",
@@ -158,18 +159,20 @@ func runChecks() -> Never {
     if Mark.flages.original == false { fail("the flag keeps its own colours") }
     if Mark.dolby.original { fail("a logo is template-rendered") }
     if Mark.dolby.aspect != 1 || Mark.dts.aspect != 1 { fail("simple-icons symbols are square") }
-    if Mark.dolby.aspect > SpecChip.discAspect || Mark.flages.aspect > SpecChip.discAspect {
-        fail("the double-D and the flag sit in the disc")
-    }
-    if Mark.hdr10plus.aspect <= SpecChip.discAspect || Mark.imax.aspect <= SpecChip.discAspect {
-        fail("the HDR10+ badge and IMAX run inline")
+    if Mark.badge4k.aspect != 1 || Mark.badge4k.original {
+        fail("the tabler badges are square templates")
     }
     // The value → mark binding, the manifest's own table.
     if DynamicRange.dolbyVision.marks != Marks(symbol: .dolby, lockup: .dolbyvision)
         || DynamicRange.hdr10Plus.marks != Marks(symbol: .hdr10plus, lockup: .hdr10plus)
         || DynamicRange.sdr.marks != .none || DynamicRange.hlg.marks != .none
-        || Resolution.p2160.marks != Marks(lockup: .ultrahd) || Resolution.p1080.marks != .none
+        || Resolution.p2160.marks != Marks(symbol: .badge4k, lockup: .badge4k)
+        || Resolution.p4320.marks != Marks(symbol: .badge8k, lockup: .badge8k)
+        || Resolution.p1080.marks != Marks(symbol: .badgehd, lockup: .badgehd)
+        || Resolution.sd.marks != Marks(symbol: .badgesd, lockup: .badgesd)
+        || Resolution.p720.marks != .none
         || ObjectAudio.atmos.marks != Marks(symbol: .dolby, lockup: .dolbyatmos)
+        || ObjectAudio.dtsX.marks != .none
         || AudioCodec.trueHD.marks != Marks(symbol: .dolby, lockup: .dolbytruehd)
         || AudioCodec.dtsHDMA.marks != Marks(symbol: .dts, lockup: .dtshdma)
         || AudioCodec.aac.marks != .none

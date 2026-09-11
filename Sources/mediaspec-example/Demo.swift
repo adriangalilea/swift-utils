@@ -72,8 +72,8 @@ struct DemoView: View {
                     }
                 }
             }
-            section("height · 28 / 34 / 44") {
-                ForEach([28, 34, 44] as [CGFloat], id: \.self) { h in
+            section("height · 24 / 34 / 44") {
+                ForEach([24, 34, 44] as [CGFloat], id: \.self) { h in
                     MediaSpecStrip(spec: reference, height: h)
                 }
             }
@@ -109,8 +109,8 @@ struct DemoView: View {
             section("omit · a surface that states an axis elsewhere") {
                 MediaSpecStrip(spec: reference, omit: [.tier, .cut])
             }
-            section("rungs · the poster symbol (28) vs the rail lockup (34, 44), ink vs brand") {
-                ForEach([28, 34, 44] as [CGFloat], id: \.self) { h in
+            section("rungs · the poster symbols (24) vs the rail lockups (34, 44), ink vs brand") {
+                ForEach([24, 34, 44] as [CGFloat], id: \.self) { h in
                     ForEach(Tone.allCases, id: \.self) { tone in
                         HStack(spacing: .inkGap) {
                             Text("\(Int(h)) \(tone.rawValue)").font(.caption.monospaced())
@@ -133,24 +133,37 @@ struct DemoView: View {
                     }
                 }
             }
-            section("marks · the catalog, symbol rung and rail rung, ink then brand") {
+            section("badges · artwork badges beside drawn word-badges, same geometry") {
+                ForEach([24, 34, 44] as [CGFloat], id: \.self) { h in
+                    HStack(spacing: .inkTight) {
+                        SpecChip(.art(.badgesd), height: h)
+                        SpecChip(.art(.badgehd), height: h)
+                        SpecChip(.art(.badge4k), height: h)
+                        SpecChip(.art(.badge8k), height: h)
+                        SpecChip(.art(.hdr10), height: h)
+                        SpecChip(.art(.hdr10plus), height: h)
+                        SpecChip("720p", height: h)
+                        SpecChip("HLG", height: h)
+                        SpecChip("7.1", height: h)
+                        SpecChip("Remux", height: h)
+                        SpecChip("WEB-DL", height: h)
+                        SpecChip("DTS:X", height: h)
+                        SpecChip("castellano", height: h)
+                    }
+                }
+            }
+            section("marks · the catalog at 24 / 34 / 44, ink then brand, then the four weights") {
                 ForEach(Mark.allCases, id: \.self) { m in
                     HStack(spacing: .inkLane) {
                         Text(m.rawValue).font(.caption.monospaced()).foregroundStyle(.secondary)
                             .frame(width: 120, alignment: .leading)
-                        ForEach([28, 34, 44] as [CGFloat], id: \.self) { h in
-                            SpecChip(
-                                .picture, parts: [], symbol: m, accessibility: m.title, height: h)
-                            SpecChip(
-                                .picture, parts: [.mark(m)], symbol: nil, accessibility: m.title,
-                                height: h)
+                        ForEach([24, 34, 44] as [CGFloat], id: \.self) { h in
+                            SpecChip(.art(m), height: h)
                         }
-                        SpecChip(
-                            .picture, parts: [.mark(m)], symbol: nil, accessibility: m.title,
-                            height: 34, tone: .brand)
-                        SpecChip(
-                            .picture, parts: [.mark(m)], symbol: nil, accessibility: m.title,
-                            provenance: .claim, height: 34, tone: .brand)
+                        SpecChip(.art(m), height: 34, tone: .brand)
+                        ForEach(Provenance.allCases, id: \.self) { p in
+                            SpecChip(.art(m), provenance: p, height: 28)
+                        }
                         Text(String(format: "%.2f · lum %.2f", m.aspect, m.luminance))
                             .font(.caption.monospaced()).foregroundStyle(.secondary)
                     }

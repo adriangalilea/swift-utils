@@ -1,0 +1,5 @@
+{
+  "images" : [ { "filename" : "badge4k.svg", "idiom" : "universal" } ],
+  "info" : { "author" : "brandgen", "version" : 1 },
+  "properties" : { "preserves-vector-representation" : true, "template-rendering-intent" : "template" }
+}

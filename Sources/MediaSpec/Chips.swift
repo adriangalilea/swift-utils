@@ -1,193 +1,123 @@
 import Ink
 import SwiftUI
 
-// The chips. One shape (Ink's Pill: the leading disc IS the cap), the
-// value's MARK where it has one, words where it does not, and PROVENANCE
-// AS WEIGHT - never a color, per the flare rule. A claim is a stroke with
-// nothing inside; a verified fact rests; a measured one is raised; a
-// delivered one is raised AND edged, its disc lit, because it is the only
-// chip that speaks about THIS screen right now.
+// GRAMMAR V3: ARTWORK FIRST. The whole point of the family is proper
+// iconography, so a chip is ONE MARK standing FRAMELESS - the artwork IS
+// the chip. Badge artwork (HDR10, HDR10+, 4K, 8K, HD, SD) keeps its own
+// box, a lockup keeps its shape, a symbol stands alone at the small rung.
+// No pill, no disc, no kind glyph around a mark.
 //
-// TWO RUNGS, one threshold. At `SpecChip.rail` and above (34 is the
-// default, 44 the couch) the LOCKUP replaces the word it stands for and
-// the rest stays text: "4K" + the Dolby Vision logotype, the Dolby Atmos
-// logotype + "TrueHD 7.1", the Blu-ray logotype + "Remux". Below it (the
-// poster rung, 28 and under) the SYMBOL stands in: the double-D in the
-// disc + "DV", the dts mark + "X", the HDR10+ badge alone. A symbol whose
-// artwork is disc-shaped (aspect ≤ 1.6) takes the cap; a wide one runs
-// inline like a lockup. Values without artwork render exactly as words.
+// A DRAWN word-badge exists only for a value with no artwork anywhere:
+// 720p, HLG, channels (7.1), Remux, WEB-DL / WEBRip / HDTV / CAM, DTS:X,
+// TrueHD when the Atmos lockup is already shown, AAC / PCM / ALAC / MP3 /
+// MP2 / Vorbis, castellano / latino / a language code, every cut but IMAX.
+// Its geometry is the HDR10 badge's: box ≈ 1.5 × cap height (the word's
+// font is 0.62 × box, cap ≈ 0.7 × font), corner radius 0.25 × box, a
+// stroke of 0.08 × box, semibold.
 //
-// Sizes, tuned once: a lockup or inline symbol stands 0.50 × height
-// (the label's font is 0.44 × height, so the mark's x-height lands on the
-// text's cap height and a two-line lockup stays legible at 34); a symbol
-// in the disc is inset 0.2 × height per side (0.6 × height across).
+// PROVENANCE sits ON the mark: claim is ghosted (0.55 opacity); verified is
+// full ink; measured is full ink over a soft `inkRest` wash capsule;
+// delivered is the wash plus an `inkEdge` ring. Tone: `ink` follows the
+// axis's foreground, `brand` paints a mark its official hex - unfilled
+// weights only, never a near-black official colour (black on dark is a
+// missing logo, not a brand statement); original-colour marks (the flag)
+// ignore tone by construction.
+//
+// Two rungs, one threshold (`SpecChip.rail` = 32): at and above it lockups,
+// below it the brand SYMBOLS (Dolby D, dts, the Blu-ray glyph, the flag)
+// and the small badges. A strip groups per axis: `.inkTight` within an
+// axis, `.inkGap` between axes; a delta trails the axis's last mark.
 
-/// One piece of a chip's content: words, a mark, or a mark with a word
-/// glued to its trailing edge (the dts wordmark + ":X").
-public enum Part: Hashable, Sendable {
-    case text(String)
-    case mark(Mark)
-    case marked(Mark, suffix: String)
+/// One mark's content: artwork from the catalog, or a word that has none.
+public enum Glyph: Hashable, Sendable {
+    case art(Mark)
+    case word(String)
 }
 
-/// The one chip body every kind wears. Public so a consumer with an axis
-/// this product does not name (a container, a frame rate) can still render
-/// it in the family's grammar.
+/// One glyph standing frameless, wearing its provenance. Public so a
+/// consumer with an axis this product does not name (a container, a frame
+/// rate) can still render it in the family's grammar.
 public struct SpecChip: View {
     /// The height at and above which a chip wears lockups; below it, symbols.
     public static let rail: CGFloat = 32
-    /// A symbol at most this wide-for-tall sits in the disc; wider ones
-    /// run inline (the HDR10 badge, the Blu-ray glyph, IMAX).
-    public static let discAspect: Double = 1.6
 
-    let kind: Kind
-    let parts: [Part]
-    let symbol: Mark?
-    let accessibility: String
+    let glyph: Glyph
     let provenance: Provenance
     let height: CGFloat
-    let delta: Delta?
-    let detail: String?
     let tone: Tone
 
-    /// Words only - the shape every value without artwork takes.
     public init(
-        _ kind: Kind, _ label: String, provenance: Provenance = .verified,
-        height: CGFloat = 34, delta: Delta? = nil, detail: String? = nil, tone: Tone = .ink
+        _ glyph: Glyph, provenance: Provenance = .verified, height: CGFloat = 34,
+        tone: Tone = .ink
     ) {
-        self.init(
-            kind, parts: [.text(label)], symbol: nil, accessibility: label,
-            provenance: provenance, height: height, delta: delta, detail: detail, tone: tone)
-    }
-
-    /// Composed content. `symbol` takes the disc when disc-shaped, else it is
-    /// prepended inline; `accessibility` is the full spoken label.
-    public init(
-        _ kind: Kind, parts: [Part], symbol: Mark?, accessibility: String,
-        provenance: Provenance = .verified, height: CGFloat = 34, delta: Delta? = nil,
-        detail: String? = nil, tone: Tone = .ink
-    ) {
-        self.kind = kind
-        self.symbol = symbol
-        self.accessibility = accessibility
+        self.glyph = glyph
         self.provenance = provenance
         self.height = height
-        self.delta = delta
-        self.detail = detail
         self.tone = tone
-        if let symbol, symbol.aspect > SpecChip.discAspect {
-            self.parts = [.mark(symbol)] + parts
-        } else {
-            self.parts = parts
-        }
+    }
+
+    /// The drawn word-badge - the one shape a value without artwork takes.
+    public init(
+        _ word: String, provenance: Provenance = .verified, height: CGFloat = 34,
+        tone: Tone = .ink
+    ) {
+        self.init(.word(word), provenance: provenance, height: height, tone: tone)
     }
 
     public var body: some View {
-        Pill(height: height, tint: fill) {
-            ZStack {
-                Circle().fill(disc)
-                if let symbol, symbol.aspect <= SpecChip.discAspect {
-                    BrandMark(symbol, height: height * 0.6, tint: markTint(symbol))
-                } else {
-                    Image(systemName: kind.symbol)
-                        .font(.system(size: height * 0.42, weight: .semibold))
-                        .foregroundStyle(labelStyle)
-                }
+        content
+            .opacity(provenance == .claim ? 0.55 : 1)
+            .padding(.horizontal, washed ? height * 0.18 : 0)
+            .padding(.vertical, washed ? height * 0.12 : 0)
+            .background {
+                if washed { Capsule().fill(Color.inkRest) }
             }
-        } content: {
-            HStack(spacing: height * 0.18) {
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: height * 0.14) {
-                        ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
-                            self.part(part)
-                        }
-                    }
-                    if let detail, !detail.isEmpty {
-                        Text(detail)
-                            .font(.system(size: height * 0.3))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                if let delta {
-                    Text(delta.glyph)
-                        .font(.system(size: height * 0.36, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(delta.rawValue)
-                }
+            .overlay {
+                if provenance == .delivered { Capsule().strokeBorder(Color.inkEdge, lineWidth: 1) }
             }
-        }
-        .overlay {
-            if stroked {
-                Capsule().strokeBorder(Color.inkEdge, lineWidth: 1)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(kind.rawValue): \(accessibility), \(provenance.rawValue)")
+            .accessibilityLabel("\(accessibility), \(provenance.rawValue)")
     }
 
     @ViewBuilder
-    private func part(_ part: Part) -> some View {
-        switch part {
-        case .text(let s):
-            label(s)
-        case .mark(let m):
-            BrandMark(m, height: height * 0.5, tint: markTint(m))
-        case .marked(let m, let suffix):
-            HStack(spacing: 0) {
-                BrandMark(m, height: height * 0.5, tint: markTint(m))
-                label(suffix)
-            }
+    private var content: some View {
+        switch glyph {
+        case .art(let m):
+            BrandMark(m, height: height, tint: markTint(m))
+        case .word(let w):
+            Text(w)
+                .font(.system(size: height * 0.62, weight: .semibold))
+                .foregroundStyle(ink)
+                .lineLimit(1)
+                .padding(.horizontal, height * 0.26)
+                .frame(height: height)
+                .overlay {
+                    RoundedRectangle(cornerRadius: height * 0.25)
+                        .strokeBorder(ink, lineWidth: height * 0.08)
+                }
         }
     }
 
-    private func label(_ s: String) -> some View {
-        Text(s)
-            .font(.system(size: height * 0.44, weight: provenance == .claim ? .regular : .semibold))
-            .foregroundStyle(labelStyle)
-            .lineLimit(1)
+    private var accessibility: String {
+        switch glyph {
+        case .art(let m): m.title
+        case .word(let w): w
+        }
     }
 
-    private var labelStyle: HierarchicalShapeStyle {
-        provenance == .claim ? .secondary : .primary
-    }
+    private var ink: Color { .primary }
+    private var washed: Bool { provenance == .measured || provenance == .delivered }
 
-    /// THE TONE RULE. `ink` follows the label. `brand` paints the mark its
-    /// official hex - but only on the unfilled weights (claim, verified):
-    /// on a filled chip the mark stays in the label colour, one ink on one
-    /// ground. And a brand whose official colour is near-black (Dolby,
-    /// HDR10, DVD - luminance under 0.15) reads as ink too: black on a dark
-    /// chip is not a brand statement, it is a missing logo. Original-colour
-    /// marks (the flag) ignore all of this by construction.
+    /// THE TONE RULE. `ink` follows the axis. `brand` paints the mark its
+    /// official hex on the unfilled weights only, and never a near-black
+    /// one (luminance under 0.15 - Dolby, HDR10, DVD): black on a dark
+    /// ground is a missing logo. The flag renders as authored regardless.
     private func markTint(_ m: Mark) -> Color {
-        let ink = provenance == .claim ? Color.secondary : Color.primary
-        guard tone == .brand, !filled, m.luminance >= 0.15 else { return ink }
+        guard tone == .brand, !washed, m.luminance >= 0.15 else { return ink }
         return m.color
     }
-
-    private var filled: Bool { provenance == .measured || provenance == .delivered }
-
-    private var fill: Color {
-        switch provenance {
-        case .claim: .clear
-        case .verified: .inkRest
-        case .measured, .delivered: .inkRaised
-        }
-    }
-
-    private var disc: Color {
-        switch provenance {
-        case .claim: .clear
-        case .verified: .inkRest
-        case .measured: .inkRaised
-        case .delivered: .inkSelection
-        }
-    }
-
-    private var stroked: Bool { provenance == .claim || provenance == .delivered }
 }
 
-/// The per-chip options every value chip and the strip share.
+/// The per-axis options every value chip and the strip share.
 public struct ChipOptions: Sendable {
     public var provenance: Provenance = .verified
     public var height: CGFloat = 34
@@ -196,6 +126,44 @@ public struct ChipOptions: Sendable {
     public var tone: Tone = .ink
 
     var atRail: Bool { height >= SpecChip.rail }
+    func glyph(_ marks: Marks) -> Glyph? {
+        (atRail ? marks.lockup : marks.symbol).map(Glyph.art)
+    }
+}
+
+/// One axis: its glyphs tight in a row, the delta trailing, the detail
+/// beneath. Every value chip is this over its own glyph list.
+struct Axis: View {
+    let kind: Kind
+    let glyphs: [Glyph]
+    let accessibility: String
+    let options: ChipOptions
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: .inkTight) {
+                ForEach(Array(glyphs.enumerated()), id: \.offset) { _, g in
+                    SpecChip(
+                        g, provenance: options.provenance, height: options.height,
+                        tone: options.tone)
+                }
+                if let delta = options.delta {
+                    Text(delta.glyph)
+                        .font(.system(size: options.height * 0.4, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(delta.rawValue)
+                }
+            }
+            if let detail = options.detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.system(size: options.height * 0.3))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(kind.rawValue): \(accessibility), \(options.provenance.rawValue)")
+    }
 }
 
 public struct PictureChip: View {
@@ -214,35 +182,12 @@ public struct PictureChip: View {
     }
 
     public var body: some View {
-        let rangeMarks = range?.marks ?? .none
-        var parts: [Part] = []
-        var symbol: Mark?
-        if options.atRail {
-            // "4K" + the range lockup; a 4K copy with no range lockup wears
-            // the Ultra HD wordmark instead of the word.
-            if let lockup = rangeMarks.lockup {
-                if let r = resolution { parts.append(.text(r.label)) }
-                parts.append(.mark(lockup))
-            } else if let ultra = resolution?.marks.lockup {
-                parts.append(.mark(ultra))
-                if let g = range, g != .sdr { parts.append(.text(g.label)) }
-            } else {
-                parts.append(.text(pictureLabel(resolution, range)))
-            }
-        } else {
-            symbol = rangeMarks.symbol
-            if symbol != nil {
-                // The symbol says the range; the short word beside it only
-                // where the artwork alone is ambiguous (the double-D).
-                if range == .dolbyVision { parts.append(.text(DynamicRange.dolbyVision.short)) }
-            } else {
-                parts.append(.text(pictureLabel(resolution, range, short: true)))
-            }
-        }
-        return SpecChip(
-            .picture, parts: parts, symbol: symbol, accessibility: pictureLabel(resolution, range),
-            provenance: options.provenance, height: options.height, delta: options.delta,
-            detail: options.detail, tone: options.tone)
+        var glyphs: [Glyph] = []
+        if let r = resolution { glyphs.append(options.glyph(r.marks) ?? .word(r.label)) }
+        if let g = range, g != .sdr { glyphs.append(options.glyph(g.marks) ?? .word(g.label)) }
+        return Axis(
+            kind: .picture, glyphs: glyphs, accessibility: pictureLabel(resolution, range),
+            options: options)
     }
 }
 
@@ -260,46 +205,22 @@ public struct SoundChip: View {
     }
 
     public var body: some View {
-        var parts: [Part] = []
-        var symbol: Mark?
-        let channels = audio.channels?.label
-        if options.atRail {
-            switch audio.object {
-            case .atmos?:
-                // The object lockup leads; the codec and layout stay words.
-                parts.append(.mark(.dolbyatmos))
-                parts.append(
-                    .text([audio.codec.label, channels].compactMap { $0 }.joined(separator: " ")))
-            case .dtsX?:
-                // No DTS:X artwork exists anywhere: the dts wordmark + ":X".
-                parts.append(.marked(.dtswordmark, suffix: ":X"))
-                if let channels { parts.append(.text(channels)) }
-            case nil:
-                if let lockup = audio.codec.marks.lockup {
-                    parts.append(.mark(lockup))
-                    if let channels { parts.append(.text(channels)) }
-                } else {
-                    parts.append(.text(soundLabel(audio)))
-                }
-            }
-        } else {
-            switch audio.object {
-            case .atmos?:
-                symbol = .dolby
-                parts.append(.text(ObjectAudio.atmos.label))
-            case .dtsX?:
-                symbol = .dts
-                parts.append(.text("X"))
-            case nil:
-                symbol = audio.codec.marks.symbol
-                let word = symbol == nil ? audio.codec.label : audio.codec.wordBesideSymbol
-                if !word.isEmpty { parts.append(.text(word)) }
-            }
+        var glyphs: [Glyph] = []
+        // The object mark leads and, when it is artwork, the codec steps
+        // down to a word (the Atmos lockup already says Dolby).
+        var objectDrawn = false
+        if let o = audio.object {
+            let g = options.glyph(o.marks) ?? .word(o.label)
+            if case .art = g { objectDrawn = true }
+            glyphs.append(g)
         }
-        return SpecChip(
-            .sound, parts: parts, symbol: symbol, accessibility: soundLabel(audio),
-            provenance: options.provenance, height: options.height, delta: options.delta,
-            detail: options.detail, tone: options.tone)
+        glyphs.append(
+            objectDrawn
+                ? .word(audio.codec.label)
+                : options.glyph(audio.codec.marks) ?? .word(audio.codec.label))
+        if let c = audio.channels { glyphs.append(.word(c.label)) }
+        return Axis(
+            kind: .sound, glyphs: glyphs, accessibility: soundLabel(audio), options: options)
     }
 }
 
@@ -321,24 +242,14 @@ public struct TierChip: View {
     }
 
     public var body: some View {
-        let marks = tier.marks(at: resolution)
-        var parts: [Part] = []
-        var symbol: Mark?
-        if options.atRail {
-            if let lockup = marks.lockup {
-                parts.append(.mark(lockup))
-                if tier == .remux { parts.append(.text(tier.label)) }
-            } else {
-                parts.append(.text(tier.label))
-            }
+        var glyphs: [Glyph] = []
+        if let art = options.glyph(tier.marks(at: resolution)) {
+            glyphs.append(art)
+            if tier == .remux { glyphs.append(.word(tier.label)) }
         } else {
-            symbol = marks.symbol
-            if symbol == nil { parts.append(.text(tier.label)) }
+            glyphs.append(.word(tier.label))
         }
-        return SpecChip(
-            .tier, parts: parts, symbol: symbol, accessibility: tier.label,
-            provenance: options.provenance, height: options.height, delta: options.delta,
-            detail: options.detail, tone: options.tone)
+        return Axis(kind: .tier, glyphs: glyphs, accessibility: tier.label, options: options)
     }
 }
 
@@ -356,20 +267,14 @@ public struct LangChip: View {
     }
 
     public var body: some View {
-        let marks = lang.marks
-        var parts: [Part] = []
-        var symbol: Mark?
-        if options.atRail, let flag = marks.lockup {
-            parts = [.mark(flag), .text(lang.label)]
-        } else if !options.atRail, let flag = marks.symbol {
-            symbol = flag
+        var glyphs: [Glyph] = []
+        if let flag = options.glyph(lang.marks) {
+            glyphs.append(flag)
+            if options.atRail { glyphs.append(.word(lang.label)) }
         } else {
-            parts = [.text(lang.label)]
+            glyphs.append(.word(lang.label))
         }
-        return SpecChip(
-            .lang, parts: parts, symbol: symbol, accessibility: lang.label,
-            provenance: options.provenance, height: options.height, delta: options.delta,
-            detail: options.detail, tone: options.tone)
+        return Axis(kind: .lang, glyphs: glyphs, accessibility: lang.label, options: options)
     }
 }
 
@@ -387,18 +292,16 @@ public struct CutChip: View {
     }
 
     public var body: some View {
-        let marks = cut.marks
-        let mark = options.atRail ? marks.lockup : marks.symbol
-        return SpecChip(
-            .cut, parts: mark.map { [.mark($0)] } ?? [.text(cut.label)], symbol: nil,
-            accessibility: cut.label, provenance: options.provenance, height: options.height,
-            delta: options.delta, detail: options.detail, tone: options.tone)
+        Axis(
+            kind: .cut, glyphs: [options.glyph(cut.marks) ?? .word(cut.label)],
+            accessibility: cut.label, options: options)
     }
 }
 
 /// The spec as a row, fixed order picture · sound · tier · lang · cut,
-/// absent axes omitted. One provenance and one tone for the strip: a spec
-/// is one observation, not five. `deltas` decorate a candidate's axes
+/// absent axes omitted, `.inkGap` between axes (each axis packs its own
+/// marks at `.inkTight`). One provenance and one tone for the strip: a
+/// spec is one observation, not five. `deltas` trail a candidate's axes
 /// against the owned copy; `omit` is for surfaces that state an axis
 /// elsewhere. The tier chip is handed the resolution so a 4K disc wears
 /// the Ultra HD Blu-ray mark.
@@ -477,7 +380,7 @@ public struct MediaSpecStrip: View {
                 resolution: .p2160, range: .dolbyVision,
                 audio: Audio(codec: .trueHD, channels: .surround71, object: .atmos),
                 tier: .bluray, lang: Lang("es-ES")),
-            height: 28, tone: .brand)
+            height: 24, tone: .brand)
     }
     .padding(.inkBlock)
     .background(Color.black)
