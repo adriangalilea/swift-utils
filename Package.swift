@@ -56,14 +56,17 @@ let package = Package(
         .library(name: "Scores", targets: ["Scores"]),
         // The media-format vocabulary, typed: picture, sound, source tier,
         // language and cut as VALUES the chips know how to say, with
-        // provenance worn as weight. Owns labels and glyphs, never ranking
-        // (the daemon's ladder) and never brand marks (licensed; words
-        // read at 10 ft). `swift run mediaspec-example --check` pins the
-        // wire literals shared with the React twin.
+        // provenance worn as weight and the real marks (Dolby, DTS, HDR10+,
+        // Blu-ray, IMAX…) in its own catalog - brands ship with their
+        // consumer, and this is the consumer. Owns labels, marks and
+        // glyphs, never ranking (the daemon's ladder). `swift run
+        // mediaspec-example --check` pins the wire literals shared with the
+        // React twin and the catalog against the manifest.
         .library(name: "MediaSpec", targets: ["MediaSpec"]),
-        // Any brand mark, natively: fetches simple-icons artwork (CC0)
-        // into a target's catalog and regenerates its typed `Brand` enum
-        // with each brand's OFFICIAL color. `swift run brandgen add <slug>`.
+        // Any brand mark, natively: fetches simple-icons artwork (CC0) -
+        // or imports a reviewed local SVG - into a target's catalog and
+        // regenerates its typed enum with each brand's OFFICIAL color.
+        // `swift run brandgen add <slug>` / `brandgen import <slug> --svg …`.
         .executable(name: "brandgen", targets: ["brandgen"]),
         // Gallery's gate + demo: `swift run gallery-example --check` runs
         // the kernel invariants headless (nonzero exit on failure);
@@ -95,7 +98,14 @@ let package = Package(
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap"]),
         .executableTarget(name: "gallery-example", dependencies: ["Gallery"]),
-        .target(name: "MediaSpec", dependencies: ["Ink"]),
+        .target(
+            name: "MediaSpec",
+            dependencies: ["Ink"],
+            // brandgen's local-mark ledger sits beside the catalog so the
+            // generator can find it; it is a build input, never a resource.
+            exclude: ["Resources/brandgen.local.json", "Resources/PROVENANCE.md"],
+            resources: [.process("Resources")]
+        ),
         .executableTarget(name: "mediaspec-example", dependencies: ["MediaSpec"]),
         .executableTarget(name: "brandgen"),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),

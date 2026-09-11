@@ -1,0 +1,110 @@
+{
+  "bluray" : {
+    "hex" : "0095D5",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "Blu-ray Disc"
+  },
+  "blurayglyph" : {
+    "hex" : "0095D5",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD), glyph split from the lockup",
+    "title" : "Blu-ray Disc"
+  },
+  "dolbyatmos" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "Dolby Atmos"
+  },
+  "dolbydigital" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "Dolby Digital"
+  },
+  "dolbydigitalplus" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "Dolby Digital Plus"
+  },
+  "dolbytruehd" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "Dolby TrueHD"
+  },
+  "dolbyvision" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "Dolby Vision"
+  },
+  "dtshdma" : {
+    "hex" : "F98B2B",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "DTS-HD Master Audio"
+  },
+  "dtswordmark" : {
+    "hex" : "F98B2B",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "DTS"
+  },
+  "dvd" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "DVD"
+  },
+  "flac" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD, Xiph)",
+    "title" : "FLAC"
+  },
+  "flages" : {
+    "hex" : "C60B1E",
+    "original" : true,
+    "source" : "Wikimedia Commons (PD), civil flag",
+    "title" : "Spain"
+  },
+  "hdr10" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "HDR10"
+  },
+  "hdr10plus" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "HDR10+"
+  },
+  "imax" : {
+    "hex" : "0072CE",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "IMAX"
+  },
+  "opus" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD, Xiph)",
+    "title" : "Opus"
+  },
+  "ultrahd" : {
+    "hex" : "221E1F",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "Ultra HD"
+  },
+  "ultrahdbluray" : {
+    "hex" : "007DC5",
+    "original" : false,
+    "source" : "Wikimedia Commons (PD)",
+    "title" : "Ultra HD Blu-ray"
+  }
+}

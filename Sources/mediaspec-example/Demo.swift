@@ -14,7 +14,7 @@ struct DemoApp: App {
                 DemoView().padding(.inkBlock)
             }
             .background(Color.black)
-            .frame(minWidth: 1100, minHeight: 720)
+            .frame(minWidth: 1400, minHeight: 800)
         }
     }
 }
@@ -108,6 +108,53 @@ struct DemoView: View {
             }
             section("omit · a surface that states an axis elsewhere") {
                 MediaSpecStrip(spec: reference, omit: [.tier, .cut])
+            }
+            section("rungs · the poster symbol (28) vs the rail lockup (34, 44), ink vs brand") {
+                ForEach([28, 34, 44] as [CGFloat], id: \.self) { h in
+                    ForEach(Tone.allCases, id: \.self) { tone in
+                        HStack(spacing: .inkGap) {
+                            Text("\(Int(h)) \(tone.rawValue)").font(.caption.monospaced())
+                                .foregroundStyle(.secondary).frame(width: 72, alignment: .leading)
+                            MediaSpecStrip(
+                                spec: MediaSpec(
+                                    resolution: .p2160, range: .dolbyVision,
+                                    audio: Audio(
+                                        codec: .trueHD, channels: .surround71, object: .atmos),
+                                    tier: .remux, lang: Lang("es-ES"), cut: .imax),
+                                height: h, tone: tone)
+                            MediaSpecStrip(
+                                spec: MediaSpec(
+                                    resolution: .p2160, range: .hdr10Plus,
+                                    audio: Audio(
+                                        codec: .dtsHDMA, channels: .surround71, object: .dtsX),
+                                    tier: .bluray),
+                                height: h, tone: tone)
+                        }
+                    }
+                }
+            }
+            section("marks · the catalog, symbol rung and rail rung, ink then brand") {
+                ForEach(Mark.allCases, id: \.self) { m in
+                    HStack(spacing: .inkLane) {
+                        Text(m.rawValue).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            .frame(width: 120, alignment: .leading)
+                        ForEach([28, 34, 44] as [CGFloat], id: \.self) { h in
+                            SpecChip(
+                                .picture, parts: [], symbol: m, accessibility: m.title, height: h)
+                            SpecChip(
+                                .picture, parts: [.mark(m)], symbol: nil, accessibility: m.title,
+                                height: h)
+                        }
+                        SpecChip(
+                            .picture, parts: [.mark(m)], symbol: nil, accessibility: m.title,
+                            height: 34, tone: .brand)
+                        SpecChip(
+                            .picture, parts: [.mark(m)], symbol: nil, accessibility: m.title,
+                            provenance: .claim, height: 34, tone: .brand)
+                        Text(String(format: "%.2f · lum %.2f", m.aspect, m.luminance))
+                            .font(.caption.monospaced()).foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }

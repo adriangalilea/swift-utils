@@ -5,7 +5,7 @@ import MediaSpec
 // `media-spec` item's own check; the two renderers share a wire and this
 // is how a rename on either side fails a gate instead of drawing a wrong
 // chip. Then the label rules, the provenance order, the lenient-decode law
-// and the zero-resource law.
+// and the mark catalog against the reviewed manifest.
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data(("mediaspec-example check FAILED: " + message + "\n").utf8))
@@ -134,14 +134,53 @@ func runChecks() -> Never {
     let again = try? JSONDecoder().decode(MediaSpec.self, from: JSONEncoder().encode(spec))
     if again != spec { fail("encode/decode round trip drifted") }
 
-    // ---- zero brand bytes, by construction ----
-    let resources = URL(fileURLWithPath: #filePath)
+    // ---- the catalog IS the manifest: every artwork on disk is a Mark ----
+    let catalog = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("MediaSpec/Resources")
-    if FileManager.default.fileExists(atPath: resources.path) {
-        fail(
-            "MediaSpec must ship no resources (Dolby/DTS are licensed marks; words at 10 ft beat logos)"
-        )
+        .appendingPathComponent("MediaSpec/Resources/Marks.xcassets")
+    let onDisk = ((try? FileManager.default.contentsOfDirectory(atPath: catalog.path)) ?? [])
+        .filter { $0.hasSuffix(".imageset") }.map { String($0.dropLast(".imageset".count)) }
+        .sorted()
+    let generated = Mark.allCases.map(\.rawValue).sorted()
+    print("marks: \(generated.joined(separator: ","))")
+    if onDisk != generated {
+        fail("catalog \(onDisk) and Mark \(generated) disagree - run brandgen sync")
+    }
+    let wantMarks = [
+        "bluray", "blurayglyph", "dolby", "dolbyatmos", "dolbydigital", "dolbydigitalplus",
+        "dolbytruehd", "dolbyvision", "dts", "dtshdma", "dtswordmark", "dvd", "flac", "flages",
+        "hdr10", "hdr10plus", "imax", "opus", "ultrahd", "ultrahdbluray",
+    ]
+    if generated != wantMarks { fail("the mark catalog drifted from the reviewed manifest") }
+    // Every value that claims artwork names a mark that exists (the enum
+    // makes this a compile-time fact; the aspect rule is the runtime one).
+    for m in Mark.allCases where m.aspect <= 0 { fail("\(m.rawValue) has no aspect") }
+    if Mark.flages.original == false { fail("the flag keeps its own colours") }
+    if Mark.dolby.original { fail("a logo is template-rendered") }
+    if Mark.dolby.aspect != 1 || Mark.dts.aspect != 1 { fail("simple-icons symbols are square") }
+    if Mark.dolby.aspect > SpecChip.discAspect || Mark.flages.aspect > SpecChip.discAspect {
+        fail("the double-D and the flag sit in the disc")
+    }
+    if Mark.hdr10plus.aspect <= SpecChip.discAspect || Mark.imax.aspect <= SpecChip.discAspect {
+        fail("the HDR10+ badge and IMAX run inline")
+    }
+    // The value → mark binding, the manifest's own table.
+    if DynamicRange.dolbyVision.marks != Marks(symbol: .dolby, lockup: .dolbyvision)
+        || DynamicRange.hdr10Plus.marks != Marks(symbol: .hdr10plus, lockup: .hdr10plus)
+        || DynamicRange.sdr.marks != .none || DynamicRange.hlg.marks != .none
+        || Resolution.p2160.marks != Marks(lockup: .ultrahd) || Resolution.p1080.marks != .none
+        || ObjectAudio.atmos.marks != Marks(symbol: .dolby, lockup: .dolbyatmos)
+        || AudioCodec.trueHD.marks != Marks(symbol: .dolby, lockup: .dolbytruehd)
+        || AudioCodec.dtsHDMA.marks != Marks(symbol: .dts, lockup: .dtshdma)
+        || AudioCodec.aac.marks != .none
+        || Tier.remux.marks(at: .p2160) != Marks(symbol: .blurayglyph, lockup: .ultrahdbluray)
+        || Tier.bluray.marks(at: .p1080) != Marks(symbol: .blurayglyph, lockup: .bluray)
+        || Tier.webdl.marks(at: .p2160) != .none
+        || Lang("es-ES").marks != Marks(symbol: .flages, lockup: .flages)
+        || Lang("es-419").marks != .none
+        || Cut.imax.marks != Marks(symbol: .imax, lockup: .imax) || Cut.extended.marks != .none
+    {
+        fail("value → mark binding drifted from the manifest")
     }
 
     print("mediaspec-example check OK")
