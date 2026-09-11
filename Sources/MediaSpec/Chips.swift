@@ -235,7 +235,12 @@ public struct SpecChip: View {
         let vivid = emphasis == .vivid
         guard tone == .gold else { return AnyShapeStyle(vivid ? Color.white : Color.primary) }
         if vivid { return AnyShapeStyle(Gold.stops.first?.color ?? Gold.flat) }
-        return height >= SpecChip.rail ? AnyShapeStyle(Gold.gradient) : AnyShapeStyle(Gold.flat)
+        // The metal is a gradient wherever the DRAWN BOX is at the rail or
+        // above: the two-panel sticker stands 1.75 × the chip height, so it
+        // earns the gradient below the rail while a one-line badge there
+        // stays flat (a gradient at 8pt is noise).
+        let box: CGFloat = if case .badge = glyph { height * 1.75 } else { height }
+        return box >= SpecChip.rail ? AnyShapeStyle(Gold.gradient) : AnyShapeStyle(Gold.flat)
     }
 
     private var ground: Color { tone == .gold ? Gold.ground : SpecChip.ground }
@@ -243,11 +248,13 @@ public struct SpecChip: View {
     /// THE TONE RULE for marks. `ink` follows the axis. `brand` paints the
     /// mark its official hex, and never a near-black one (luminance under
     /// 0.15 - Dolby, HDR10, DVD): black on a dark ground is a missing logo.
-    /// `gold` is for the drawn badges only: a mark stays in ink beside a
-    /// gold sticker, as disc cases print them. Vivid lifts ink to white.
-    /// The flag renders as authored regardless.
+    /// `gold` paints the mark in the same metal as the stickers beside it -
+    /// one foil across the whole row, the way a premium case is stamped (a
+    /// white mark beside a gold sticker read as two different objects).
+    /// Vivid lifts ink to white. The flag renders as authored regardless.
     private func markStyle(_ m: Mark) -> AnyShapeStyle {
         if tone == .brand, m.luminance >= 0.15 { return AnyShapeStyle(m.color) }
+        if tone == .gold { return ink }
         return AnyShapeStyle(emphasis == .vivid ? Color.white : Color.primary)
     }
 }
