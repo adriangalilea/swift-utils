@@ -317,14 +317,17 @@ extension KeyedDecodingContainer {
     }
 }
 
-/// One audio track's format. `codec` is the one required fact: a track
-/// whose codec is foreign to this build is no track at all.
+/// One audio track's format. The codec is optional for a CLAIM that names
+/// only the object layer (a disc case, a release name saying "Atmos" and
+/// nothing about its carrier); a described track always names one. At least
+/// one of codec / object is set. A codec foreign to this build reads as
+/// unnamed, like every other lenient axis.
 public struct Audio: Codable, Hashable, Sendable {
-    public var codec: AudioCodec
+    @Lenient public var codec: AudioCodec?
     @Lenient public var channels: Channels?
     @Lenient public var object: ObjectAudio?
 
-    public init(codec: AudioCodec, channels: Channels? = nil, object: ObjectAudio? = nil) {
+    public init(codec: AudioCodec? = nil, channels: Channels? = nil, object: ObjectAudio? = nil) {
         self.codec = codec
         self.channels = channels
         self.object = object
@@ -378,8 +381,9 @@ public func pictureLabel(_ resolution: Resolution?, _ range: DynamicRange?, shor
 /// "TrueHD Atmos 7.1", "DD+ Atmos 5.1", "DTS-HD MA 5.1", "AAC 2.0"; short
 /// is the object format when present, else the codec.
 public func soundLabel(_ audio: Audio, short: Bool = false) -> String {
-    if short { return audio.object?.label ?? audio.codec.label }
-    var parts = [audio.codec.label]
+    if short { return audio.object?.label ?? audio.codec?.label ?? "" }
+    var parts: [String] = []
+    if let c = audio.codec { parts.append(c.label) }
     if let o = audio.object { parts.append(o.label) }
     if let c = audio.channels { parts.append(c.label) }
     return parts.joined(separator: " ")

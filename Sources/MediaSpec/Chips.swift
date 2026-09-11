@@ -334,10 +334,14 @@ public struct SoundChip: View {
             if case .art = g { objectDrawn = true }
             glyphs.append(g)
         }
-        glyphs.append(
-            objectDrawn
-                ? .word(audio.codec.label)
-                : options.glyph(audio.codec.marks) ?? .word(audio.codec.label))
+        // An unnamed carrier (a claim) draws nothing: the object mark is the
+        // whole claim.
+        if let codec = audio.codec {
+            glyphs.append(
+                objectDrawn
+                    ? .word(codec.label)
+                    : options.glyph(codec.marks) ?? .word(codec.label))
+        }
         if let c = audio.channels { glyphs.append(.word(c.label)) }
         return Axis(
             kind: .sound, glyphs: glyphs, accessibility: soundLabel(audio), options: options)
