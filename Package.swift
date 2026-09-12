@@ -21,6 +21,11 @@ let package = Package(
         // future products (AppSettings, credits) build on it without
         // dragging the keymap machine.
         .library(name: "Ink", targets: ["Ink"]),
+        // Code the user reads before approving it: real grammars
+        // (highlight.js via Highlightr), one component, colors only - the
+        // host brings font and chrome. Its own product so Ink stays
+        // dependency-free.
+        .library(name: "Syntax", targets: ["Syntax"]),
         .library(name: "Keymap", targets: ["Keymap"]),
         // The about/support tab every app drops into its Settings: bundle
         // identity + author + links + the support ask, designed once.
@@ -78,8 +83,18 @@ let package = Package(
         // variant in a window on black.
         .executable(name: "mediaspec-example", targets: ["mediaspec-example"]),
     ],
+    dependencies: [
+        // Syntax's engine: highlight.js run in JavaScriptCore, packaged.
+        // The one third-party dependency in the repo; only the Syntax
+        // product drags it, and only consumers that import Syntax link it.
+        .package(url: "https://github.com/raspu/Highlightr", from: "2.3.0")
+    ],
     targets: [
         .target(name: "Ink", resources: [.process("Resources")]),
+        .target(
+            name: "Syntax",
+            dependencies: [.product(name: "Highlightr", package: "Highlightr")]),
+        .testTarget(name: "SyntaxTests", dependencies: ["Syntax"]),
         .target(
             name: "Keymap",
             dependencies: ["Ink"],
