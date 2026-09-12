@@ -107,19 +107,30 @@ public enum Syntax {
 public struct SyntaxText: View {
     private let text: String
     private let format: Syntax.Format
+    private let font: Font
 
-    public init(_ text: String, format: Syntax.Format) {
+    /// `font` is a parameter, not an ambient: a font set ON the inner Text
+    /// would silently beat any modifier the host applies outside, so the
+    /// override point is explicit. Monospace is the default because code is.
+    public init(
+        _ text: String, format: Syntax.Format,
+        font: Font = .system(.callout, design: .monospaced)
+    ) {
         self.text = text
         self.format = format
+        self.font = font
     }
 
-    public init(_ text: String, format raw: String?) {
-        self.init(text, format: Syntax.Format(raw))
+    public init(
+        _ text: String, format raw: String?,
+        font: Font = .system(.callout, design: .monospaced)
+    ) {
+        self.init(text, format: Syntax.Format(raw), font: font)
     }
 
     public var body: some View {
         Text(Syntax.highlight(text, as: format))
-            .font(.system(.callout, design: .monospaced))
+            .font(font)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
