@@ -28,7 +28,13 @@ public enum Syntax {
     /// your surfaces. Every current surface is dark glass.
     public static var theme: String {
         get { store.lock.withLock { store.theme } }
-        set { store.lock.withLock { store.theme = newValue; store.cache = [:]; store.order = [] } }
+        set {
+            store.lock.withLock {
+                store.theme = newValue
+                store.cache = [:]
+                store.order = []
+            }
+        }
     }
 
     /// Above this the grammar pass is skipped outright: JSC on hundreds of
@@ -46,7 +52,8 @@ public enum Syntax {
             // A multi-line "shell" body is usually a script riding a heredoc
             // or a -c string; detection reads the content, the bash grammar
             // would paint it all as one string. A single line IS shell.
-            let colored = code(text, language: text.contains("\n") ? nil : "bash")
+            let colored =
+                code(text, language: text.contains("\n") ? nil : "bash")
                 ?? AttributedString(text)
             remember(key, colored)
             return colored
