@@ -1,8 +1,12 @@
-#if os(macOS)
-    import AppKit
+#if os(macOS) || os(iOS)
+    #if os(macOS)
+        import AppKit
+    #else
+        import UIKit
+    #endif
     import SwiftUI
 
-    /// A shell command the user must run elsewhere: a monospaced chip whose
+    /// Copyable text, such as a shell command or pairing code: a monospaced chip whose
     /// trailing segment IS the button (hairline divider, its own hover
     /// raise), while the whole chip stays the click target. Copying
     /// confirms in place - Copy flips to a green ✓ Copied and reverts on
@@ -16,16 +20,24 @@
     /// breathe on the swap.
     public struct CopyableCommand: View {
         let command: String
+        let font: Font
         @State private var copied = false
         @State private var hovering = false
         @State private var revert: Task<Void, Never>?
 
-        public init(_ command: String) { self.command = command }
+        public init(_ command: String, font: Font = .caption.monospaced()) {
+            self.command = command
+            self.font = font
+        }
 
         public var body: some View {
             Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(command, forType: .string)
+                #if os(macOS)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(command, forType: .string)
+                #else
+                    UIPasteboard.general.string = command
+                #endif
                 withAnimation(.easeOut(duration: 0.12)) { copied = true }
                 revert?.cancel()
                 revert = Task {
@@ -36,7 +48,7 @@
             } label: {
                 HStack(spacing: 0) {
                     Text(command)
-                        .font(.caption.monospaced())
+                        .font(font)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .padding(.horizontal, 9)
@@ -70,6 +82,13 @@
                 .contentShape(RoundedRectangle(cornerRadius: 6))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(command)
+            .accessibilityHint(String(localized: "Copy to clipboard", bundle: .module))
+            .onDisappear { revert?.cancel() }
+            .onChange(of: command) { _, _ in
+                revert?.cancel()
+                copied = false
+            }
             .onHover { hovering = $0 }
             .animation(.easeOut(duration: 0.12), value: hovering)
             .help(String(localized: "Copy to clipboard", bundle: .module))
