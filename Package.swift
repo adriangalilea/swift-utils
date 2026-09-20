@@ -124,5 +124,6 @@ let package = Package(
         .executableTarget(name: "mediaspec-example", dependencies: ["MediaSpec"]),
         .executableTarget(name: "brandgen"),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
+        .testTarget(name: "GrantTests", dependencies: ["Grant"]),
     ]
 )

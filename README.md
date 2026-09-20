@@ -205,11 +205,14 @@ if grant.blocking { banner }     // THE one banner/preflight predicate
 can lie (a settings plist that records intent while the daemon serves
 nothing): intent is a claim, a real outcome is the only witness, the
 verdict reconciles them, and every prediction/reality disagreement is a
-journaled CONTRADICTION. An unproven claim (switch readable and on)
-renders `good` - proof is journal detail, never UI divergence. A switch
-the system hides from the app (`evaluate(on: nil)`) is `unknown`, not
-off and not good: only the capability seen live right now vouches for it,
-a past success is a witness of the past. `TCC` wraps the accessibility + per-app automation probes and
+journaled CONTRADICTION. `evaluate(intent:live:)` takes the switch as the
+consumer read it - `.on`, `.off(reason)` (the consumer names why: turned
+off, not registered), `.unreadable` - and the machine adds only what IT
+learned, a failure under a switch that claims on (`whenFailing`). An
+unproven claim (switch on) renders `good` - proof is journal detail,
+never UI divergence. An unreadable switch is `unknown`, not off and not
+good: only the capability seen live right now vouches for it, a past
+success is a witness of the past. `TCC` wraps the accessibility + per-app automation probes and
 requests, including the per-process AE answer cache and the
 denied-means-deep-link rule.
 

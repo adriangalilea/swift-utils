@@ -11,15 +11,19 @@ import os
 /// machine exists for.
 ///
 /// Epistemics, deliberately explicit:
-/// - INTENT (the `on` input to evaluate) is the user's switch: a claim.
-///   It can be UNREADABLE (nil) - the system hides the switch from the
-///   app - and unreadable is not off.
+/// - INTENT is the user's switch as the CONSUMER read it: on, off with the
+///   reason the consumer knows (turned off; not even registered), or
+///   unreadable - the system hides the switch - which is not off.
 /// - PROOF is a real outcome: the only witness that cannot lie. A past
 ///   success is a witness of the PAST; only a capability seen live RIGHT
 ///   NOW speaks for the present when the switch can't be read.
 /// - The verdict reconciles claim with evidence. It may be WRONG - and
 ///   when reality says so, the machine records the contradiction and
 ///   corrects itself. Never silently.
+///
+/// Knowledge sits where it lives: the consumer names why a switch is off
+/// (it read the registry), the machine names only what IT learned - a
+/// failure under a switch that claims on (`whenFailing`).
 ///
 /// An unproven claim is NOT a problem: the owning Grant renders both
 /// `.capable` and `.unproven` as `.good` (the switch is readable and on)
@@ -30,6 +34,23 @@ import os
 /// only manufacture isolation errors, not safety).
 @Observable
 public final class Claim<Reason: Equatable> {
+    public enum Intent: Equatable, CustomStringConvertible {
+        /// The switch reads on.
+        case on
+        /// The switch reads off, and the consumer knows why.
+        case off(Reason)
+        /// The system hides the switch from the app.
+        case unreadable
+
+        public var description: String {
+            switch self {
+            case .on: "on"
+            case .off(let why): "off(\(why))"
+            case .unreadable: "unreadable"
+            }
+        }
+    }
+
     public enum Verdict: Equatable, CustomStringConvertible {
         /// The switch is on and a real success proved it - or the
         /// capability is live right now. Capable until reality says otherwise.
@@ -77,17 +98,15 @@ public final class Claim<Reason: Equatable> {
     /// first, capped. Render it verbatim in a debug surface.
     public private(set) var journal: [(at: Date, line: String)] = []
 
-    private let whenOff: Reason
     private let whenFailing: Reason
     private let log: Logger
     private var proven = false
     private var lastFailure: String?
 
-    /// `whenOff` is the verdict's reason while the user-facing switch is
-    /// off; `whenFailing` while the switch is on but the last attempt
-    /// failed (the system is not serving what the switch claims).
-    public init(whenOff: Reason, whenFailing: Reason, log: Logger) {
-        self.whenOff = whenOff
+    /// `whenFailing` is the verdict's reason while the switch claims on
+    /// (or can't be read) but the last attempt failed: the system is not
+    /// serving what the switch claims.
+    public init(whenFailing: Reason, log: Logger) {
         self.whenFailing = whenFailing
         self.log = log
     }
@@ -95,21 +114,20 @@ public final class Claim<Reason: Equatable> {
     /// Re-derive the verdict from intent plus everything reality has
     /// said. Call from the app's reconcile path (app-active + relevant
     /// system events - the liveness pattern) with the switch's current
-    /// read (nil = the system hides it) and whether the capability is
-    /// live right now.
-    public func evaluate(on: Bool?, live: Bool) {
+    /// read and whether the capability is live right now.
+    public func evaluate(intent: Intent, live: Bool) {
         if live, !proven { observe(.witnessed) }
         let next: Verdict =
-            switch on {
-            case false: .impossible(whenOff)
-            case true:
+            switch intent {
+            case .off(let why): .impossible(why)
+            case .on:
                 proven ? .capable : lastFailure != nil ? .impossible(whenFailing) : .unproven
-            case nil:
+            case .unreadable:
                 // A past success does not speak for a switch nobody can
                 // read; only the capability live NOW does.
                 live ? .capable : lastFailure != nil ? .impossible(whenFailing) : .unknown
             }
-        transition(to: next, cause: "evaluate(on: \(on.map(String.init) ?? "unreadable"))")
+        transition(to: next, cause: "evaluate(\(intent))")
     }
 
     /// Reality reports. A contradiction is reality disagreeing with the
