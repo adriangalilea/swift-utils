@@ -11,26 +11,35 @@ import os
 /// machine exists for.
 ///
 /// Epistemics, deliberately explicit:
-/// - INTENT (the `off` input to evaluate) is the user's switch: a claim.
-/// - PROOF is a real outcome: the only witness that cannot lie.
+/// - INTENT (the `on` input to evaluate) is the user's switch: a claim.
+///   It can be UNREADABLE (nil) - the system hides the switch from the
+///   app - and unreadable is not off.
+/// - PROOF is a real outcome: the only witness that cannot lie. A past
+///   success is a witness of the PAST; only a capability seen live RIGHT
+///   NOW speaks for the present when the switch can't be read.
 /// - The verdict reconciles claim with evidence. It may be WRONG - and
 ///   when reality says so, the machine records the contradiction and
 ///   corrects itself. Never silently.
 ///
 /// An unproven claim is NOT a problem: the owning Grant renders both
-/// `.capable` and `.unproven` as `.good` (trust the switch until reality
-/// contradicts it) - proof is journal detail, never UI divergence.
+/// `.capable` and `.unproven` as `.good` (the switch is readable and on)
+/// - proof is journal detail, never UI divergence. `.unknown` renders as
+/// exactly that, never as good.
 /// Isolation is the consumer's convention (main-thread by convention
 /// matches an unannotated app model; annotating @MainActor here would
 /// only manufacture isolation errors, not safety).
 @Observable
 public final class Claim<Reason: Equatable> {
     public enum Verdict: Equatable, CustomStringConvertible {
-        /// A real success proved it. Capable until reality says otherwise.
+        /// The switch is on and a real success proved it - or the
+        /// capability is live right now. Capable until reality says otherwise.
         case capable
         /// Intent says on; nothing has confirmed yet. Attempts proceed -
         /// the first success IS the confirmation.
         case unproven
+        /// The switch can't be read and nothing is live to vouch for it.
+        /// Attempts proceed; nothing is claimed either way.
+        case unknown
         /// We believe an attempt cannot succeed now, and why. A belief:
         /// the user may try anyway, and a success is a recorded
         /// contradiction that flips the verdict.
@@ -40,6 +49,7 @@ public final class Claim<Reason: Equatable> {
             switch self {
             case .capable: "capable"
             case .unproven: "unproven"
+            case .unknown: "unknown"
             case .impossible(let why): "impossible(\(why))"
             }
         }
@@ -85,14 +95,21 @@ public final class Claim<Reason: Equatable> {
     /// Re-derive the verdict from intent plus everything reality has
     /// said. Call from the app's reconcile path (app-active + relevant
     /// system events - the liveness pattern) with the switch's current
-    /// read and whether the capability is live right now.
-    public func evaluate(on: Bool, live: Bool) {
+    /// read (nil = the system hides it) and whether the capability is
+    /// live right now.
+    public func evaluate(on: Bool?, live: Bool) {
         if live, !proven { observe(.witnessed) }
         let next: Verdict =
-            if !on { .impossible(whenOff) } else if proven {
-                .capable
-            } else if lastFailure != nil { .impossible(whenFailing) } else { .unproven }
-        transition(to: next, cause: "evaluate(on: \(on))")
+            switch on {
+            case false: .impossible(whenOff)
+            case true:
+                proven ? .capable : lastFailure != nil ? .impossible(whenFailing) : .unproven
+            case nil:
+                // A past success does not speak for a switch nobody can
+                // read; only the capability live NOW does.
+                live ? .capable : lastFailure != nil ? .impossible(whenFailing) : .unknown
+            }
+        transition(to: next, cause: "evaluate(on: \(on.map(String.init) ?? "unreadable"))")
     }
 
     /// Reality reports. A contradiction is reality disagreeing with the

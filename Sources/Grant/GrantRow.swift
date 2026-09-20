@@ -59,11 +59,19 @@
                     }
                 }
                 Spacer(minLength: 12)
-                if standing.grade == .good {
+                switch standing.grade {
+                case .good:
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .padding(.top, 2)
-                } else {
+                case .unknown:
+                    // The honest mark: the app can't see this grant, so it
+                    // neither vouches (a checkmark) nor warns (a button).
+                    Text("unknown")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 3)
+                case .askable, .broken:
                     Button(standing.actionTitle) { grant.act() }
                         .controlSize(.small)
                 }

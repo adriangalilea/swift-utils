@@ -11,7 +11,8 @@ import Foundation
 /// is unwritable. An enum so the invalid states (a good with an action,
 /// a broken without its fix) are unrepresentable.
 public enum Standing: Equatable, Sendable {
-    /// Nothing to do. Checkmark; no surface warns, no banner, no note.
+    /// Granted, and the app can SEE that it is. Checkmark; no surface
+    /// warns, no banner, no note.
     case good
     /// Not yet granted, one click asks. An OFFER, never a failure:
     /// onboarding and settings present it, nothing warns about it.
@@ -19,23 +20,36 @@ public enum Standing: Equatable, Sendable {
     /// The user must fix something outside the app. EVERY surface warns -
     /// row, banner, preflight - with this same note + action.
     case broken(_ actionTitle: String, note: String)
+    /// The app CANNOT READ whether this is granted (the system hides the
+    /// readout from apps), and nothing has contradicted it. Rendered as
+    /// exactly that: a quiet "unknown" mark, no checkmark, no button, the
+    /// note saying why. Never warns, never blocks, never asks - a
+    /// checkmark here would be a lie, a warning would be one too.
+    case unknown(note: String)
 
     /// The payload-free shape, for the comparisons surfaces live on
-    /// (`grade != .good`, `grade == .broken`).
-    public enum Grade: Equatable, Sendable { case good, askable, broken }
+    /// (`grade == .broken`, `grade.needsUser`).
+    public enum Grade: Equatable, Sendable {
+        case good, askable, broken, unknown
+
+        /// Something for the user to DO: ask, or fix. `good` has nothing and
+        /// `unknown` has nothing either - the app can't even tell them what.
+        public var needsUser: Bool { self == .askable || self == .broken }
+    }
 
     public var grade: Grade {
         switch self {
         case .good: .good
         case .askable: .askable
         case .broken: .broken
+        case .unknown: .unknown
         }
     }
 
-    /// Never rendered for `.good` (the checkmark replaces the button).
+    /// Rendered only for the grades with a button (`askable`, `broken`).
     public var actionTitle: String {
         switch self {
-        case .good: ""
+        case .good, .unknown: ""
         case .askable(let title, _), .broken(let title, note: _): title
         }
     }
@@ -45,6 +59,7 @@ public enum Standing: Equatable, Sendable {
         case .good: nil
         case .askable(_, let note): note
         case .broken(_, let note): note
+        case .unknown(let note): note
         }
     }
 }

@@ -173,9 +173,12 @@ Permission standing, split-brain-proof. Every grant an app needs (a TCC
 grant, a system-extension enable, a capability claim) resolves to ONE
 `Standing` - `good` (checkmark, nothing warns) / `askable` (one click asks,
 an offer not a failure) / `broken` (every surface warns with the SAME note
-and action). The presentation rides the state: surfaces render a Standing
-mechanically and never re-derive "is this a problem?", so a settings row
-and a main-window banner can never disagree.
+and action) / `unknown` (the system hides the readout from the app: a quiet
+mono "unknown", no checkmark, no button, never warns, never blocks - a
+checkmark would be a lie). The presentation rides the state: surfaces
+render a Standing mechanically and never re-derive "is this a problem?",
+so a settings row and a main-window banner can never disagree.
+`Grade.needsUser` is the one predicate for "something to ask or fix".
 
 ```swift
 struct AXGrant: Grant {
@@ -202,9 +205,11 @@ if grant.blocking { banner }     // THE one banner/preflight predicate
 can lie (a settings plist that records intent while the daemon serves
 nothing): intent is a claim, a real outcome is the only witness, the
 verdict reconciles them, and every prediction/reality disagreement is a
-journaled CONTRADICTION. An unproven claim renders `good` - trust the
-switch until reality contradicts it; proof is journal detail, never UI
-divergence. `TCC` wraps the accessibility + per-app automation probes and
+journaled CONTRADICTION. An unproven claim (switch readable and on)
+renders `good` - proof is journal detail, never UI divergence. A switch
+the system hides from the app (`evaluate(on: nil)`) is `unknown`, not
+off and not good: only the capability seen live right now vouches for it,
+a past success is a witness of the past. `TCC` wraps the accessibility + per-app automation probes and
 requests, including the per-process AE answer cache and the
 denied-means-deep-link rule.
 
