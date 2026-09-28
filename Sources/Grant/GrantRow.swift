@@ -1,4 +1,5 @@
 #if os(macOS)
+    import Combine
     import SwiftUI
 
     /// The one row every grant surface wears: icon, title + why, a live
