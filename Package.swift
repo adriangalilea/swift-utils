@@ -42,7 +42,8 @@ let package = Package(
         // ONE Standing (good / askable / broken) that carries its own
         // presentation, so no two surfaces can disagree on "is this a
         // problem?". Ships the Claim proof machine (for capabilities
-        // whose system readout lies), the TCC probes, and the live row.
+        // whose system readout lies), the TCC and notification probes,
+        // and the live row.
         .library(name: "Grant", targets: ["Grant"]),
         // The library-grid product: framework-free layout + selection
         // kernels (justified rows, the 2D cursor walk, the 3-mode

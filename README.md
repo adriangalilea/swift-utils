@@ -216,6 +216,20 @@ success is a witness of the past. `TCC` wraps the accessibility + per-app automa
 requests, including the per-process AE answer cache and the
 denied-means-deep-link rule.
 
+`Notifications` is the same shape for the permission TCC doesn't own.
+`Notifications.reach()` answers `NotificationReach` - `notAsked` /
+`denied` / `silenced` (allowed, but alerts off, style None, or quiet
+delivery: nothing appears, which for a message that matters is denied) /
+`allowed` - and `Notifications.standing(_:)` is the one mapping to a
+Standing, so every app reads a silenced app the same way. `request()` asks
+once, then deep-links to the app's own row in System Settings ›
+Notifications. `NotificationGrant(why:)` is the ready grant for an app that
+posts from its own process. A launchd agent or bare binary cannot use
+UNUserNotificationCenter at all: it posts through a nested helper app, the
+helper records the reach, and the agent renders
+`Notifications.standing(recorded)` and opens settings with the HELPER's
+bundle id (the row belongs to whoever posts).
+
 ## Colophon
 
 The about/support Settings tab, designed once: app identity (name, version, build, icon) derived from the running bundle so it can never drift, the author byline, external links, the support ask, and an optional check-for-updates hook (Sparkle stays app-side, pass a closure).
