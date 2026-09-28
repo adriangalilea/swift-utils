@@ -81,7 +81,7 @@ extension Resolution {
 /// rate) can still render it in the family's grammar.
 public struct SpecChip: View {
     /// The height at and above which a chip wears lockups; below it, symbols.
-    public static let rail: CGFloat = 32
+    nonisolated public static let rail: CGFloat = 32
     /// The drawn badges' ground panel under `ink` and `brand` (gold has its
     /// own, `Gold.ground`).
     nonisolated(unsafe) public static var ground = Color(white: 0.07)
