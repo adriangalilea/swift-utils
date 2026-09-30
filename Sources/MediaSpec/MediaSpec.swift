@@ -332,6 +332,25 @@ public struct Audio: Codable, Hashable, Sendable {
         self.channels = channels
         self.object = object
     }
+
+    enum CodingKeys: String, CodingKey { case codec, channels, object }
+
+    /// A track left with neither a codec nor an object (a codec foreign to
+    /// this build, no object layer) names nothing: it refuses to decode, so
+    /// the spec's lenient `audio` field blanks instead of carrying an empty
+    /// track. A foreign codec beside Atmos keeps the Atmos.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        _codec = try c.decode(Lenient<AudioCodec>.self, forKey: .codec)
+        _channels = try c.decode(Lenient<Channels>.self, forKey: .channels)
+        _object = try c.decode(Lenient<ObjectAudio>.self, forKey: .object)
+        if codec == nil && object == nil {
+            throw DecodingError.dataCorrupted(
+                .init(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "a track names a codec or an object"))
+        }
+    }
 }
 
 /// A media spec: every axis optional, because a wire carries whatever

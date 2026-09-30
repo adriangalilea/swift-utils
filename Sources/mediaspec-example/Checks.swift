@@ -140,6 +140,11 @@ func runChecks() -> Never {
     if foreignCodec == nil || foreignCodec!.audio != nil {
         fail("a foreign codec must blank the audio")
     }
+    let foreignBesideAtmos = try? JSONDecoder().decode(
+        MediaSpec.self, from: Data(#"{"audio":{"codec":"mqa","object":"atmos"}}"#.utf8))
+    if foreignBesideAtmos?.audio != Audio(object: .atmos) {
+        fail("a foreign codec beside Atmos keeps the Atmos")
+    }
     // Round trip keeps the words.
     let again = try? JSONDecoder().decode(MediaSpec.self, from: JSONEncoder().encode(spec))
     if again != spec { fail("encode/decode round trip drifted") }
