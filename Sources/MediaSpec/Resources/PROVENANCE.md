@@ -98,7 +98,7 @@ The file above is the canonical sourcing record shared with the web `@ag/media-s
 | dtshdma | DTS-HD Master Audio lockup | Commons `File:DTS-HD-MA.svg` | PD | lockup |
 | hdr10 | HDR10 badge | Commons `File:HDR 10 logo (black).svg` | PD | reference only, not wired: HDR10 is a drawn badge |
 | hdr10plus | HDR10+ badge | Commons `File:HDR 10 plus logo (black).svg` | PD | reference only, not wired: HDR10+ is a drawn badge |
-| ultrahd | ULTRA HD wordmark | Commons `File:Ultra HD.svg` | PD | in the catalog, unbound since grammar v3 (the 4K badge took its place) |
+| ultrahd | ULTRA HD wordmark, "HD" redrawn at a light weight (the Commons file's 0.041 hairlines vanish at chip size; byte-identical to ui's references/media-marks/Ultra_HD.svg) | Commons `File:Ultra HD.svg` | PD | in the catalog, unbound since grammar v3 (the 4K badge took its place) |
 | flac | FLAC lockup | Commons `File:FLAC logo vector.svg` (Xiph) | PD | lockup |
 | opus | Opus lockup | Commons `File:Opus logo2.svg` (Xiph) | PD | lockup |
 | bluray | Blu-ray Disc lockup | Commons `File:Blu-ray Disc.svg` | PD | lockup |
