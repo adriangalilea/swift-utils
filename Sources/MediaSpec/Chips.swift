@@ -364,15 +364,17 @@ struct Axis: View {
 public struct PictureChip: View {
     let resolution: Resolution?
     let range: DynamicRange?
+    let stereo: Stereo?
     let options: ChipOptions
 
     public init(
-        resolution: Resolution?, range: DynamicRange?, emphasis: Emphasis = .plain,
-        height: CGFloat = 34, trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink,
-        form: MarkForm? = nil
+        resolution: Resolution?, range: DynamicRange?, stereo: Stereo? = nil,
+        emphasis: Emphasis = .plain, height: CGFloat = 34, trailing: AnyView? = nil,
+        detail: String? = nil, tone: Tone = .ink, form: MarkForm? = nil
     ) {
         self.resolution = resolution
         self.range = range
+        self.stereo = stereo
         self.options = ChipOptions(
             emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone,
             form: form)
@@ -382,9 +384,11 @@ public struct PictureChip: View {
         var glyphs: [Glyph] = []
         if let r = resolution { glyphs.append(options.glyph(r.marks) ?? r.glyph) }
         if let g = range, g != .sdr { glyphs.append(options.glyph(g.marks) ?? .word(g.label)) }
+        // 3D is one drawn badge whatever the layout; the layout is the axis's words.
+        if stereo != nil { glyphs.append(.word("3D")) }
         return Axis(
-            kind: .picture, glyphs: glyphs, accessibility: pictureLabel(resolution, range),
-            options: options)
+            kind: .picture, glyphs: glyphs,
+            accessibility: pictureLabel(resolution, range, stereo: stereo), options: options)
     }
 }
 
@@ -550,8 +554,9 @@ public struct MediaSpecStrip: View {
         HStack(spacing: spacing) {
             if !omit.contains(.picture), spec.resolution != nil || spec.range != nil {
                 PictureChip(
-                    resolution: spec.resolution, range: spec.range, emphasis: emphasis,
-                    height: height, trailing: adornments[.picture], tone: tone, form: form)
+                    resolution: spec.resolution, range: spec.range, stereo: spec.stereo,
+                    emphasis: emphasis, height: height, trailing: adornments[.picture], tone: tone,
+                    form: form)
             }
             if !omit.contains(.sound), let audio = spec.audio {
                 SoundChip(

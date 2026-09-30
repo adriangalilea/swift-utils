@@ -56,6 +56,31 @@ public enum DynamicRange: String, Codable, CaseIterable, Sendable, Hashable {
     }
 }
 
+/// How one picture carries two eyes: side by side or top over bottom, each
+/// eye at full or half resolution, or the Blu-ray 3D disc's MVC second view.
+/// `.unnamed` ("3d") is stereoscopic with the layout unsaid. A flat picture
+/// has no stereo value at all. The literals are @ag/media-spec's STEREOS.
+public enum Stereo: String, Codable, CaseIterable, Sendable, Hashable {
+    case sbs
+    case halfSBS = "half-sbs"
+    case tab
+    case halfTAB = "half-tab"
+    case mvc
+    case unnamed = "3d"
+
+    /// "3D half side-by-side"; "3D" when the layout is unnamed.
+    public var label: String {
+        switch self {
+        case .sbs: "3D side-by-side"
+        case .halfSBS: "3D half side-by-side"
+        case .tab: "3D top-and-bottom"
+        case .halfTAB: "3D half top-and-bottom"
+        case .mvc: "3D frame-packed"
+        case .unnamed: "3D"
+        }
+    }
+}
+
 public enum AudioCodec: String, Codable, CaseIterable, Sendable, Hashable {
     case aac
     case ac3
@@ -358,17 +383,19 @@ public struct Audio: Codable, Hashable, Sendable {
 public struct MediaSpec: Codable, Hashable, Sendable {
     @Lenient public var resolution: Resolution?
     @Lenient public var range: DynamicRange?
+    @Lenient public var stereo: Stereo?
     @Lenient public var audio: Audio?
     @Lenient public var tier: Tier?
     @Lenient public var lang: Lang?
     @Lenient public var cut: Cut?
 
     public init(
-        resolution: Resolution? = nil, range: DynamicRange? = nil, audio: Audio? = nil,
-        tier: Tier? = nil, lang: Lang? = nil, cut: Cut? = nil
+        resolution: Resolution? = nil, range: DynamicRange? = nil, stereo: Stereo? = nil,
+        audio: Audio? = nil, tier: Tier? = nil, lang: Lang? = nil, cut: Cut? = nil
     ) {
         self.resolution = resolution
         self.range = range
+        self.stereo = stereo
         self.audio = audio
         self.tier = tier
         self.lang = lang
@@ -378,23 +405,17 @@ public struct MediaSpec: Codable, Hashable, Sendable {
 
 // MARK: - Labels (pure, the one spelling every chip and every test reads)
 
-/// "4K · Dolby Vision" / "4K·DV"; SDR is the unmarked case and is omitted
-/// ("1080p", "4K"). A range with no resolution renders the range alone.
-public func pictureLabel(_ resolution: Resolution?, _ range: DynamicRange?, short: Bool = false)
-    -> String
-{
-    let res = resolution?.label
-    let rng: String? =
-        switch range {
-        case nil, .sdr?: nil
-        case let r?: short ? r.short : r.label
-        }
-    switch (res, rng) {
-    case (let r?, let g?): return short ? "\(r)·\(g)" : "\(r) · \(g)"
-    case (let r?, nil): return r
-    case (nil, let g?): return g
-    case (nil, nil): return ""
-    }
+/// "4K · Dolby Vision · 3D half side-by-side" / "4K·DV·3D"; SDR and a flat
+/// picture are the unmarked cases and are omitted ("1080p", "4K"). A range
+/// with no resolution renders the range alone.
+public func pictureLabel(
+    _ resolution: Resolution?, _ range: DynamicRange?, stereo: Stereo? = nil, short: Bool = false
+) -> String {
+    var parts: [String] = []
+    if let r = resolution { parts.append(r.label) }
+    if let g = range, g != .sdr { parts.append(short ? g.short : g.label) }
+    if let s = stereo { parts.append(short ? "3D" : s.label) }
+    return parts.joined(separator: short ? "·" : " · ")
 }
 
 /// "TrueHD Atmos 7.1", "DD+ Atmos 5.1", "DTS-HD MA 5.1", "AAC 2.0"; short

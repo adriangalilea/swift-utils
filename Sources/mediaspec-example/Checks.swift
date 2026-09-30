@@ -27,6 +27,7 @@ func runChecks() -> Never {
     // ---- the shared literals, one line per enum, declaration order ----
     vocabulary("resolution", Resolution.self, want: "sd,720p,1080p,2160p,4320p")
     vocabulary("range", DynamicRange.self, want: "sdr,hlg,hdr10,hdr10-plus,dolby-vision")
+    vocabulary("stereo", Stereo.self, want: "sbs,half-sbs,tab,half-tab,mvc,3d")
     vocabulary(
         "audio-codec", AudioCodec.self,
         want: "aac,ac3,eac3,dts,dts-hd-hra,dts-hd-ma,truehd,flac,pcm,alac,opus,mp3,mp2,vorbis")
@@ -67,6 +68,19 @@ func runChecks() -> Never {
         }
         if pictureLabel(r, g, short: true) != short {
             fail("pictureLabel short = `\(pictureLabel(r, g, short: true))`, want `\(short)`")
+        }
+    }
+    let stereo: [(Resolution?, DynamicRange?, Stereo, String, String)] = [
+        (.p1080, nil, .halfSBS, "1080p · 3D half side-by-side", "1080p·3D"),
+        (.p2160, .hdr10, .mvc, "4K · HDR10 · 3D frame-packed", "4K·HDR10·3D"),
+        (.p1080, .sdr, .unnamed, "1080p · 3D", "1080p·3D"),
+    ]
+    for (r, g, s, long, short) in stereo {
+        if pictureLabel(r, g, stereo: s) != long {
+            fail("pictureLabel stereo = `\(pictureLabel(r, g, stereo: s))`, want `\(long)`")
+        }
+        if pictureLabel(r, g, stereo: s, short: true) != short {
+            fail("pictureLabel stereo short = `\(pictureLabel(r, g, stereo: s, short: true))`, want `\(short)`")
         }
     }
     let sound: [(Audio, String, String)] = [
