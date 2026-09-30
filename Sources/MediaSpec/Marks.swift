@@ -89,6 +89,40 @@ extension Mark {
     }
 }
 
+extension Mark {
+    /// A wordmark's primary capitals over its artwork height, measured once
+    /// on a render: the lockup stands `wordCap / cap` tall, so DOLBY's
+    /// capitals are the drawn words' capitals beside it. The artwork is
+    /// byte-identical to the web item's, so these are the same facts as
+    /// `cap` in ui's references/media-marks/manifest.json (how each was
+    /// measured is written there); change one, change both. dts and flac
+    /// by their ascenders, dts-HD by its dts, opus by x-height / 0.7, the
+    /// discs by their leading shape. nil = no word: it stands at the chip
+    /// height.
+    public var cap: CGFloat? {
+        switch self {
+        case .dolbyvision: 0.517
+        case .dolbyatmos: 0.515
+        case .dolbytruehd: 0.522
+        case .dolbydigitalplus: 0.473
+        case .dolbydigital: 0.395
+        case .dtswordmark: 0.993
+        case .dtshdma: 0.455
+        case .hdr10: 0.537
+        case .hdr10plus: 0.47
+        case .ultrahd: 0.93
+        case .flac: 0.758
+        case .opus: 0.596
+        case .bluray: 0.572
+        case .ultrahdbluray: 0.575
+        case .dvd: 0.56
+        case .imax: 0.997
+        case .badge4k, .badge8k, .badgehd, .badgesd, .blurayglyph, .dolby, .dts, .flages:
+            nil
+        }
+    }
+}
+
 extension ObjectAudio {
     /// DTS:X has no free vector anywhere (the only one is CC BY-NC-SA):
     /// it is drawn.

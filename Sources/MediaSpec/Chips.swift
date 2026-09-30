@@ -1,6 +1,12 @@
 import Ink
 import SwiftUI
 
+#if canImport(UIKit)
+    import UIKit
+#else
+    import AppKit
+#endif
+
 // ARTWORK FIRST. The whole point of the family is proper iconography, so a
 // chip is ONE MARK standing FRAMELESS - the artwork IS the chip. A brand
 // lockup keeps its shape, a brand symbol stands alone at the small rung.
@@ -55,11 +61,22 @@ public enum MarkForm: Sendable {
 }
 
 /// One mark's content: artwork from the catalog, a word that has none, or
-/// the two-line disc-case badge.
+/// the two-line disc-case badge. `art` stands at the chip height (a symbol,
+/// a flag, a badge); `lockup` is a wordmark, sized so its word's capitals
+/// are the drawn words' capitals (`Mark.cap`).
 public enum Glyph: Hashable, Sendable {
     case art(Mark)
+    case lockup(Mark)
     case word(String)
     case badge(primary: String, secondary: String)
+
+    /// Drawn from the catalog rather than set as text.
+    public var isArtwork: Bool {
+        switch self {
+        case .art, .lockup: true
+        case .word, .badge: false
+        }
+    }
 }
 
 extension Resolution {
@@ -134,6 +151,21 @@ public struct SpecChip: View {
 
     private var glowInk: Color { tone == .gold ? Gold.flat : .white }
 
+    /// The drawn words' size at a chip height.
+    private static func wordSize(_ height: CGFloat) -> CGFloat { height * 0.62 }
+    private static func wordFont(_ height: CGFloat) -> Font {
+        .system(size: wordSize(height), weight: .semibold)
+    }
+    /// The drawn words' cap height at a chip height, read from the system
+    /// font itself: the fact a lockup's capitals are matched to.
+    static func wordCap(_ height: CGFloat) -> CGFloat {
+        #if canImport(UIKit)
+            UIFont.systemFont(ofSize: wordSize(height), weight: .semibold).capHeight
+        #else
+            NSFont.systemFont(ofSize: wordSize(height), weight: .semibold).capHeight
+        #endif
+    }
+
     @ViewBuilder
     private var content: some View {
         switch glyph {
@@ -148,10 +180,19 @@ public struct SpecChip: View {
                 .foregroundStyle(markStyle(m))
                 .accessibilityLabel(m.title)
                 .frame(height: height)
+        case .lockup(let m):
+            // No outer frame: a two-line lockup stands taller than the chip,
+            // as on a disc case, and the row makes room for it.
+            m.image
+                .resizable()
+                .scaledToFit()
+                .frame(height: m.cap.map { Self.wordCap(height) / $0 } ?? height)
+                .foregroundStyle(markStyle(m))
+                .accessibilityLabel(m.title)
         case .word(let w):
             sticker(box: height, band: nil) {
                 Text(w)
-                    .font(.system(size: height * 0.62, weight: .semibold))
+                    .font(Self.wordFont(height))
                     .lineLimit(1)
             }
         case .badge(let primary, let secondary):
@@ -222,7 +263,7 @@ public struct SpecChip: View {
 
     private var accessibility: String {
         switch glyph {
-        case .art(let m): m.title
+        case .art(let m), .lockup(let m): m.title
         case .word(let w): w
         case .badge(let p, let s): "\(p) \(s)"
         }
@@ -275,7 +316,7 @@ public struct ChipOptions {
     /// above the rail, symbols below it.
     var markForm: MarkForm { form ?? (atRail ? .lockup : .symbol) }
     func glyph(_ marks: Marks) -> Glyph? {
-        (markForm == .lockup ? marks.lockup : marks.symbol).map(Glyph.art)
+        markForm == .lockup ? marks.lockup.map(Glyph.lockup) : marks.symbol.map(Glyph.art)
     }
 }
 
@@ -369,7 +410,7 @@ public struct SoundChip: View {
         var objectDrawn = false
         if let o = audio.object {
             let g = options.glyph(o.marks) ?? .word(o.label)
-            if case .art = g { objectDrawn = true }
+            if g.isArtwork { objectDrawn = true }
             glyphs.append(g)
         }
         // An unnamed carrier (a claim) draws nothing: the object mark is the

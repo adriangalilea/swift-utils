@@ -164,6 +164,12 @@ func runChecks() -> Never {
     ]
     if generated != wantMarks { fail("the mark catalog drifted from its manifest") }
     for m in Mark.allCases where m.aspect <= 0 { fail("\(m.rawValue) has no aspect") }
+    for m in Mark.allCases {
+        if let cap = m.cap, !(cap > 0 && cap <= 1) {
+            fail("\(m.rawValue) cap \(cap) is not a share of its height")
+        }
+    }
+    if Mark.imax.cap == nil || Mark.flages.cap != nil { fail("a word carries a cap, a flag none") }
     // Every catalog SVG parses clean: a stray editor namespace prefix
     // (inkscape:, sodipodi:, an undeclared xlink:) is an XML error NSImage
     // shouts to stderr at every draw - it fails here instead.
