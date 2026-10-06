@@ -9,11 +9,10 @@
 //                 of the command behind it; changes nothing
 //   ship release  the gates (any blocked one stops it), then the release
 //
-//   --name <slug>        the dmg, the notary profile and the cask are named by it
+//   --name <slug>        the dmg, its volume and the cask are named by it
 //   --app <dir/X.app>    where --assemble leaves the bundle, in a repo subdirectory
 //   --assemble <shell>   builds the bundle; runs after the gates pass
 //   --sign <path>        inner code to sign first, relative to the bundle (repeatable)
-//   --notary <profile>   the notarytool keychain profile (default: --name)
 //   --github             a GitHub release with the notes and the dmg (gh)
 //   --after <shell>      runs once the dmg is public, before the cask, with
 //                        DMG and VERSION in its environment (publishing elsewhere)
@@ -21,7 +20,11 @@
 //                        (unset: skipped, as for a fork without the tap)
 //
 // VERSION comes from the environment (the app's mise.toml), the release body
-// from notes/$VERSION.md.
+// from notes/$VERSION.md. Notarization uses one App Store Connect API key,
+// named by the releasing machine's environment, never by the repo:
+// APPSTORE_KEY (the .p8's path), APPSTORE_KEY_ID and APPSTORE_ISSUER. The
+// same three serve xcodebuild's provisioning, so one key is the whole
+// credential, wherever a release runs from.
 import Foundation
 
 // MARK: - the shell
@@ -78,7 +81,7 @@ func step(_ name: String) { print("\n→ \(name)") }
 
 guard let verb = CommandLine.arguments.dropFirst().first, ["check", "release"].contains(verb) else {
     die(
-        "usage: ship check|release --name <slug> --app <dir/X.app> --assemble <shell> [--sign <path>]… [--notary <profile>] [--github] [--after <shell>] [--cask]"
+        "usage: ship check|release --name <slug> --app <dir/X.app> --assemble <shell> [--sign <path>]… [--github] [--after <shell>] [--cask]"
     )
 }
 let args = Array(CommandLine.arguments.dropFirst(2))
@@ -100,7 +103,13 @@ guard let version = env["VERSION"], !version.isEmpty else {
     die("VERSION is not set: it comes from the app's mise.toml [env]")
 }
 let inner = values("--sign")
-let notary = value("--notary") ?? name
+/// The App Store Connect key, from the environment; empty when unset, which
+/// the key gate reports.
+let key = (
+    path: env["APPSTORE_KEY"] ?? "", id: env["APPSTORE_KEY_ID"] ?? "",
+    issuer: env["APPSTORE_ISSUER"] ?? ""
+)
+let notary = ["--key", key.path, "--key-id", key.id, "--issuer", key.issuer]
 let after = value("--after")
 let tap = has("--cask") ? env["TAP"].flatMap { $0.isEmpty ? nil : $0 } : nil
 let notes = "notes/\(version).md"
@@ -116,9 +125,8 @@ guard !dist.isEmpty, dist != ".", !dist.hasPrefix("/"), !dist.contains("..") els
 
 /// Every gate is reported before any stops the release, so one run shows all
 /// that is wrong. A blocked gate prints the answer of the command behind it,
-/// never a guess at why: notarytool fails the same way for a missing profile,
-/// a revoked key and an unsigned developer agreement, and each needs
-/// different hands.
+/// never a guess at why: notarytool fails the same way for a revoked key and
+/// an unsigned developer agreement, and each needs different hands.
 var blocked = false
 @MainActor func gate(_ what: String, _ ok: Bool, answer: String = "", hint: String? = nil) {
     print(ok ? "  ok       \(what)" : "  blocked  \(what)")
@@ -156,14 +164,20 @@ let signer = run(["security", "find-identity", "-v", "-p", "codesigning"], quiet
         return String(line[r.lowerBound...].dropFirst().dropLast())
     }.first
 gate("a Developer ID Application certificate\(signer.map { ": \($0)" } ?? "")", signer != nil)
-let notarized = run(["xcrun", "notarytool", "history", "--keychain-profile", notary], quiet: true)
+let keyNamed = !key.path.isEmpty && !key.id.isEmpty && !key.issuer.isEmpty
+let keyHere = keyNamed && FileManager.default.fileExists(atPath: key.path)
+let notarized =
+    keyHere ? run(["xcrun", "notarytool", "history"] + notary, quiet: true) : Ran(code: 1, out: "")
 gate(
-    "notary keychain profile '\(notary)'", notarized.code == 0, answer: notarized.out,
-    hint: notarized.out.contains("No Keychain password item found")
-        ? "create it once: xcrun notarytool store-credentials \(notary) --key <p8> --key-id <id> --issuer <uuid>"
-        : notarized.out.contains("agreement")
-            ? "the Account Holder accepts the pending agreement at https://developer.apple.com/account, then rerun"
-            : nil)
+    "the App Store Connect key notarizes\(keyNamed ? " (\(key.id))" : "")", notarized.code == 0,
+    answer: notarized.out,
+    hint: !keyNamed
+        ? "set APPSTORE_KEY (the .p8's path), APPSTORE_KEY_ID and APPSTORE_ISSUER in this machine's environment"
+        : !keyHere
+            ? "no file at APPSTORE_KEY (\(key.path)): restore the .p8 there"
+            : notarized.out.contains("agreement")
+                ? "the Account Holder accepts the pending agreement at https://developer.apple.com/account, then rerun"
+                : nil)
 if has("--github") {
     let gh = run(["gh", "auth", "status"], quiet: true)
     gate("gh is signed in (the GitHub release)", gh.code == 0, answer: gh.out)
@@ -203,7 +217,7 @@ for path in inner.map({ "\(app)/\($0)" }) + [app] {
 step("notarize")
 let zip = "\(dist)/\(name).zip"
 must(["ditto", "-c", "-k", "--keepParent", app, zip])
-must(["xcrun", "notarytool", "submit", zip, "--keychain-profile", notary, "--wait"])
+must(["xcrun", "notarytool", "submit", zip] + notary + ["--wait"])
 // The real verdict: stapling fails unless a ticket was issued, so this is the
 // check, not notarytool's exit status.
 must(["xcrun", "stapler", "staple", app])
@@ -281,7 +295,7 @@ try? FileManager.default.removeItem(atPath: work)
 // judges the disk image before the app inside it, and a ticket stapled to
 // each holds offline.
 must(["codesign", "--force", "--timestamp", "--sign", signer, dmg])
-must(["xcrun", "notarytool", "submit", dmg, "--keychain-profile", notary, "--wait"])
+must(["xcrun", "notarytool", "submit", dmg] + notary + ["--wait"])
 must(["xcrun", "stapler", "staple", dmg])
 
 // The branch with its tag: a tag pushed alone leaves the branch on the remote
