@@ -117,7 +117,9 @@ extension Mark {
         case .ultrahdbluray: 0.575
         case .dvd: 0.56
         case .imax: 0.997
-        case .badge4k, .badge8k, .badgehd, .badgesd, .blurayglyph, .dolby, .dts, .flages:
+        case .badge4k, .badge8k, .badgehd, .badgesd, .blurayglyph, .dolby, .dts, .flages,
+            .advisorynudity, .advisoryviolence, .advisoryprofanity, .advisorysubstances,
+            .advisoryfrightening:
             nil
         }
     }
@@ -176,5 +178,30 @@ extension Lang {
 extension Cut {
     public var marks: Marks {
         self == .imax ? Marks(symbol: .imax, lockup: .imax) : .none
+    }
+}
+
+extension Rating {
+    /// The board's flag, keyed by the board's region code like a language's
+    /// by its region subtag. Only Spain ships today; a board without a flag
+    /// draws its code.
+    public var marks: Marks {
+        board == "ES" ? Marks(symbol: .flages, lockup: .flages) : .none
+    }
+}
+
+extension AdvisoryCategory {
+    /// One tabler outline glyph per category (MIT), the same at both rungs:
+    /// an icon, not a brand, so it has no lockup of its own.
+    public var marks: Marks {
+        let m: Mark =
+            switch self {
+            case .nudity: .advisorynudity
+            case .violence: .advisoryviolence
+            case .profanity: .advisoryprofanity
+            case .substances: .advisorysubstances
+            case .frightening: .advisoryfrightening
+            }
+        return Marks(symbol: m, lockup: m)
     }
 }

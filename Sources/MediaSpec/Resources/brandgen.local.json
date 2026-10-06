@@ -1,4 +1,34 @@
 {
+  "advisoryfrightening" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "tabler icons via Iconify (MIT), tabler:ghost",
+    "title" : "Frightening & intense"
+  },
+  "advisorynudity" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "tabler icons via Iconify (MIT), tabler:flame",
+    "title" : "Sex & nudity"
+  },
+  "advisoryprofanity" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "tabler icons via Iconify (MIT), tabler:message-exclamation",
+    "title" : "Profanity"
+  },
+  "advisorysubstances" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "tabler icons via Iconify (MIT), tabler:glass-cocktail",
+    "title" : "Alcohol, drugs & smoking"
+  },
+  "advisoryviolence" : {
+    "hex" : "000000",
+    "original" : false,
+    "source" : "tabler icons via Iconify (MIT), tabler:sword",
+    "title" : "Violence & gore"
+  },
   "badge4k" : {
     "hex" : "000000",
     "original" : false,

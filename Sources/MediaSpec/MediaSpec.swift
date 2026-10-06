@@ -282,6 +282,128 @@ public enum Cut: Codable, Hashable, Sendable {
     }
 }
 
+/// An age rating as its board states it: the board named by the region it
+/// rates for (ISO 3166-1 alpha-2: "ES", "US", "GB", "DE"), the value
+/// verbatim ("16", "R", "12A"). A rating describes the TITLE, not a file:
+/// every copy shares it, which is why the strip takes it beside the spec
+/// rather than inside it.
+public struct Rating: Codable, Hashable, Sendable {
+    public var board: String
+    public var value: String
+
+    public init(board: String, value: String) {
+        self.board = board
+        self.value = value
+    }
+
+    /// The youngest viewer each board admits on its own word, per value:
+    /// the one number that orders ratings across boards. A guidance rating
+    /// (US PG, UK PG) admits everyone and reads 0.
+    public static let boardAge: [String: [String: Int]] = [
+        "ES": ["A": 0, "TP": 0, "7": 7, "12": 12, "16": 16, "18": 18, "X": 18],
+        "US": ["G": 0, "PG": 0, "PG-13": 13, "R": 17, "NC-17": 18],
+        "GB": ["U": 0, "PG": 0, "12A": 12, "12": 12, "15": 15, "18": 18, "R18": 18],
+        "FR": ["U": 0, "TP": 0, "10": 10, "12": 12, "16": 16, "18": 18],
+    ]
+}
+
+/// The minimum age a rating states, or nil when it states none: the board
+/// table, else the first number in the value ("12", "FSK 16"), else nil.
+public func ratingAge(_ rating: Rating) -> Int? {
+    if let known = Rating.boardAge[rating.board]?[rating.value] { return known }
+    let digits = rating.value.drop { !$0.isASCII || !$0.isNumber }.prefix {
+        $0.isASCII && $0.isNumber
+    }
+    return Int(digits)
+}
+
+/// "ES 16".
+public func ratingLabel(_ rating: Rating) -> String {
+    "\(rating.board) \(rating.value)"
+}
+
+/// What a title shows, by category: the Parents Guide axes, in the order a
+/// strip draws them.
+public enum AdvisoryCategory: String, Codable, CaseIterable, Sendable, Hashable {
+    case nudity
+    case violence
+    case profanity
+    case substances
+    case frightening
+
+    /// "sex & nudity": the name at the rail.
+    public var label: String {
+        switch self {
+        case .nudity: "sex & nudity"
+        case .violence: "violence & gore"
+        case .profanity: "profanity"
+        case .substances: "alcohol, drugs & smoking"
+        case .frightening: "frightening & intense scenes"
+        }
+    }
+
+    /// "nudity": the one word below it.
+    public var short: String {
+        switch self {
+        case .nudity: "nudity"
+        case .violence: "violence"
+        case .profanity: "profanity"
+        case .substances: "substances"
+        case .frightening: "frightening"
+        }
+    }
+}
+
+public enum Severity: String, Codable, CaseIterable, Sendable, Hashable {
+    case none
+    case mild
+    case moderate
+    case severe
+}
+
+/// A severity's rank, 0 (none) to 3 (severe): the order a filter compares.
+public func severityRank(_ severity: Severity) -> Int {
+    Severity.allCases.firstIndex(of: severity)!
+}
+
+/// A title's advisory: a severity per category. An absent category is
+/// UNKNOWN, never "none". On the wire it is an object keyed by category
+/// (`{"nudity":"moderate","violence":"severe"}`); under the lenient-decode
+/// law a category or severity foreign to this build drops that one entry.
+public struct Advisory: Codable, Hashable, Sendable {
+    public var severities: [AdvisoryCategory: Severity]
+
+    public init(_ severities: [AdvisoryCategory: Severity] = [:]) {
+        self.severities = severities
+    }
+
+    public subscript(category: AdvisoryCategory) -> Severity? {
+        get { severities[category] }
+        set { severities[category] = newValue }
+    }
+
+    /// The categories it states, in `AdvisoryCategory` order.
+    public var stated: [(category: AdvisoryCategory, severity: Severity)] {
+        AdvisoryCategory.allCases.compactMap { c in severities[c].map { (c, $0) } }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let wire = try decoder.singleValueContainer().decode([String: String].self)
+        var out: [AdvisoryCategory: Severity] = [:]
+        for (k, v) in wire {
+            if let c = AdvisoryCategory(rawValue: k), let s = Severity(rawValue: v) { out[c] = s }
+        }
+        severities = out
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(
+            Dictionary(
+                uniqueKeysWithValues: severities.map { ($0.key.rawValue, $0.value.rawValue) }))
+    }
+}
+
 /// How much a chip stands out, named for the look alone and made of
 /// LIGHT, never geometry: `ghost` is the chip at 0.55 opacity; `plain` is
 /// the resting look; `lit` adds a soft glow behind the chip in its own
@@ -294,13 +416,16 @@ public enum Emphasis: String, Codable, CaseIterable, Sendable, Hashable {
     case vivid
 }
 
-/// The five axes a spec renders, in the order a strip composes them.
+/// The axes a strip renders, in the order it composes them: the file's
+/// five, then the title's two.
 public enum Kind: String, Codable, CaseIterable, Sendable, Hashable {
     case picture
     case sound
     case tier
     case lang
     case cut
+    case rating
+    case advisory
 
     public var symbol: String {
         switch self {
@@ -309,6 +434,8 @@ public enum Kind: String, Codable, CaseIterable, Sendable, Hashable {
         case .tier: "opticaldisc"
         case .lang: "character.bubble"
         case .cut: "scissors"
+        case .rating: "checkmark.shield"
+        case .advisory: "exclamationmark.triangle"
         }
     }
 }

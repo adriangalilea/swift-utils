@@ -36,7 +36,11 @@ func runChecks() -> Never {
     vocabulary("tier", Tier.self, want: "remux,bluray,webdl,webrip,hdtv,dvd,cam")
     vocabulary("emphasis", Emphasis.self, want: "ghost,plain,lit,vivid")
     vocabulary("tone", Tone.self, want: "ink,brand,gold")
-    vocabulary("kind", Kind.self, want: "picture,sound,tier,lang,cut")
+    vocabulary("kind", Kind.self, want: "picture,sound,tier,lang,cut,rating,advisory")
+    vocabulary(
+        "advisory", AdvisoryCategory.self,
+        want: "nudity,violence,profanity,substances,frightening")
+    vocabulary("severity", Severity.self, want: "none,mild,moderate,severe")
     let cuts = Cut.known.map(\.rawValue).joined(separator: ",")
     print("cut: \(cuts)")
     if cuts != "theatrical,extended,directors,unrated,uncut,final,imax,remastered" {
@@ -130,6 +134,52 @@ func runChecks() -> Never {
         fail("an unknown cut is .other, verbatim")
     }
 
+    // ---- a rating's age orders boards; its label names the board ----
+    let ages: [(String, String, Int?)] = [
+        ("ES", "16", 16), ("ES", "A", 0), ("ES", "TP", 0), ("ES", "X", 18),
+        ("US", "PG", 0), ("US", "PG-13", 13), ("US", "R", 17), ("US", "NC-17", 18),
+        ("GB", "12A", 12), ("GB", "R18", 18), ("FR", "10", 10), ("FR", "U", 0),
+        ("DE", "FSK 16", 16), ("DE", "12", 12), ("NL", "AL", nil),
+    ]
+    for (board, value, want) in ages {
+        let got = ratingAge(Rating(board: board, value: value))
+        if got != want {
+            fail(
+                "ratingAge(\(board) \(value)) = \(String(describing: got)), want \(String(describing: want))"
+            )
+        }
+    }
+    if ratingLabel(Rating(board: "ES", value: "16")) != "ES 16" { fail("ratingLabel") }
+    if Severity.allCases.map(severityRank) != [0, 1, 2, 3] { fail("severityRank") }
+    if AdvisoryCategory.nudity.label != "sex & nudity"
+        || AdvisoryCategory.substances.label != "alcohol, drugs & smoking"
+        || AdvisoryCategory.frightening.label != "frightening & intense scenes"
+        || AdvisoryCategory.violence.short != "violence"
+    {
+        fail("advisory labels")
+    }
+    // An advisory is an object keyed by category; a foreign category or
+    // severity drops that one entry, an absent one stays unknown.
+    let advisory = try? JSONDecoder().decode(
+        Advisory.self,
+        from: Data(
+            #"{"nudity":"moderate","violence":"severe","gambling":"mild","profanity":"extreme","frightening":"none"}"#
+                .utf8))
+    if advisory != Advisory([.nudity: .moderate, .violence: .severe, .frightening: .none]) {
+        fail("advisory decode: \(String(describing: advisory))")
+    }
+    if advisory?.stated.map(\.category) != [.nudity, .violence, .frightening] {
+        fail("advisory states its categories in vocabulary order")
+    }
+    if let a = advisory,
+        (try? JSONDecoder().decode(Advisory.self, from: JSONEncoder().encode(a))) != a
+    {
+        fail("advisory round trip drifted")
+    }
+    let rating = try? JSONDecoder().decode(
+        Rating.self, from: Data(#"{"board":"GB","value":"12A"}"#.utf8))
+    if rating != Rating(board: "GB", value: "12A") { fail("rating decode") }
+
     // ---- the lenient-decode law: a foreign word blanks one field ----
     let wire =
         #"{"resolution":"2160p","range":"nonsense","audio":{"codec":"truehd","object":"atmos","channels":"7.1"},"tier":"laserdisc","cut":"fan edit"}"#
@@ -178,7 +228,8 @@ func runChecks() -> Never {
         fail("catalog \(onDisk) and Mark \(generated) disagree - run brandgen sync")
     }
     let wantMarks = [
-        "badge4k", "badge8k", "badgehd", "badgesd",
+        "advisoryfrightening", "advisorynudity", "advisoryprofanity", "advisorysubstances",
+        "advisoryviolence", "badge4k", "badge8k", "badgehd", "badgesd",
         "bluray", "blurayglyph", "dolby", "dolbyatmos", "dolbydigital", "dolbydigitalplus",
         "dolbytruehd", "dolbyvision", "dts", "dtshdma", "dtswordmark", "dvd", "flac", "flages",
         "hdr10", "hdr10plus", "imax", "opus", "ultrahd", "ultrahdbluray",
@@ -244,6 +295,11 @@ func runChecks() -> Never {
         || Lang("es-ES").marks != Marks(symbol: .flages, lockup: .flages)
         || Lang("es-419").marks != .none || Lang("es").marks != .none
         || Cut.imax.marks != Marks(symbol: .imax, lockup: .imax) || Cut.extended.marks != .none
+        || Rating(board: "ES", value: "16").marks != Marks(symbol: .flages, lockup: .flages)
+        || Rating(board: "US", value: "R").marks != .none
+        || AdvisoryCategory.nudity.marks != Marks(symbol: .advisorynudity, lockup: .advisorynudity)
+        || AdvisoryCategory.allCases.contains(where: { $0.marks.symbol == nil })
+        || Mark.advisorynudity.original || Mark.advisorynudity.aspect != 1
     {
         fail("value → mark binding drifted from the manifest")
     }

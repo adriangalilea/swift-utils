@@ -16,7 +16,7 @@ Disc Association.
 | Xiph.Org wiki | FLAC and Opus logos, the projects' own files | Xiph project logos, free to use | `https://wiki.xiph.org/images/f/fc/FLAC_Logo.svg`, `https://wiki.xiph.org/images/7/7f/Opus-Logo.svg` |
 | lipis/flag-icons | Spain flag (4:3 and 1:1) | MIT | `https://raw.githubusercontent.com/lipis/flag-icons/main/flags/4x3/es.svg` |
 | HatScripts/circle-flags | Spain as a circle; a language-keyed `es-mx` exists | MIT | `https://raw.githubusercontent.com/HatScripts/circle-flags/gh-pages/flags/es.svg` (and `flags/language/es-mx.svg`) |
-| Iconify API (tabler, mdi) | Generic glyphs: `badge-4k`, `badge-8k`, `badge-hd`, `badge-sd`, `hdr`, `surround-sound`, `disc` | tabler MIT, mdi Apache-2.0 | `https://api.iconify.design/tabler/badge-4k.svg`, `https://api.iconify.design/mdi/disc.svg` |
+| Iconify API (tabler, mdi) | Generic glyphs: `badge-4k`, `badge-8k`, `badge-hd`, `badge-sd`, `hdr`, `surround-sound`, `disc`; the advisory glyphs `flame`, `sword`, `message-exclamation`, `glass-cocktail`, `ghost` (outline, stroke 2) | tabler MIT, mdi Apache-2.0 | `https://api.iconify.design/tabler/badge-4k.svg`, `https://api.iconify.design/mdi/disc.svg` |
 
 ### Wikimedia Commons: rate limits and etiquette
 

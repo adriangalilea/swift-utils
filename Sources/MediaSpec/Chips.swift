@@ -60,21 +60,24 @@ public enum MarkForm: Sendable {
     case lockup
 }
 
-/// One mark's content: artwork from the catalog, a word that has none, or
-/// the two-line disc-case badge. `art` stands at the chip height (a symbol,
-/// a flag, a badge); `lockup` is a wordmark, sized so its word's capitals
-/// are the drawn words' capitals (`Mark.cap`).
+/// One mark's content: artwork from the catalog, a word that has none, the
+/// two-line disc-case badge, or a METER. `art` stands at the chip height (a
+/// symbol, a flag, a badge); `lockup` is a wordmark, sized so its word's
+/// capitals are the drawn words' capitals (`Mark.cap`); `meter` is `of`
+/// steps, `filled` of them in the ink (an advisory's severity), `name`
+/// what it says aloud.
 public enum Glyph: Hashable, Sendable {
     case art(Mark)
     case lockup(Mark)
     case word(String)
     case badge(primary: String, secondary: String)
+    case meter(filled: Int, of: Int, name: String)
 
     /// Drawn from the catalog rather than set as text.
     public var isArtwork: Bool {
         switch self {
         case .art, .lockup: true
-        case .word, .badge: false
+        case .word, .badge, .meter: false
         }
     }
 }
@@ -213,7 +216,31 @@ public struct SpecChip: View {
                         .lineLimit(1)
                 }
             }
+        case .meter(let filled, let of, _):
+            meter(filled: filled, of: of)
         }
+    }
+
+    /// THE METER: each step a pip the badge's height tall and a third as
+    /// wide. Filled steps in the ink (the metal under gold); empty steps a
+    /// hairline of it at 45 %, so "none" reads as a meter at zero rather
+    /// than as nothing.
+    private func meter(filled: Int, of: Int) -> some View {
+        let width = height / 3
+        let shape = RoundedRectangle(cornerRadius: width * 0.35)
+        return HStack(spacing: height * 0.15) {
+            ForEach(0..<of, id: \.self) { i in
+                Group {
+                    if i < filled {
+                        shape.fill(ink)
+                    } else {
+                        shape.strokeBorder(ink, lineWidth: max(1, height * 0.05)).opacity(0.45)
+                    }
+                }
+                .frame(width: width, height: height)
+            }
+        }
+        .frame(height: height)
     }
 
     /// THE STICKER, sized by its content. A ground panel with the text;
@@ -266,6 +293,7 @@ public struct SpecChip: View {
         case .art(let m), .lockup(let m): m.title
         case .word(let w): w
         case .badge(let p, let s): "\(p) \(s)"
+        case .meter(_, _, let name): name
         }
     }
 
@@ -327,6 +355,10 @@ struct Axis: View {
     let glyphs: [Glyph]
     let accessibility: String
     let options: ChipOptions
+    /// Symbols stand at the sticker's height beside the row's two-panel
+    /// badges. An advisory glyph is an icon beside its own meter, not a
+    /// brand symbol beside a sticker, so it stays at h.
+    var tallSymbols = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -356,7 +388,7 @@ struct Axis: View {
     /// Artwork in symbol form, when the row's stickers still hold two
     /// panels (below that the sticker is one line and the symbol stays at h).
     private func symbolBeside(_ g: Glyph) -> Bool {
-        guard case .art = g, options.markForm == .symbol else { return false }
+        guard tallSymbols, case .art = g, options.markForm == .symbol else { return false }
         return options.height * 1.75 * 0.30 * 0.6 >= 5
     }
 }
@@ -516,15 +548,77 @@ public struct CutChip: View {
     }
 }
 
-/// The spec as a row, fixed order picture · sound · tier · lang · cut,
-/// absent axes omitted, `.inkGap` between axes (each axis packs its own
-/// marks at `.inkTight`). One emphasis and one tone for the strip.
-/// `adornments` are trailing views per axis; `labels` overrides the
-/// language's display name; `omit` is for surfaces that state an axis
-/// elsewhere. The tier chip is handed the resolution so a 4K disc wears
-/// the Ultra HD Blu-ray mark.
+/// The board's flag where one exists, else its code as a drawn badge; then
+/// the value, verbatim. A bare "16" is ambiguous across boards, so the
+/// board always shows.
+public struct RatingChip: View {
+    let rating: Rating
+    let options: ChipOptions
+
+    public init(
+        rating: Rating, emphasis: Emphasis = .plain, height: CGFloat = 34,
+        trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink,
+        form: MarkForm? = nil
+    ) {
+        self.rating = rating
+        self.options = ChipOptions(
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone,
+            form: form)
+    }
+
+    public var body: some View {
+        Axis(
+            kind: .rating,
+            glyphs: [options.glyph(rating.marks) ?? .word(rating.board), .word(rating.value)],
+            accessibility: ratingLabel(rating), options: options)
+    }
+}
+
+/// One category: its glyph, its name where lockups go (the rail), then the
+/// severity as a three-step meter - none draws three empty steps, a known
+/// zero, not an absence.
+public struct AdvisoryChip: View {
+    let category: AdvisoryCategory
+    let severity: Severity
+    let options: ChipOptions
+
+    public init(
+        category: AdvisoryCategory, severity: Severity, emphasis: Emphasis = .plain,
+        height: CGFloat = 34, trailing: AnyView? = nil, detail: String? = nil, tone: Tone = .ink,
+        form: MarkForm? = nil
+    ) {
+        self.category = category
+        self.severity = severity
+        self.options = ChipOptions(
+            emphasis: emphasis, height: height, trailing: trailing, detail: detail, tone: tone,
+            form: form)
+    }
+
+    public var body: some View {
+        var glyphs: [Glyph] = [options.glyph(category.marks) ?? .word(category.short)]
+        if options.markForm == .lockup { glyphs.append(.word(category.label)) }
+        glyphs.append(.meter(filled: severityRank(severity), of: 3, name: severity.rawValue))
+        return Axis(
+            kind: .advisory, glyphs: glyphs,
+            accessibility: "\(category.label): \(severity.rawValue)", options: options,
+            tallSymbols: false)
+    }
+}
+
+/// The spec as a row, fixed order picture · sound · tier · lang · cut, then
+/// the title's rating and advisory, absent axes omitted, `.inkGap` between
+/// axes (each axis packs its own marks at `.inkTight`). One emphasis and
+/// one tone for the strip. `rating` and `advisory` describe the TITLE, not
+/// the file the spec describes, so they ride beside it: the advisory draws
+/// one chip per category it states, in `AdvisoryCategory` order.
+/// `adornments` are trailing views per axis (the advisory's chips take
+/// none); `langLabel` overrides the language's display name; `omit` is for
+/// surfaces that state an axis elsewhere. The tier chip is handed the
+/// resolution so a 4K disc wears the Ultra HD Blu-ray mark.
 public struct MediaSpecStrip: View {
     let spec: MediaSpec
+    let rating: Rating?
+    let advisory: Advisory?
     let emphasis: Emphasis
     let height: CGFloat
     let adornments: [Kind: AnyView]
@@ -535,11 +629,14 @@ public struct MediaSpecStrip: View {
     let form: MarkForm?
 
     public init(
-        spec: MediaSpec, emphasis: Emphasis = .plain, height: CGFloat = 34,
+        spec: MediaSpec, rating: Rating? = nil, advisory: Advisory? = nil,
+        emphasis: Emphasis = .plain, height: CGFloat = 34,
         adornments: [Kind: AnyView] = [:], langLabel: String? = nil, omit: Set<Kind> = [],
         spacing: CGFloat = .inkGap, tone: Tone = .ink, form: MarkForm? = nil
     ) {
         self.spec = spec
+        self.rating = rating
+        self.advisory = advisory
         self.emphasis = emphasis
         self.height = height
         self.adornments = adornments
@@ -578,6 +675,18 @@ public struct MediaSpecStrip: View {
                     cut: cut, emphasis: emphasis, height: height, trailing: adornments[.cut],
                     tone: tone, form: form)
             }
+            if !omit.contains(.rating), let rating {
+                RatingChip(
+                    rating: rating, emphasis: emphasis, height: height,
+                    trailing: adornments[.rating], tone: tone, form: form)
+            }
+            if !omit.contains(.advisory), let advisory {
+                ForEach(advisory.stated, id: \.category) { stated in
+                    AdvisoryChip(
+                        category: stated.category, severity: stated.severity,
+                        emphasis: emphasis, height: height, tone: tone, form: form)
+                }
+            }
         }
     }
 }
@@ -604,6 +713,9 @@ public struct MediaSpecStrip: View {
                 audio: Audio(codec: .trueHD, channels: .surround71, object: .atmos),
                 tier: .bluray, lang: Lang("es-ES")),
             height: 24, tone: .brand)
+        MediaSpecStrip(
+            spec: MediaSpec(resolution: .p1080), rating: Rating(board: "ES", value: "16"),
+            advisory: Advisory([.nudity: .moderate, .violence: .severe, .profanity: .none]))
     }
     .padding(.inkBlock)
     .background(Color.black)

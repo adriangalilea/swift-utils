@@ -72,6 +72,29 @@ struct DemoView: View {
                     CutChip(cut: .other("fan edit"))
                 }
             }
+            section("rating · advisory · every category × every severity, 24 then 34") {
+                ForEach([24, 34] as [CGFloat], id: \.self) { h in
+                    HStack(spacing: .inkGap) {
+                        ForEach(
+                            [("ES", "16"), ("US", "PG-13"), ("GB", "12A"), ("DE", "FSK 12")],
+                            id: \.1
+                        ) {
+                            RatingChip(rating: Rating(board: $0.0, value: $0.1), height: h)
+                        }
+                    }
+                    ForEach(AdvisoryCategory.allCases, id: \.self) { c in
+                        HStack(spacing: .inkGap) {
+                            ForEach(Severity.allCases, id: \.self) { s in
+                                AdvisoryChip(category: c, severity: s, height: h)
+                            }
+                        }
+                    }
+                }
+                MediaSpecStrip(
+                    spec: reference, rating: Rating(board: "ES", value: "16"),
+                    advisory: Advisory([.nudity: .moderate, .violence: .severe, .profanity: .mild]),
+                    tone: .gold)
+            }
             section("emphasis · one strip, four looks") {
                 ForEach(Emphasis.allCases, id: \.self) { e in
                     HStack(spacing: .inkGap) {
