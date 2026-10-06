@@ -209,14 +209,74 @@ must(["xcrun", "notarytool", "submit", zip, "--keychain-profile", notary, "--wai
 must(["xcrun", "stapler", "staple", app])
 try? FileManager.default.removeItem(atPath: zip)
 
+// The install window is designed, not defaulted: a scratch image is mounted
+// once so Finder (scripted) writes its .DS_Store, a fixed 660×400 window,
+// 128 pt icons, the app left and Applications right, and the app's own icon
+// becomes the volume's. Then compressed to the shipping UDZO. Finder
+// scripting needs a logged-in session and, once, the Automation permission;
+// releases run on a logged-in Mac by design. All image work goes through
+// `diskutil image` (hdiutil is deprecated in macOS 27).
 step("dmg")
-let stage = "\(dist)/stage"
+let appName = (app as NSString).lastPathComponent
+let work = "\(dist)/dmg"
+let scratch = "\(work)/scratch.asif"
 do {
-    try FileManager.default.createDirectory(atPath: stage, withIntermediateDirectories: true)
-} catch { die("create \(stage): \(error.localizedDescription)") }
-must(["cp", "-R", app, stage])
-must(["ln", "-sf", "/Applications", "\(stage)/Applications"])
-must(["diskutil", "image", "create", "from", "--format", "UDZO", "--volumeName", name, stage, dmg])
+    try FileManager.default.createDirectory(atPath: work, withIntermediateDirectories: true)
+} catch { die("create \(work): \(error.localizedDescription)") }
+guard
+    let appMB = Int(run(["du", "-sm", app], quiet: true).out.split(separator: "\t").first ?? ""),
+    appMB > 0
+else { die("cannot size \(app) for the disk image") }
+must([
+    "diskutil", "image", "create", "blank", "--format", "ASIF", "--fs", "APFS", "--volumeName",
+    name, "--size", "\(appMB + 64)m", scratch,
+])
+let attached = run(["diskutil", "image", "attach", "--plist", scratch], quiet: true).out
+guard
+    let mountKey = attached.range(of: "<key>mount-point</key>"),
+    let open = attached.range(of: "<string>", range: mountKey.upperBound..<attached.endIndex),
+    let close = attached.range(of: "</string>", range: open.upperBound..<attached.endIndex)
+else { die("diskutil attach gave no mount point:\n\(attached)") }
+let mount = String(attached[open.upperBound..<close.lowerBound])
+must(["cp", "-R", app, mount])
+must(["ln", "-s", "/Applications", "\(mount)/Applications"])
+must([
+    "osascript", "-e",
+    """
+    tell application "Finder"
+      tell disk "\(name)"
+        open
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set the bounds of container window to {400, 200, 1060, 600}
+        set opts to the icon view options of container window
+        set icon size of opts to 128
+        set text size of opts to 13
+        set arrangement of opts to not arranged
+        set position of item "\(appName)" of container window to {165, 180}
+        set position of item "Applications" of container window to {495, 180}
+        update without registering applications
+        close
+      end tell
+    end tell
+    """,
+])
+// After the Finder pass: its update deletes .VolumeIcon.icns and clears the
+// custom-icon flag if they are already there.
+let iconFile = run(
+    ["/usr/libexec/PlistBuddy", "-c", "Print :CFBundleIconFile", "\(app)/Contents/Info.plist"],
+    quiet: true
+).out
+let icns =
+    "\(app)/Contents/Resources/\(iconFile.hasSuffix(".icns") ? iconFile : "\(iconFile).icns")"
+must(["cp", icns, "\(mount)/.VolumeIcon.icns"])
+must(["SetFile", "-a", "C", mount])
+must(["SetFile", "-a", "E", "\(mount)/\(appName)"])
+must(["sync"])
+must(["diskutil", "eject", mount])
+must(["diskutil", "image", "create", "from", "--format", "UDZO", scratch, dmg])
+try? FileManager.default.removeItem(atPath: work)
 // The download itself is signed, notarized and stapled too: Gatekeeper
 // judges the disk image before the app inside it, and a ticket stapled to
 // each holds offline.
