@@ -26,6 +26,10 @@ import Foundation
 
 // MARK: - the shell
 
+// Line-buffered even into a pipe (mise, a log): every step header lands
+// before the output of the commands it introduces.
+setvbuf(stdout, nil, _IOLBF, 0)
+
 struct Ran {
     let code: Int32
     let out: String
