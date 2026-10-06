@@ -322,6 +322,13 @@ public func ratingLabel(_ rating: Rating) -> String {
     "\(rating.board) \(rating.value)"
 }
 
+/// The ages a disc is drawn for: every minimum age the boards state (the web
+/// item's AGES).
+public let ages = [0, 7, 12, 13, 15, 16, 17, 18]
+
+/// "ALL" for every age, else the number.
+public func ageLabel(_ age: Int) -> String { age == 0 ? "ALL" : String(age) }
+
 /// What a title shows, by category: the Parents Guide axes, in the order a
 /// strip draws them.
 public enum AdvisoryCategory: String, Codable, CaseIterable, Sendable, Hashable {

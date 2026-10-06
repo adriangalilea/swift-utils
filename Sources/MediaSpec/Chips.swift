@@ -60,12 +60,6 @@ public enum MarkForm: Sendable {
     case lockup
 }
 
-/// What leads a plate: a catalog mark (a flag) or a word (a board's code).
-public enum PlateLead: Hashable, Sendable {
-    case mark(Mark)
-    case word(String)
-}
-
 /// One mark's content: artwork from the catalog, a word that has none, the
 /// two-line disc-case badge, or a METER. `art` stands at the chip height (a
 /// symbol, a flag, a badge); `lockup` is a wordmark, sized so its word's
@@ -78,16 +72,16 @@ public enum Glyph: Hashable, Sendable {
     case word(String)
     case badge(primary: String, secondary: String)
     case meter(filled: Int, of: Int, name: String)
-    /// A PLATE: one drawn frame holding a lead (a mark, or a word set
-    /// quieter), a hairline, then the word — a rating's board and its value
-    /// as one object, never two boxes pressed together.
-    case plate(lead: PlateLead, word: String)
+    /// An AGE DISC: the age in a round mark of its band's colour (`ageBand`),
+    /// kept whatever the tone — the colour is the meaning. `name` is what it
+    /// says aloud (a rating's board word, "ES 16").
+    case age(Int, name: String)
 
     /// Drawn from the catalog rather than set as text.
     public var isArtwork: Bool {
         switch self {
         case .art, .lockup: true
-        case .word, .badge, .meter, .plate: false
+        case .word, .badge, .meter, .age: false
         }
     }
 }
@@ -228,30 +222,16 @@ public struct SpecChip: View {
             }
         case .meter(let filled, let of, _):
             meter(filled: filled, of: of)
-        case .plate(let lead, let word):
-            sticker(box: height, band: nil) {
-                HStack(spacing: height * 0.28) {
-                    switch lead {
-                    case .mark(let m):
-                        m.image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: height * 0.52)
-                            .foregroundStyle(markStyle(m))
-                    case .word(let w):
-                        Text(w)
-                            .font(.system(size: Self.wordSize(height) * 0.85, weight: .medium))
-                            .opacity(0.7)
-                    }
-                    Rectangle()
-                        .fill(ink)
-                        .opacity(0.45)
-                        .frame(width: max(1, height * 0.05), height: height * 0.55)
-                    Text(word)
-                        .font(Self.wordFont(height))
-                        .lineLimit(1)
-                }
-            }
+        case .age(let age, _):
+            // The disc stands at the sticker's height, as on the web.
+            let d = height * 1.75
+            let label = ageLabel(age)
+            Text(label)
+                .font(.system(size: d * (label.count > 2 ? 0.34 : 0.5), weight: .black))
+                .tracking(-0.02 * d)
+                .foregroundStyle(.white)
+                .frame(width: d, height: d)
+                .background(ageBand(age), in: Circle())
         }
     }
 
@@ -328,11 +308,7 @@ public struct SpecChip: View {
         case .word(let w): w
         case .badge(let p, let s): "\(p) \(s)"
         case .meter(_, _, let name): name
-        case .plate(let lead, let word):
-            switch lead {
-            case .mark(let m): "\(m.title) \(word)"
-            case .word(let w): "\(w) \(word)"
-            }
+        case .age(_, let name): name
         }
     }
 
@@ -605,15 +581,45 @@ public struct RatingChip: View {
             form: form)
     }
 
+    /// A title's rating AS AN AGE: the disc of the youngest age its board
+    /// admits, never the board's flag beside it — a country is not an age.
+    /// A value stating no age ("NR") draws its word.
     public var body: some View {
         Axis(
             kind: .rating,
             glyphs: [
-                .plate(
-                    lead: rating.marks.symbol.map(PlateLead.mark) ?? .word(rating.board),
-                    word: rating.value)
+                ratingAge(rating).map { .age($0, name: ratingLabel(rating)) } ?? .word(rating.value)
             ],
             accessibility: ratingLabel(rating), options: options)
+    }
+}
+
+/// The band an age falls in, as its disc's colour: green up to 7, amber 12
+/// to 16, red from 17 (the web item's ageBand, same hexes).
+public func ageBand(_ age: Int) -> Color {
+    if age <= 7 { return Color(red: 0x3a / 255, green: 0x9f / 255, blue: 0x45 / 255) }
+    if age <= 16 { return Color(red: 0xe8 / 255, green: 0x90 / 255, blue: 0x1b / 255) }
+    return Color(red: 0xd8 / 255, green: 0x26 / 255, blue: 0x1c / 255)
+}
+
+/// One age, its disc: the reusable badge for "suitable from this age" — a
+/// filter's stop, a legend, anywhere an age is said without a title.
+public struct AgeBadge: View {
+    let age: Int
+    let options: ChipOptions
+
+    public init(age: Int, emphasis: Emphasis = .plain, height: CGFloat = 34, detail: String? = nil)
+    {
+        self.age = age
+        self.options = ChipOptions(
+            emphasis: emphasis, height: height, trailing: nil, detail: detail, tone: .ink, form: nil
+        )
+    }
+
+    public var body: some View {
+        Axis(
+            kind: .rating, glyphs: [.age(age, name: ageLabel(age))],
+            accessibility: age == 0 ? "all ages" : "\(age)+", options: options)
     }
 }
 
