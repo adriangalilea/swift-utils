@@ -8,6 +8,18 @@ The styling atoms every product builds on: the `ink*` fill ladder for dark-glass
 
 Ink also carries the pieces every surface repeats: `Pill` / `PersonPill` / `PillButtonStyle` (the leading slot - avatar or icon, always - is a circle whose diameter is the pill's height, flush at the left end, so its curvature IS the cap's curvature), `inkEdgeFade` (the law of scrolling regions: content near a scroll edge fades, never cuts mid-element; mask-based, so it works over any background), `MicButton` + `PushToTalk` (THE mic affordance, designed once: the messaging-app grammar - hold to talk, quick tap latches with a lock badge, next tap stops - one state machine shared by the pointer gesture and any key binding's press/release, a live Siri-family gradient waveform while hot (glowing mirrored ribbon, bright on voice activity - deliberately not red: a live mic is a state, not an error); the studio's signal source is listen's `AudioSpectrum` over `MicCapture` in github.com/adriangalilea/swift-senses - Ink owns the FEEL, listen owns the DSP), and the brand-mark machinery below.
 
+## Releases (`ship`)
+
+A Mac app's release outside the App Store, one implementation for every app. The app builds its bundle; `ship` does everything after it, from the app's own repo with `VERSION` in its environment and the release body in `notes/$VERSION.md`:
+
+```
+ship check   --name myapp --app dist/myapp.app --assemble "scripts/assemble.sh dist/myapp.app"
+ship release --name myapp --app dist/myapp.app --assemble "scripts/assemble.sh dist/myapp.app" \
+             --sign Contents/MacOS/helper --github --after "mise run publish" --cask
+```
+
+`check` reports every gate (own repo root, clean tree, no tag yet, the notes and their grammar, a Developer ID certificate, the notary keychain profile, and each channel's prerequisite) and prints the real answer under a blocked one: notarytool fails alike for a missing profile, a revoked key and an expired developer agreement, and each needs different hands. `release` runs the gates, then: `--assemble`, signing with hardened runtime and a secure timestamp (each `--sign` path inside the bundle first, then the bundle), notarization judged by `stapler` rather than notarytool's exit status, a dmg with an Applications link, the tag pushed with its branch, and the channels asked for: `--github` (a release with the notes and the dmg), `--after` (any command, with `DMG` and `VERSION` set, run once the dmg is public), `--cask` (bumps `Casks/<name>.rb` in the tap checkout at `$TAP`, skipped when unset). Install it with mise: `"spm:adriangalilea/swift-utils" = "<tag>"`.
+
 ## Brands (`brandgen`)
 
 Any brand mark, natively, with no runtime SVG engine and no dependency. Swift has nothing like react-icons: SF Symbols excludes brands by trademark policy, and every third-party option is either an icon-font relic or a runtime parser. But asset catalogs compile SVG with vector preservation and template rendering, so the only missing piece was a way to GET the artwork.

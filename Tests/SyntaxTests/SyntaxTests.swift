@@ -9,7 +9,7 @@ struct SyntaxTests {
     /// (several distinct inks), and coloring may never rewrite a character.
     @Test func aHeredocScriptIsColoredAndCharacterExact() {
         let command = """
-            cd /Users/adrian/Developer/videoclub; python3 - <<'EOF'
+            cd ~/project; python3 - <<'EOF'
             def rep(a, b):
                 global s
                 assert s.count(a) == 1, a[:60]

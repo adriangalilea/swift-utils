@@ -74,6 +74,11 @@ let package = Package(
         // regenerates its typed enum with each brand's OFFICIAL color.
         // `swift run brandgen add <slug>` / `brandgen import <slug> --svg …`.
         .executable(name: "brandgen", targets: ["brandgen"]),
+        // A Mac app's release outside the App Store: gates with honest
+        // answers, Developer ID signing, notarization judged by the staple,
+        // the dmg, the branch and tag, and the channels the app asks for.
+        // `ship check` / `ship release`, installed by mise's spm backend.
+        .executable(name: "ship", targets: ["ship"]),
         // Gallery's gate + demo: `swift run gallery-example --check` runs
         // the kernel invariants headless (nonzero exit on failure);
         // without the flag it opens a demo window with the keyboard walk
@@ -124,6 +129,7 @@ let package = Package(
         ),
         .executableTarget(name: "mediaspec-example", dependencies: ["MediaSpec"]),
         .executableTarget(name: "brandgen"),
+        .executableTarget(name: "ship"),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
         .testTarget(name: "GrantTests", dependencies: ["Grant"]),
     ]
