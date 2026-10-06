@@ -79,6 +79,11 @@ let package = Package(
         // the dmg, the branch and tag, and the channels the app asks for.
         // `ship check` / `ship release`, installed by mise's spm backend.
         .executable(name: "ship", targets: ["ship"]),
+        // A Mac app's icon from its one source, the Icon Composer package
+        // (`<Name>.icon`: icon.json + SVG layers): `mark build` compiles the
+        // glass Assets.car, the flat icns and a 512 png; `mark preview`
+        // shows Apple's own rendering of every appearance on a page.
+        .executable(name: "mark", targets: ["mark"]),
         // Gallery's gate + demo: `swift run gallery-example --check` runs
         // the kernel invariants headless (nonzero exit on failure);
         // without the flag it opens a demo window with the keyboard walk
@@ -130,6 +135,7 @@ let package = Package(
         .executableTarget(name: "mediaspec-example", dependencies: ["MediaSpec"]),
         .executableTarget(name: "brandgen"),
         .executableTarget(name: "ship"),
+        .executableTarget(name: "mark"),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
         .testTarget(name: "GrantTests", dependencies: ["Grant"]),
     ]

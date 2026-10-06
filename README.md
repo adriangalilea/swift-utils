@@ -20,6 +20,17 @@ ship release --name myapp --app dist/myapp.app --assemble "scripts/assemble.sh d
 
 `check` reports every gate (own repo root, clean tree, no tag yet, the notes and their grammar, a Developer ID certificate, the App Store Connect key, and each channel's prerequisite) and prints the real answer under a blocked one: notarytool fails alike for a revoked key and an expired developer agreement, and each needs different hands. The key is named by the releasing machine's environment, never the repo: `APPSTORE_KEY` (the .p8's path), `APPSTORE_KEY_ID`, `APPSTORE_ISSUER`, the same three xcodebuild's provisioning takes. `release` runs the gates, then: `--assemble`, signing with hardened runtime and a secure timestamp (each `--sign` path inside the bundle first, then the bundle), notarization judged by `stapler` rather than notarytool's exit status, a dmg that opens on a designed install window, the app beside an Applications link and the app's icon on the volume (itself signed, notarized and stapled), the tag pushed with its branch, and the channels asked for: `--github` (a release with the notes and the dmg), `--after` (any command, with `DMG` and `VERSION` set, run once the dmg is public), `--cask` (bumps `Casks/<name>.rb` in the tap checkout at `$TAP`, skipped when unset). Install it with mise: `"spm:adriangalilea/swift-utils" = "<tag>"`.
 
+## Icons (`mark`)
+
+A Mac app's icon has one source: its Icon Composer package, `<Name>.icon` (the `icon.json` Icon Composer writes, and `Assets/` with each layer as SVG). Open it in Icon Composer to change the lighting, glass or layer order; diff it in git; and compile every icon file from it, so there is never a second drawing:
+
+```
+mark preview MyApp.icon [--all]                       # Apple's own rendering, 256 to 20 px, on a page
+mark build   MyApp.icon --out Resources --png icon.png  # Assets.car + MyApp.icns (+ a 512 px png)
+```
+
+`build` runs `actool`: `Assets.car` is the glass icon macOS 26 draws in every appearance, `MyApp.icns` the flat fallback for Finder's older paths and the dmg's volume icon; the bundle names both (`CFBundleIconName` and `CFBundleIconFile`, each `MyApp`). `preview` renders with Icon Composer's `ictool`, the review before anything ships; `--all` adds the dark, clear and tinted appearances a person can pick. Layers are plain vector SVG: Icon Composer ignores SVG filters, so an effect is baked into the geometry, and a PNG layer is refused (a rendering, not the drawing). Install it with mise like `ship`.
+
 ## Brands (`brandgen`)
 
 Any brand mark, natively, with no runtime SVG engine and no dependency. Swift has nothing like react-icons: SF Symbols excludes brands by trademark policy, and every third-party option is either an icon-font relic or a runtime parser. But asset catalogs compile SVG with vector preservation and template rendering, so the only missing piece was a way to GET the artwork.
