@@ -213,6 +213,12 @@ do {
 must(["cp", "-R", app, stage])
 must(["ln", "-sf", "/Applications", "\(stage)/Applications"])
 must(["diskutil", "image", "create", "from", "--format", "UDZO", "--volumeName", name, stage, dmg])
+// The download itself is signed, notarized and stapled too: Gatekeeper
+// judges the disk image before the app inside it, and a ticket stapled to
+// each holds offline.
+must(["codesign", "--force", "--timestamp", "--sign", signer, dmg])
+must(["xcrun", "notarytool", "submit", dmg, "--keychain-profile", notary, "--wait"])
+must(["xcrun", "stapler", "staple", dmg])
 
 // The branch with its tag: a tag pushed alone leaves the branch on the remote
 // behind the release it names.
