@@ -60,6 +60,12 @@ public enum MarkForm: Sendable {
     case lockup
 }
 
+/// What leads a plate: a catalog mark (a flag) or a word (a board's code).
+public enum PlateLead: Hashable, Sendable {
+    case mark(Mark)
+    case word(String)
+}
+
 /// One mark's content: artwork from the catalog, a word that has none, the
 /// two-line disc-case badge, or a METER. `art` stands at the chip height (a
 /// symbol, a flag, a badge); `lockup` is a wordmark, sized so its word's
@@ -72,12 +78,16 @@ public enum Glyph: Hashable, Sendable {
     case word(String)
     case badge(primary: String, secondary: String)
     case meter(filled: Int, of: Int, name: String)
+    /// A PLATE: one drawn frame holding a lead (a mark, or a word set
+    /// quieter), a hairline, then the word — a rating's board and its value
+    /// as one object, never two boxes pressed together.
+    case plate(lead: PlateLead, word: String)
 
     /// Drawn from the catalog rather than set as text.
     public var isArtwork: Bool {
         switch self {
         case .art, .lockup: true
-        case .word, .badge, .meter: false
+        case .word, .badge, .meter, .plate: false
         }
     }
 }
@@ -218,6 +228,30 @@ public struct SpecChip: View {
             }
         case .meter(let filled, let of, _):
             meter(filled: filled, of: of)
+        case .plate(let lead, let word):
+            sticker(box: height, band: nil) {
+                HStack(spacing: height * 0.28) {
+                    switch lead {
+                    case .mark(let m):
+                        m.image
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: height * 0.52)
+                            .foregroundStyle(markStyle(m))
+                    case .word(let w):
+                        Text(w)
+                            .font(.system(size: Self.wordSize(height) * 0.85, weight: .medium))
+                            .opacity(0.7)
+                    }
+                    Rectangle()
+                        .fill(ink)
+                        .opacity(0.45)
+                        .frame(width: max(1, height * 0.05), height: height * 0.55)
+                    Text(word)
+                        .font(Self.wordFont(height))
+                        .lineLimit(1)
+                }
+            }
         }
     }
 
@@ -294,6 +328,11 @@ public struct SpecChip: View {
         case .word(let w): w
         case .badge(let p, let s): "\(p) \(s)"
         case .meter(_, _, let name): name
+        case .plate(let lead, let word):
+            switch lead {
+            case .mark(let m): "\(m.title) \(word)"
+            case .word(let w): "\(w) \(word)"
+            }
         }
     }
 
@@ -569,7 +608,11 @@ public struct RatingChip: View {
     public var body: some View {
         Axis(
             kind: .rating,
-            glyphs: [options.glyph(rating.marks) ?? .word(rating.board), .word(rating.value)],
+            glyphs: [
+                .plate(
+                    lead: rating.marks.symbol.map(PlateLead.mark) ?? .word(rating.board),
+                    word: rating.value)
+            ],
             accessibility: ratingLabel(rating), options: options)
     }
 }
