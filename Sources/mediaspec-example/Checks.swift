@@ -80,7 +80,9 @@ func runChecks() -> Never {
             fail("pictureLabel stereo = `\(pictureLabel(r, g, stereo: s))`, want `\(long)`")
         }
         if pictureLabel(r, g, stereo: s, short: true) != short {
-            fail("pictureLabel stereo short = `\(pictureLabel(r, g, stereo: s, short: true))`, want `\(short)`")
+            fail(
+                "pictureLabel stereo short = `\(pictureLabel(r, g, stereo: s, short: true))`, want `\(short)`"
+            )
         }
     }
     let sound: [(Audio, String, String)] = [
