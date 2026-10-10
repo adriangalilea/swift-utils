@@ -10,10 +10,10 @@ import PackageDescription
 let package = Package(
     name: "swift-utils",
     // One version floor on every platform - the 26-era SwiftUI API surface
-    // everywhere, so cross-platform products (Gallery) never carry
+    // everywhere, so cross-platform products (Ink, MediaSpec) never carry
     // availability checks. Keymap (Carbon/AppKit) stays mac-only de facto -
     // SwiftPM builds only the products a consumer requests, so a tvOS app
-    // importing Gallery never compiles it.
+    // importing Ink never compiles it.
     platforms: [.macOS(.v26), .tvOS(.v26), .iOS(.v26)],
     products: [
         // The styling atoms: the Ink token ladder + the studio's
@@ -45,12 +45,6 @@ let package = Package(
         // whose system readout lies), the TCC and notification probes,
         // and the live row.
         .library(name: "Grant", targets: ["Grant"]),
-        // The library-grid product: framework-free layout + selection
-        // kernels (justified rows, the 2D cursor walk, the 3-mode
-        // selection verb) and the GalleryView shell. Cross-platform by
-        // design - macOS binds keyboards to the kernels, tvOS lets the
-        // focus engine drive the same geometry.
-        .library(name: "Gallery", targets: ["Gallery"]),
         // The system-wide shortcut overlay: a tiny background agent showing
         // the frontmost app's published keymap on one global chord (⌃⌘/).
         // Dogfood-first: `swift run keymap-overlay`.
@@ -84,11 +78,6 @@ let package = Package(
         // glass Assets.car, the flat icns and a 512 png; `mark preview`
         // shows Apple's own rendering of every appearance on a page.
         .executable(name: "mark", targets: ["mark"]),
-        // Gallery's gate + demo: `swift run gallery-example --check` runs
-        // the kernel invariants headless (nonzero exit on failure);
-        // without the flag it opens a demo window with the keyboard walk
-        // wired. The tvOS gate is the first tvOS consumer app.
-        .executable(name: "gallery-example", targets: ["gallery-example"]),
         // MediaSpec's gate + demo: `--check` pins the vocabulary, the label
         // rules and the lenient-decode law; without the flag, every chip
         // variant in a window on black.
@@ -120,10 +109,8 @@ let package = Package(
         .target(name: "Door"),
         .target(name: "Grant"),
         .executableTarget(name: "door-example", dependencies: ["Door"]),
-        .target(name: "Gallery", dependencies: ["Ink"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap"]),
-        .executableTarget(name: "gallery-example", dependencies: ["Gallery"]),
         .target(
             name: "MediaSpec",
             dependencies: ["Ink"],

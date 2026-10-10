@@ -76,16 +76,6 @@ Generic media format chips: `Resolution`, `DynamicRange`, `Audio` (codec + chann
 
 The raw values are the wire spellings, shared with the React `media-spec` item. `swift run mediaspec-example --check` prints every enum's vocabulary in declaration order and asserts it equals the pinned literal (the React item pins the same literal on its side, so a rename fails a gate instead of drawing a wrong chip), the label rules, the lenient-decode law, and the catalog against its manifest (every imageset is a `Mark`, every value's binding); without the flag it opens the sweep window - every resolution × range, every codec, the four looks, three heights, the trailing slot, the two rungs in both tones, the drawn badges beside the artwork, the whole catalog, and four recipes showing what the generic ergonomics allow.
 
-## Gallery
-
-The library-grid product: a framework-free layout kernel plus the SwiftUI shell, cross-platform by design - macOS binds keyboards to the kernels, tvOS lets the focus engine drive the same geometry.
-
-- `GalleryPack.justifiedRows` - greedy justified rows (every row fills the width, each item at its TRUE aspect). **Prefix-stable**: a row is emitted the moment it fills, on its own items alone, so appending a page can only re-pack the old last row - the property paging stands on when nothing may reflow under a cursor or a focus engine.
-- `GallerySelection` - the 3-mode selection verb (replace / toggle / range) with anchor+cursor discipline and the 2D ragged-row walk. Pure state over `(orderedItems, Set)`, zero UI: the host binds the inputs.
-- `GalleryView` - observation-agnostic (plain values + closures, never a god-object), with `rowFocusSections` as the tvOS focus fallback and `galleryZoomSource`/`galleryZoomDestination` wrapping the system zoom navigation transition, so a card expands into its page and collapses back.
-
-Gate: `swift run gallery-example --check` asserts the kernel invariants headless (row fill, append stability, every selection law); without the flag it opens a demo window with the keyboard walk wired.
-
 ## Liveness (a pattern, not yet a module)
 
 Any externally-mutable status an app RENDERS — a TCC grant, an extension's
