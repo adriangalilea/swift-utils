@@ -1,14 +1,23 @@
-# swift-utils releasing itself through the same reusable workflow every consumer
-# calls. Local ref (./) rather than @ci-v1 on purpose: the pipeline must be tested
-# by the commit that changes it, not by the last tagged copy of itself.
+# A Swift library's version IS its git tag: pushing one verifies the package
+# and publishes the notes, through adriangalilea/ci.
 name: release
 
 on:
   push:
     tags: ['[0-9]+.[0-9]+.[0-9]+']
 
+permissions: {}
+
 jobs:
+  verify:
+    uses: adriangalilea/ci/.github/workflows/swift.yml@69c560ad05a9a3f62cdb9a33cf4307cc6b485c1d # v1.1.0
+    permissions:
+      contents: read
+
   release:
-    uses: ./.github/workflows/lib-release.yml
+    needs: verify
+    uses: adriangalilea/ci/.github/workflows/release.yml@69c560ad05a9a3f62cdb9a33cf4307cc6b485c1d # v1.1.0
+    with:
+      tag: ${{ github.ref_name }}
     permissions:
       contents: write

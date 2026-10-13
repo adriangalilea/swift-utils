@@ -20,6 +20,8 @@ ship release --name myapp --app dist/myapp.app --assemble "scripts/assemble.sh d
 
 `check` reports every gate (own repo root, clean tree, no tag yet, the notes and their grammar, a Developer ID certificate, the App Store Connect key, and each channel's prerequisite) and prints the real answer under a blocked one: notarytool fails alike for a revoked key and an expired developer agreement, and each needs different hands. The key is named by the releasing machine's environment, never the repo: `APPSTORE_KEY` (the .p8's path), `APPSTORE_KEY_ID`, `APPSTORE_ISSUER`, the same three xcodebuild's provisioning takes. `release` runs the gates, then: `--assemble`, signing with hardened runtime and a secure timestamp (each `--sign` path inside the bundle first, then the bundle), notarization judged by `stapler` rather than notarytool's exit status, a dmg that opens on a designed install window, the app beside an Applications link and the app's icon on the volume (itself signed, notarized and stapled), the tag pushed with its branch, and the channels asked for: `--github` (a release with the notes and the dmg), `--after` (any command, with `DMG` and `VERSION` set, run once the dmg is public), `--cask` (bumps `Casks/<name>.rb` in the tap checkout at `$TAP`, skipped when unset). Install it with mise: `"spm:adriangalilea/swift-utils" = "<tag>"`.
 
+`ship` runs where the Developer ID lives. Libraries and packages (this one included) release from CI instead, through [adriangalilea/ci](https://github.com/adriangalilea/ci), which never signs; a CI-side app release would be a workflow there calling `ship`, not a second implementation.
+
 ## Icons (`mark`)
 
 A Mac app's icon has one source: its Icon Composer package, `<Name>.icon` (the `icon.json` Icon Composer writes, and `Assets/` with each layer as SVG). Open it in Icon Composer to change the lighting, glass or layer order; diff it in git; and compile every icon file from it, so there is never a second drawing:
@@ -351,17 +353,4 @@ Tag and push: `git tag 0.1.2 && git push --tags`. Git is the registry. Push the 
 
 Mac apps invert this: an app bundle has a native version (`CFBundleShortVersionString`), so there the manifest is truth and CI derives the tag from it.
 
-The pipeline is itself a product here. `lib-release.yml` is reusable (`workflow_call`); any Swift library repo consumes it by ref:
-
-```yaml
-jobs:
-  release:
-    uses: adriangalilea/swift-utils/.github/workflows/lib-release.yml@ci-v1
-    permissions: { contents: write }
-```
-
-`ci-v1` is a moving major tag, deliberately NOT the library's semver: a Keymap patch and a pipeline change must never share a version number. Advance it for compatible pipeline changes, cut `ci-v2` when a consumer's call would break. Never pin a consumer to `@main`; a bad push here would then break their releases silently.
-
-The changelog format is `.github/cliff.toml`, which the workflow checks out into `.ci/` at `ci-v1`, so consuming repos inherit format fixes without copying the file. swift-utils calls its own workflow through `./` rather than `@ci-v1`, so the pipeline is always tested by the commit that changes it.
-
-Verify runs on `macos-26` (the package targets macOS 26); the release job runs on Linux, because a library release ships no binaries and git-cliff-action is a Docker action, which cannot run on macOS runners.
+The tag runs `.github/workflows/release.yml`, a stub over the shared workflows in [adriangalilea/ci](https://github.com/adriangalilea/ci): `swift.yml` builds and tests on `macos-26` (the package targets macOS 26), then `release.yml` writes the git-cliff notes and the GitHub Release. Any Swift library uses the same stub, listed in that repo's README; the pipeline is versioned there, apart from this library's semver, so a Keymap patch and a pipeline change never share a version number.
