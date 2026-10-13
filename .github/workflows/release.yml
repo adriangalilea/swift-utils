@@ -10,13 +10,13 @@ permissions: {}
 
 jobs:
   verify:
-    uses: adriangalilea/ci/.github/workflows/swift.yml@aff0340f6067ae0013ad2304c3c1bb591d64ceb6 # v1.2.1
+    uses: adriangalilea/ci/.github/workflows/swift.yml@7018e276a6c519cef370fb1eeb1b8b5ee34da500 # v1.2.2
     permissions:
       contents: read
 
   release:
     needs: verify
-    uses: adriangalilea/ci/.github/workflows/release.yml@aff0340f6067ae0013ad2304c3c1bb591d64ceb6 # v1.2.1
+    uses: adriangalilea/ci/.github/workflows/release.yml@7018e276a6c519cef370fb1eeb1b8b5ee34da500 # v1.2.2
     with:
       tag: ${{ github.ref_name }}
     permissions:
