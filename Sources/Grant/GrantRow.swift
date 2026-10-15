@@ -1,6 +1,13 @@
-#if os(macOS)
+#if os(macOS) || os(iOS)
     import Combine
     import SwiftUI
+    #if os(macOS)
+        import AppKit
+        private let becameActive = NSApplication.didBecomeActiveNotification
+    #else
+        import UIKit
+        private let becameActive = UIApplication.didBecomeActiveNotification
+    #endif
 
     /// The one row every grant surface wears: icon, title + why, a live
     /// checkmark or the standing's action. SELF-SUFFICIENT by design, so a
@@ -81,10 +88,10 @@
             .onChange(of: live) { sync() }
             .onReceive(pulse) { _ in sync() }
             .onAppear { sync(arrival: true) }
-            .onReceive(
-                NotificationCenter.default.publisher(
-                    for: NSApplication.didBecomeActiveNotification)
-            ) { _ in sync(arrival: true) }
+            // Back from Settings (where the person changes it) is RETURN.
+            .onReceive(NotificationCenter.default.publisher(for: becameActive)) { _ in
+                sync(arrival: true)
+            }
         }
 
         private func sync(arrival: Bool = false) {
