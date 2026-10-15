@@ -13,6 +13,48 @@ public enum CodeFormat: String, Sendable, Codable {
     }
 }
 
+/// A grammar coloring as data: computed where the engine runs (`Syntax`,
+/// JavaScriptCore) and painted where it cannot (a Live Activity, a widget),
+/// so both show the same inks. `palette` is `#rrggbb` inks; `runs` covers
+/// the text in order, each `[characters, ink]` (ink -1 = the host's color).
+/// Small by construction: a few hundred bytes for a glance's excerpt.
+public struct CodeColors: Codable, Hashable, Sendable {
+    public var palette: [String]
+    public var runs: [[Int]]
+    public init(palette: [String], runs: [[Int]]) {
+        self.palette = palette
+        self.runs = runs
+    }
+
+    /// `text` painted with these inks; nil when they do not cover it
+    /// exactly (colors for other text are never applied).
+    public func paint(_ text: String) -> AttributedString? {
+        guard runs.reduce(0, { $0 + $1[0] }) == text.count else { return nil }
+        var out = AttributedString()
+        var rest = Substring(text)
+        for run in runs {
+            var piece = AttributedString(String(rest.prefix(run[0])))
+            rest = rest.dropFirst(run[0])
+            if run[1] >= 0, run[1] < palette.count, let color = Color(hex: palette[run[1]]) {
+                piece.foregroundColor = color
+            }
+            out += piece
+        }
+        return out
+    }
+}
+
+extension Color {
+    /// `#rrggbb`.
+    init?(hex: String) {
+        guard hex.count == 7, hex.hasPrefix("#"), let value = UInt32(hex.dropFirst(), radix: 16)
+        else { return nil }
+        self.init(
+            red: Double((value >> 16) & 0xff) / 255, green: Double((value >> 8) & 0xff) / 255,
+            blue: Double(value & 0xff) / 255)
+    }
+}
+
 /// Coloring that needs no grammar engine: a diff by its line prefixes
 /// (green added, red removed, `@@` headers muted; our diff format is ours
 /// and its semantics are exact), everything else as written. What a
@@ -51,15 +93,20 @@ public enum SyntaxLines {
 public struct CodeExcerpt: View {
     private let text: String
     private let format: CodeFormat
+    private let colors: CodeColors?
     private let lines: Int
     private let font: Font
 
+    /// `colors`: the grammar's inks, computed where the engine runs
+    /// (`Syntax.colors`); without them a diff is still line-colored and
+    /// anything else plain.
     public init(
-        _ text: String, format: CodeFormat, lines: Int = 3,
+        _ text: String, format: CodeFormat, colors: CodeColors? = nil, lines: Int = 3,
         font: Font = .system(.caption, design: .monospaced)
     ) {
         self.text = text
         self.format = format
+        self.colors = colors
         self.lines = lines
         self.font = font
     }
@@ -69,7 +116,7 @@ public struct CodeExcerpt: View {
             if format == .shell {
                 Text("$").foregroundStyle(.secondary)
             }
-            Text(SyntaxLines.color(text, as: format))
+            Text(colors?.paint(text) ?? SyntaxLines.color(text, as: format))
                 .lineLimit(lines)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)

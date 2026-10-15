@@ -22,6 +22,19 @@ struct SyntaxTests {
         #expect(inks.count >= 2, "one ink means the grammar pass did nothing: \(inks)")
     }
 
+    /// The grammar's inks travel as data and paint the same text the same
+    /// way where no engine runs; they never paint other text.
+    @Test func colorsTravelAsDataAndPaintExactly() throws {
+        let command = "find .build -name \"*.o\" -delete && echo \"freed in $HOME\""
+        let colors = try #require(Syntax.colors(command, as: .shell))
+        let painted = try #require(colors.paint(command))
+        #expect(String(painted.characters) == command)
+        #expect(Set(painted.runs.compactMap { $0.foregroundColor }).count >= 2)
+        #expect(colors.paint(command + "x") == nil)
+        #expect(Syntax.colors("+ a\n- b", as: .diff) == nil)
+        #expect(try JSONEncoder().encode(colors).count < 1024)
+    }
+
     @Test func aSingleShellLineIsColoredAsShell() {
         let command = "rg -n \"pattern\" src | head -5"
         let colored = Syntax.highlight(command, as: .shell)

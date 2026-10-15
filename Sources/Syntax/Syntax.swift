@@ -49,6 +49,47 @@ public enum Syntax {
         }
     }
 
+    /// The grammar's inks for `text` as data (`CodeColors`), for a surface
+    /// that cannot run the engine to paint (`CodeExcerpt(colors:)`). Nil for
+    /// a diff (line-colored without an engine) and plain text, or when the
+    /// grammar gives nothing.
+    public static func colors(_ text: String, as format: CodeFormat) -> CodeColors? {
+        guard format == .shell, text.utf8.count <= ceiling else { return nil }
+        let colored = highlight(text, as: format)
+        var palette: [String] = []
+        var runs: [[Int]] = []
+        for run in colored.runs {
+            let count = colored[run.range].characters.count
+            var ink = -1
+            if let color = run.foregroundColor, let hex = hex(color) {
+                if let at = palette.firstIndex(of: hex) {
+                    ink = at
+                } else {
+                    palette.append(hex)
+                    ink = palette.count - 1
+                }
+            }
+            if let last = runs.last, last[1] == ink {
+                runs[runs.count - 1][0] += count
+            } else {
+                runs.append([count, ink])
+            }
+        }
+        return palette.isEmpty ? nil : CodeColors(palette: palette, runs: runs)
+    }
+
+    private static func hex(_ color: Color) -> String? {
+        #if canImport(AppKit)
+            guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { return nil }
+            let (r, g, b) = (rgb.redComponent, rgb.greenComponent, rgb.blueComponent)
+        #else
+            var (r, g, b, a): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+            guard UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a) else { return nil }
+        #endif
+        let byte = { (v: CGFloat) in Int((min(max(v, 0), 1) * 255).rounded()) }
+        return String(format: "#%02x%02x%02x", byte(r), byte(g), byte(b))
+    }
+
     // MARK: - the engine
 
     /// One highlight.js instance (a JSContext loading ~1MB of grammar is not
