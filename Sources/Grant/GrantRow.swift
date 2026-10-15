@@ -39,13 +39,81 @@
         @State private var shown: Standing?
         private let pulse = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-        public init(_ grant: any Grant) {
+        /// `row`: a settings list line (small icon, why + note, a small
+        /// control). `card`: a device-list card, the shape of a row of
+        /// devices on a phone (a large icon tinted by the standing, title
+        /// over one line of detail, the mark or the action centred on the
+        /// right); the detail is the note when there is one, else the why.
+        public enum Style: Sendable { case row, card }
+        private let style: Style
+
+        public init(_ grant: any Grant, style: Style = .row) {
             self.grant = grant
+            self.style = style
         }
 
         public var body: some View {
             let live = grant.standing
             let standing = shown ?? live
+            content(standing)
+                .onChange(of: live) { sync() }
+                .onReceive(pulse) { _ in sync() }
+                .onAppear { sync(arrival: true) }
+                // Back from Settings (where the person changes it) is RETURN.
+                .onReceive(NotificationCenter.default.publisher(for: becameActive)) { _ in
+                    sync(arrival: true)
+                }
+        }
+
+        @ViewBuilder private func content(_ standing: Standing) -> some View {
+            switch style {
+            case .row: row(standing)
+            case .card: card(standing)
+            }
+        }
+
+        private func card(_ standing: Standing) -> some View {
+            HStack(spacing: 14) {
+                Image(systemName: grant.symbol)
+                    .font(.title2)
+                    .foregroundStyle(tint(standing.grade))
+                    .frame(width: 34)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(grant.title).font(.body.weight(.medium))
+                    Text(standing.note ?? grant.why)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                switch standing.grade {
+                case .good:
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.green)
+                case .unknown:
+                    Text("unknown")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.tertiary)
+                case .askable, .broken:
+                    Button(standing.actionTitle) { grant.act() }
+                        .buttonStyle(.glassProminent)
+                }
+            }
+        }
+
+        /// The icon says the standing at a glance, as a device row does:
+        /// green when good, orange when the person must fix it.
+        private func tint(_ grade: Standing.Grade) -> Color {
+            switch grade {
+            case .good: .green
+            case .broken: .orange
+            case .askable, .unknown: .secondary
+            }
+        }
+
+        private func row(_ standing: Standing) -> some View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: grant.symbol)
                     .font(.system(size: 15))
@@ -85,13 +153,6 @@
                 }
             }
             .padding(.vertical, 4)
-            .onChange(of: live) { sync() }
-            .onReceive(pulse) { _ in sync() }
-            .onAppear { sync(arrival: true) }
-            // Back from Settings (where the person changes it) is RETURN.
-            .onReceive(NotificationCenter.default.publisher(for: becameActive)) { _ in
-                sync(arrival: true)
-            }
         }
 
         private func sync(arrival: Bool = false) {
