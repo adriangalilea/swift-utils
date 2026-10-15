@@ -1,5 +1,6 @@
 import Highlightr
 import SwiftUI
+@_exported import SyntaxLines
 
 /// Review-body coloring for approval surfaces: the text a human reads before
 /// saying yes, told apart by what the requester SAID it is, never guessed.
@@ -11,18 +12,6 @@ import SwiftUI
 /// rewrites a character: the output's characters are the input, exactly,
 /// so what is approved is what was shown.
 public enum Syntax {
-    /// The wire vocabulary a requester declares ("shell", "diff", "text");
-    /// anything unrecognized is plain, never an error.
-    public enum Format: String, Sendable {
-        case shell
-        case diff
-        case plain = "text"
-
-        public init(_ raw: String?) {
-            self = raw.flatMap(Format.init(rawValue:)) ?? .plain
-        }
-    }
-
     /// The highlight.js theme the colors come from. Foreground colors only -
     /// the host owns background and font - so pick one whose inks read on
     /// your surfaces. Every current surface is dark glass.
@@ -41,9 +30,9 @@ public enum Syntax {
     /// kilobytes stalls the render for something nobody reads colored.
     public static let ceiling = 32 * 1024
 
-    public static func highlight(_ text: String, as format: Format) -> AttributedString {
+    public static func highlight(_ text: String, as format: CodeFormat) -> AttributedString {
         switch format {
-        case .diff: return diff(text)
+        case .diff: return SyntaxLines.diff(text)
         case .plain: return AttributedString(text)
         case .shell:
             guard text.utf8.count <= ceiling else { return AttributedString(text) }
@@ -58,24 +47,6 @@ public enum Syntax {
             remember(key, colored)
             return colored
         }
-    }
-
-    private static func diff(_ text: String) -> AttributedString {
-        var out = AttributedString()
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-        for (index, line) in lines.enumerated() {
-            var run = AttributedString(String(line))
-            if line.hasPrefix("+") {
-                run.foregroundColor = .green
-            } else if line.hasPrefix("-") {
-                run.foregroundColor = .red
-            } else if line.hasPrefix("@@") {
-                run.foregroundColor = .secondary
-            }
-            out += run
-            if index < lines.count - 1 { out += AttributedString("\n") }
-        }
-        return out
     }
 
     // MARK: - the engine
@@ -156,14 +127,14 @@ public enum Syntax {
 /// showing the same evidence must color it identically, and this is how.
 public struct SyntaxText: View {
     private let text: String
-    private let format: Syntax.Format
+    private let format: CodeFormat
     private let font: Font
 
     /// `font` is a parameter, not an ambient: a font set ON the inner Text
     /// would silently beat any modifier the host applies outside, so the
     /// override point is explicit. Monospace is the default because code is.
     public init(
-        _ text: String, format: Syntax.Format,
+        _ text: String, format: CodeFormat,
         font: Font = .system(.callout, design: .monospaced)
     ) {
         self.text = text
@@ -175,7 +146,7 @@ public struct SyntaxText: View {
         _ text: String, format raw: String?,
         font: Font = .system(.callout, design: .monospaced)
     ) {
-        self.init(text, format: Syntax.Format(raw), font: font)
+        self.init(text, format: CodeFormat(raw), font: font)
     }
 
     public var body: some View {

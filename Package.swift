@@ -26,6 +26,10 @@ let package = Package(
         // host brings font and chrome. Its own product so Ink stays
         // dependency-free.
         .library(name: "Syntax", targets: ["Syntax"]),
+        // Syntax without its engine: the format vocabulary, diff line
+        // coloring and a short excerpt view, for surfaces that cannot run
+        // JavaScriptCore (a widget, a Live Activity). No dependencies.
+        .library(name: "SyntaxLines", targets: ["SyntaxLines"]),
         .library(name: "Keymap", targets: ["Keymap"]),
         // The about/support tab every app drops into its Settings: bundle
         // identity + author + links + the support ask, designed once.
@@ -91,9 +95,10 @@ let package = Package(
     ],
     targets: [
         .target(name: "Ink", resources: [.process("Resources")]),
+        .target(name: "SyntaxLines"),
         .target(
             name: "Syntax",
-            dependencies: [.product(name: "Highlightr", package: "Highlightr")]),
+            dependencies: ["SyntaxLines", .product(name: "Highlightr", package: "Highlightr")]),
         .testTarget(name: "SyntaxTests", dependencies: ["Syntax"]),
         .target(
             name: "Keymap",
