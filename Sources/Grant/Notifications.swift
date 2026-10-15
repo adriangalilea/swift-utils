@@ -90,7 +90,8 @@
         ) {
             Task {
                 guard await reach() == .notAsked else { return openSettings(bundleID: bundleID) }
-                _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: options)
+                _ = try? await UNUserNotificationCenter.current().requestAuthorization(
+                    options: options)
             }
         }
 
@@ -108,7 +109,8 @@
                     )!)
             #else
                 Task { @MainActor in
-                    UIApplication.shared.open(URL(string: UIApplication.openNotificationSettingsURLString)!)
+                    UIApplication.shared.open(
+                        URL(string: UIApplication.openNotificationSettingsURLString)!)
                 }
             #endif
         }
