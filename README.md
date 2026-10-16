@@ -82,6 +82,10 @@ The raw values are the wire spellings, shared with the React `media-spec` item. 
 
 Command-line output, by the same names as ts-utils `cli` and py-utils `cli`, so a tool reads the same in every language. `ui` is the semantic palette (`head`, `accent`, `muted`, `ok`, `warn`, `bad`, `ref`), decided once per process: FORCE_COLOR paints, NO_COLOR or TERM=dumb does not, else only when stdout and stderr are both terminals. `ANSI` is the always-on vocabulary underneath. `width` counts terminal cells (escapes free, wide and emoji clusters two), `clip` truncates without breaking styles or wide characters, `padEnd`/`padStart` align on visible width, and `table`, `kv`, `indent`, `tree` lay out blocks that stay aligned whether colored or plain.
 
+## Log (not yet a module)
+
+The logging and tracing contract go-utils, ts-utils and py-utils share (`github.com/adriangalilea/utils`: one event stream, spans as start/end events, W3C `traceparent` across processes, `LOG_*` variables, `LOG_SHIP`, a conformance probe per language) has no Swift writer yet. It belongs here, by the same verbs and the same bytes, with os_log as a second sink, and a `probes/swift` in the harness proving it; authz and vigil then trace a request across processes and devices into one trace any reader of the contract shows.
+
 ## Liveness (a pattern, not yet a module)
 
 Any externally-mutable status an app RENDERS — a TCC grant, an extension's
