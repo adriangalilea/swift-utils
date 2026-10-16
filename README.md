@@ -78,6 +78,10 @@ Generic media format chips: `Resolution`, `DynamicRange`, `Audio` (codec + chann
 
 The raw values are the wire spellings, shared with the React `media-spec` item. `swift run mediaspec-example --check` prints every enum's vocabulary in declaration order and asserts it equals the pinned literal (the React item pins the same literal on its side, so a rename fails a gate instead of drawing a wrong chip), the label rules, the lenient-decode law, and the catalog against its manifest (every imageset is a `Mark`, every value's binding); without the flag it opens the sweep window - every resolution × range, every codec, the four looks, three heights, the trailing slot, the two rungs in both tones, the drawn badges beside the artwork, the whole catalog, and four recipes showing what the generic ergonomics allow.
 
+## Terminal
+
+Command-line output, by the same names as ts-utils `cli` and py-utils `cli`, so a tool reads the same in every language. `ui` is the semantic palette (`head`, `accent`, `muted`, `ok`, `warn`, `bad`, `ref`), decided once per process: FORCE_COLOR paints, NO_COLOR or TERM=dumb does not, else only when stdout and stderr are both terminals. `ANSI` is the always-on vocabulary underneath. `width` counts terminal cells (escapes free, wide and emoji clusters two), `clip` truncates without breaking styles or wide characters, `padEnd`/`padStart` align on visible width, and `table`, `kv`, `indent`, `tree` lay out blocks that stay aligned whether colored or plain.
+
 ## Liveness (a pattern, not yet a module)
 
 Any externally-mutable status an app RENDERS — a TCC grant, an extension's

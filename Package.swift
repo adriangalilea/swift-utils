@@ -31,6 +31,10 @@ let package = Package(
         // JavaScriptCore (a widget, a Live Activity). No dependencies.
         .library(name: "SyntaxLines", targets: ["SyntaxLines"]),
         .library(name: "Keymap", targets: ["Keymap"]),
+        // Command-line output: the semantic palette (TTY + NO_COLOR /
+        // FORCE_COLOR gated), ANSI-aware width/clip/pad, table/kv/tree.
+        // ts-utils `cli` and py-utils `cli` by the same names.
+        .library(name: "Terminal", targets: ["Terminal"]),
         // The about/support tab every app drops into its Settings: bundle
         // identity + author + links + the support ask, designed once.
         .library(name: "Colophon", targets: ["Colophon"]),
@@ -130,5 +134,7 @@ let package = Package(
         .executableTarget(name: "mark"),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
         .testTarget(name: "GrantTests", dependencies: ["Grant"]),
+        .target(name: "Terminal"),
+        .testTarget(name: "TerminalTests", dependencies: ["Terminal"]),
     ]
 )
