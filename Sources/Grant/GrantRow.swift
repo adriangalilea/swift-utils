@@ -15,8 +15,9 @@
     /// Two update paths, both explicit - body reads `grant.standing`
     /// (registering this view's own observation of any observable state
     /// behind it, so claim-backed grants repaint the instant a verdict
-    /// moves) and a 1s pulse re-probes (for probe-backed grants nothing
-    /// observes).
+    /// moves) and a re-probe for probe-backed grants nothing observes: on
+    /// every activation, and on macOS a 1s pulse as well (System Settings
+    /// changes them beside the running app).
     ///
     /// DOCTRINE: action buttons carry NO hover tooltips - guidance a row
     /// needs is rendered INLINE as the standing's note, visible without
@@ -37,7 +38,12 @@
         // other transition renders immediately: grades on different
         // surfaces disagreeing is the split-brain this module bans.
         @State private var shown: Standing?
-        private let pulse = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+        #if os(macOS)
+            /// A Mac's grants change in System Settings beside the running
+            /// app, with no event: probed each second. An iPhone's change only
+            /// in Settings, which the app returns from (`becameActive`).
+            private let pulse = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+        #endif
 
         /// `row`: a settings list line (small icon, why + note, a small
         /// control). `card`: a device-list card, the shape of a row of
@@ -57,7 +63,9 @@
             let standing = shown ?? live
             content(standing)
                 .onChange(of: live) { sync() }
-                .onReceive(pulse) { _ in sync() }
+                #if os(macOS)
+                    .onReceive(pulse) { _ in sync() }
+                #endif
                 .onAppear { sync(arrival: true) }
                 // Back from Settings (where the person changes it) is RETURN.
                 .onReceive(NotificationCenter.default.publisher(for: becameActive)) { _ in
