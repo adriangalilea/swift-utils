@@ -35,6 +35,12 @@ let package = Package(
         // FORCE_COLOR gated), ANSI-aware width/clip/pad, table/kv/tree.
         // ts-utils `cli` and py-utils `cli` by the same names.
         .library(name: "Terminal", targets: ["Terminal"]),
+        // The logging and tracing contract of github.com/adriangalilea/utils
+        // (go-utils, ts-utils, py-utils by the same verbs and the same
+        // bytes): one stream of events, spans as start/end, W3C traceparent
+        // across processes, LOG_* variables, LOG_SHIP; Apple's unified log as
+        // a second sink. No dependencies.
+        .library(name: "Log", targets: ["Log"]),
         // The about/support tab every app drops into its Settings: bundle
         // identity + author + links + the support ask, designed once.
         .library(name: "Colophon", targets: ["Colophon"]),
@@ -136,5 +142,7 @@ let package = Package(
         .testTarget(name: "GrantTests", dependencies: ["Grant"]),
         .target(name: "Terminal"),
         .testTarget(name: "TerminalTests", dependencies: ["Terminal"]),
+        .target(name: "Log"),
+        .testTarget(name: "LogTests", dependencies: ["Log"]),
     ]
 )

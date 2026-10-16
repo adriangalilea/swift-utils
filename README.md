@@ -82,9 +82,33 @@ The raw values are the wire spellings, shared with the React `media-spec` item. 
 
 Command-line output, by the same names as ts-utils `cli` and py-utils `cli`, so a tool reads the same in every language. `ui` is the semantic palette (`head`, `accent`, `muted`, `ok`, `warn`, `bad`, `ref`), decided once per process: FORCE_COLOR paints, NO_COLOR or TERM=dumb does not, else only when stdout and stderr are both terminals. `ANSI` is the always-on vocabulary underneath. `width` counts terminal cells (escapes free, wide and emoji clusters two), `clip` truncates without breaking styles or wide characters, `padEnd`/`padStart` align on visible width, and `table`, `kv`, `indent`, `tree` lay out blocks that stay aligned whether colored or plain.
 
-## Log (not yet a module)
+## Log
 
-The logging and tracing contract go-utils, ts-utils and py-utils share (`github.com/adriangalilea/utils`: one event stream, spans as start/end events, W3C `traceparent` across processes, `LOG_*` variables, `LOG_SHIP`, a conformance probe per language) has no Swift writer yet. It belongs here, by the same verbs and the same bytes, with os_log as a second sink, and a `probes/swift` in the harness proving it; authz and vigil then trace a request across processes and devices into one trace any reader of the contract shows.
+The logging and tracing contract go-utils, ts-utils and py-utils share, in Swift, by the same verbs and the same bytes: [github.com/adriangalilea/utils](https://github.com/adriangalilea/utils) is the contract, and its conformance harness runs `probes/swift` against this module beside the other three. One stream of events, spans as start/end events, W3C `traceparent` across processes, the `LOG_*` variables, `LOG_SHIP`.
+
+```swift
+import Log
+
+log.info("ready")
+log.warn("retrying", ["attempt": 2])
+log.error("charge failed", ["err": error])
+
+try await log.span("charge", ["amount": amount]) { s in
+    s.warn("retrying", ["attempt": 2])
+    try await s.span("stripe") { c in … }
+    s.set(["receipt": receipt])
+}
+
+let s = log.begin("upload")        // work that does not fit a block
+request.traceparent = s.traceparent // hand the trace on
+s.end()                             // or s.end(error), once
+
+let handler = log.join(request.traceparent) // the other side: its spans are children
+```
+
+`LogWriter` and `Span` are the two loggers (`Logging`): every verb, `scope`, `begin`, `span`, `join`. Fields are `[String: any Sendable]` taken as an autoclosure, so a line below its threshold builds nothing; values become JSON by the contract's table (an `Error` as `{type, message, cause}`, `Date` as the event time, `Duration` in milliseconds, `Data` base64, anything `Encodable` by its own form, keys sorted at every depth). `Traceparent` is the W3C value as a type: `Traceparent(parsing:)` throws `Malformed` with the reason, and it is `Codable` the same way, so a message that carries one cannot decode with a broken one. `join` of a malformed string warns once and is ignored, as the contract asks of input from outside.
+
+Two sinks: stderr (human at a terminal, JSON elsewhere, `LOG_FORMAT` to choose) and Apple's unified log, where a daemon and an iPhone app are read: subsystem the bundle identifier (else the service), category the scope path joined by dots, the message the event's JSON line at the matching `OSLogType`, so `log show --style ndjson` piped through `jq -r .eventMessage | logs` gives the stream back. `LOG_OSLOG=0` (or `setLogOSLog(false)`) turns it off. Shipping hooks `atexit` on its first event; a process leaving through `exec` or a signal calls `flushLog()` first.
 
 ## Liveness (a pattern, not yet a module)
 
