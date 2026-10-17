@@ -65,8 +65,9 @@ public func setLogService(_ name: String) {
 }
 
 /// Whether each event is also written to Apple's unified log (default on);
-/// LOG_OSLOG=1|0 overrides it. The subsystem is the bundle identifier (else
-/// the service), the category the scope path joined by dots ("root"
+/// LOG_OSLOG=1|0 overrides it. The subsystem is the identifier of the bundle
+/// the executable lives in (found through a symlink too; else the service),
+/// the category the scope path joined by dots ("root"
 /// unscoped), the message the event's JSON line, at the matching OSLogType.
 public func setLogOSLog(_ on: Bool) {
     settings.withLock { $0.osLog = on }
@@ -246,11 +247,23 @@ private func osLogger(_ scope: [String]) -> os.Logger {
     let category = scope.isEmpty ? "root" : scope.joined(separator: ".")
     return osLoggers.withLock { loggers in
         if let l = loggers[category] { return l }
-        let l = os.Logger(subsystem: Bundle.main.bundleIdentifier ?? service(), category: category)
+        let l = os.Logger(subsystem: subsystem ?? service(), category: category)
         loggers[category] = l
         return l
     }
 }
+
+/// The bundle identifier of the bundle this executable lives in. A program
+/// started through a symlink (`~/.local/bin/x` → `X.app/Contents/MacOS/x`)
+/// has no `Bundle.main` identifier: Bundle reads the path it was launched
+/// by, so the link is resolved and the bundle found from the real path.
+private let subsystem: String? = Bundle.main.bundleIdentifier
+    ?? Bundle.main.executableURL.flatMap { url -> String? in
+        let real = url.resolvingSymlinksInPath()
+        // …/X.app/Contents/MacOS/x: three levels up is the bundle.
+        let bundle = real.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return bundle.pathExtension == "app" ? Bundle(url: bundle)?.bundleIdentifier : nil
+    }
 
 private func osLogType(_ level: LogLevel) -> OSLogType {
     switch level {
