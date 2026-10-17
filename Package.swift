@@ -47,11 +47,12 @@ let package = Package(
         // The premium gate shape: one boolean the app reads, dev-toggleable
         // in every non-release build, compile-time sealed in release.
         .library(name: "Entitlement", targets: ["Entitlement"]),
-        // In-window authentication, no popup: the Safari-private-mode
-        // curtain (embedded Touch ID sensor + inline secret field) and the
-        // DoorSensor primitive. The evaluated LAContext rides the verdict,
-        // so biometry-gated keychain reads need no second prompt.
-        .library(name: "Door", targets: ["Door"]),
+        // In-window biometrics, no popup: the Safari-private-mode lock
+        // (embedded Touch ID sensor + inline secret field), the secret field
+        // and the button a finger can press, over the BiometricSensor
+        // primitive. The evaluated LAContext rides the verdict, so
+        // biometry-gated keychain reads need no second prompt.
+        .library(name: "Biometrics", targets: ["Biometrics"]),
         // Permission standing, split-brain-proof: every grant resolves to
         // ONE Standing (good / askable / broken) that carries its own
         // presentation, so no two surfaces can disagree on "is this a
@@ -121,9 +122,9 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .target(name: "Entitlement", resources: [.process("Resources")]),
-        .target(name: "Door"),
+        .target(name: "Biometrics"),
         .target(name: "Grant"),
-        .executableTarget(name: "door-example", dependencies: ["Door"]),
+        .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap"]),
         .target(

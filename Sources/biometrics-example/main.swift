@@ -1,8 +1,8 @@
-import Door
+import Biometrics
 import SwiftUI
 
-// Door's demo: the Safari-private-mode shape over sample content, live.
-// `swift run door-example` - a resting finger authorizes (real Touch ID,
+// The Biometrics demo: the Safari-private-mode lock over sample content, live.
+// `swift run biometrics-example` - a resting finger authorizes (real Touch ID,
 // in-window, no system alert), or type the demo password "sesame". A wrong
 // secret shakes in place; the status slot swaps text without reflow.
 
@@ -22,20 +22,22 @@ struct DemoView: View {
                     Text("open").font(.title2.weight(.semibold))
                     Button("lock again") { open = false }
                     Divider().frame(width: 280).padding(.vertical, 8)
-                    Text("the compact form: DoorField").font(.caption).foregroundStyle(.secondary)
-                    DoorField(
+                    Text("the compact form: BiometricField").font(.caption).foregroundStyle(.secondary)
+                    BiometricField(
                         prompt: "type the secret",
                         text: $fieldSecret, key: $fieldKey,
-                        door: DoorUnlock(reason: "authorize the demo field") { _ in "authorized" }
+                        biometric: BiometricUnlock(reason: "authorize the demo field") { _ in "authorized" }
                     )
+                    Text("a press a finger can make: BiometricButton").font(.caption).foregroundStyle(.secondary)
+                    BiometricButton("Open it", context: nil) { open = true }
                     .frame(width: 280)
                 }
             } else {
-                Door(
+                BiometricLock(
                     title: "This Demo Is Locked",
                     subtitle: "Touch ID or type \u{201c}sesame\u{201d} to open the demo.",
                     inactiveSubtitle: "Type \u{201c}sesame\u{201d} to open the demo.",
-                    reason: "unlock the door demo"
+                    reason: "unlock the biometrics demo"
                 ) { verdict in
                     switch verdict {
                     case .biometry:
@@ -56,7 +58,7 @@ struct DemoView: View {
 
 struct DemoApp: App {
     var body: some Scene {
-        WindowGroup("door demo") {
+        WindowGroup("biometrics demo") {
             DemoView()
                 .onAppear { NSApp.activate(ignoringOtherApps: true) }
         }

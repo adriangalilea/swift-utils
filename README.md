@@ -133,9 +133,9 @@ status often flips the instant a prompt fires, and a row that sprouts a
 paragraph as you click reads as background mutation, not help. Reference:
 hollow `PermissionRow.showDenied`.
 
-## Door
+## Biometrics
 
-In-window authentication, no popup. The disease it cures: a gated app that
+In-window biometrics, no popup. The disease it cures: a gated app that
 authenticates through a bare keychain read or `LAContext.evaluatePolicy`
 gets macOS's floating system alert ("<app> is trying to unlock <app>… Use
 Password / Cancel") thrown over its own window. Safari private mode proves
@@ -144,7 +144,7 @@ badge, one title, one status line, an inline password field; resting a
 finger unlocks, typing is the fallback, nothing floats.
 
 ```swift
-Door(
+BiometricLock(
     title: "This Vault Is Locked",
     subtitle: "Touch ID or enter the password to open it.",
     reason: "unlock the vault"
@@ -165,17 +165,17 @@ Door(
 
 How it works, and why there is no popup anywhere:
 
-- **`DoorSensor`** (the public primitive) wraps
+- **`BiometricSensor`** (the public primitive) wraps
   `LocalAuthenticationEmbeddedUI.LAAuthenticationView` (macOS 12+): the
   sensor pairs with ONE `LAContext`, and any `evaluatePolicy` /
   `evaluateAccessControl` on that context renders the Touch ID (or Watch)
   affordance inside the view instead of the system alert.
-- **Door owns the context and hands it back.** The classic popup is thrown
-  by the KEYCHAIN when it reads a `.biometryCurrentSet` item. Door
+- **The lock owns the context and hands it back.** The classic popup is thrown
+  by the KEYCHAIN when it reads a `.biometryCurrentSet` item. The lock
   evaluates on the paired context (in-window) and delivers it in the
   verdict; passing it to `SecItemCopyMatching` via
   `kSecUseAuthenticationContext` reads the gated item with no second
-  prompt (LAContext.h states this contract verbatim). `DoorAsk` picks what
+  prompt (LAContext.h states this contract verbatim). `BiometricAsk` picks what
   a touch authorizes: `.biometry` (a plain curtain) or
   `.accessControl(SecAccessControl, .useItem)` (evaluate the item's own
   ACL up front).
@@ -183,36 +183,46 @@ How it works, and why there is no popup anywhere:
   finger authorizes with zero clicks; the field is focused from the start,
   no mode switch. A cancel stays quiet (no surprise re-prompt); touching
   the sensor glyph re-arms a fresh attempt; no biometry on the machine (or
-  lockout) hides the sensor and the door is password-only, Safari-style.
+  lockout) hides the sensor and the lock is password-only, Safari-style.
 - **No layout shift, ever** (the presentation corollary above): subtitle
   and rejection messages share ONE fixed slot, a wrong secret shakes the
   field in place (geometry-only) and clears it. The consumer judges every
   verdict (`.accepted` / `.rejected(message)`) and owns dismissal.
 
-- **Door paints its own stage.** One `surface` color (default: the system
+- **The lock paints its own stage.** One `surface` color (default: the system
   window background) drives the self-painted full-bleed background AND
   the badge disc, so the fingerprint reads as a cutout of the lock's
   corner (Safari's trick) exactly, by construction. Solid on purpose:
-  translucency/materials under the door wash the system glyph into low
+  translucency/materials under the lock wash the system glyph into low
   contrast (learned live in a consumer). A consumer writes
-  `Door(title:subtitle:reason:judge:)` and nothing else.
+  `BiometricLock(title:subtitle:reason:judge:)` and nothing else.
 
-Demo: `swift run door-example` — real Touch ID in-window, demo password
-"sesame"; the open state shows the compact form.
+Demo: `swift run biometrics-example` — real Touch ID in-window, demo password
+"sesame"; the open state shows the compact forms.
 
 The compact form ships too: **`SecretField`** (reveal eye, AutoFill
-content types, validation border) and **`DoorField`** — a SecretField
-with the biometric door built in. Three ways through: type, REST A FINGER
+content types, validation border) and **`BiometricField`** — a SecretField
+with the Touch ID sensor built in. Three ways through: type, REST A FINGER
 (the paired sensor rides invisibly over a quiet static glyph — red while
 armed, the sensor's own semantic — recognizes in place, bounces green;
 wrong finger shakes and re-arms), or click for the classic system prompt.
-Generic over the key type: `DoorUnlock(reason:unlock:)` names the door (a
-nominal type - an inline tuple+closure defeats the type checker), success
+Generic over the key type: `BiometricUnlock(reason:unlock:)` says what a
+finger opens (a nominal type - an inline tuple+closure defeats the type
+checker; passed as `biometric:`), success
 hands `unlock` the evaluated context, and `kSecUseAuthenticationContext`
 keychain reads prompt nothing. `LoginPassword.verify` rounds it out: the
 typed fallback for curtains that gate nothing keychain-bound - Safari's
 own semantics (the user's LOGIN password, via OpenDirectory; unsandboxed
 apps only).
+
+**`BiometricButton`** is a press that needs biometrics, on every device: a
+prominent button whose small inset well holds the biometric glyph, so it
+reads as a finger or a face before anyone presses. On a Mac the well IS the
+sensor (the field's invisible-sensor-under-the-glyph, red while armed), so a
+resting finger is the press and its proof in one gesture; on an iPhone it
+holds Face ID's glyph and the press asks for it. `BiometricButton("Book it",
+context: armed, onReady: { start($0) }) { click() }`; the lock, the field and
+the sensor build on macOS alone, the button everywhere.
 
 ## Grant
 

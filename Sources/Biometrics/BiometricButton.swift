@@ -1,15 +1,15 @@
 import LocalAuthentication
 import SwiftUI
 
-// A button whose press needs the person proven, one look on every device:
-// the label says what the press does ("Book it"), and a small well inside the
-// same capsule holds the proof's glyph, so it reads before anyone presses
-// that this press is also a finger or a face.
+// A button whose press needs biometrics, one look on every device: the label
+// says what the press does ("Book it"), and a small well inside the same
+// capsule holds the biometric glyph, so it reads before anyone presses that
+// this press is also a finger or a face.
 //
-// On a Mac the well IS the sensor: DoorField's in-field Touch ID, installed
+// On a Mac the well IS the sensor: BiometricField's in-field Touch ID, installed
 // under the glyph, red and alive while armed (the system's own semantic for a
 // live sensor), so a finger is the press and its proof in one gesture with no
-// system dialog after it. The system sensor (`DoorSensor`) sits nearly
+// system dialog after it. The system sensor (`BiometricSensor`) sits nearly
 // invisible under the glyph: it must be in a window for Touch ID to render in
 // place, and the host starts evaluating only from `onReady`. One context per
 // attempt: a fresh context is a fresh sensor. A click stays a press; the host
@@ -18,7 +18,7 @@ import SwiftUI
 //
 // On an iPhone no sensor lives in a view: the well holds Face ID's glyph, the
 // press asks for Face ID as it goes, and `context` is never armed.
-public struct DoorButton: View {
+public struct BiometricButton: View {
     let label: String
     let context: LAContext?
     let onReady: @MainActor (LAContext) -> Void
@@ -47,7 +47,7 @@ public struct DoorButton: View {
                 ZStack {
                     #if os(macOS)
                         if let context {
-                            DoorSensor(context: context, controlSize: .small) { onReady(context) }
+                            BiometricSensor(context: context, controlSize: .small) { onReady(context) }
                                 .id(ObjectIdentifier(context))
                                 .frame(width: 22, height: 22)
                                 .opacity(0.02)

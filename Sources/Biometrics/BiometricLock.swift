@@ -10,7 +10,7 @@ import SwiftUI
 // fallback; nothing floats over the app.
 //
 // Why the popup exists elsewhere: reading a `.biometryCurrentSet` keychain
-// item makes the KEYCHAIN run the system alert. Door owns the LAContext
+// item makes the KEYCHAIN run the system alert. The lock owns the LAContext
 // instead: it evaluates on a context paired with the embedded sensor (so
 // the UI renders in-window) and hands the authorized context back - the
 // consumer passes it to SecItemCopyMatching via kSecUseAuthenticationContext
@@ -18,8 +18,8 @@ import SwiftUI
 // successful access control evaluation, the LAContext can be used with
 // keychain operations, so that they do not require user to authenticate").
 
-/// What the door authorizes when a finger lands.
-public enum DoorAsk {
+/// What a finger authorizes when it lands.
+public enum BiometricAsk {
     /// A plain policy gate (an app curtain with nothing keychain-bound).
     case policy(LAPolicy)
     /// A keychain access control (the `.biometryCurrentSet` item shape):
@@ -28,42 +28,43 @@ public enum DoorAsk {
     case accessControl(SecAccessControl, LAAccessControlOperation)
 
     /// The default gate: Touch ID, or an authorized companion (Watch).
-    public static var biometry: DoorAsk {
+    public static var biometry: BiometricAsk {
         .policy(.deviceOwnerAuthenticationWithBiometricsOrCompanion)
     }
 }
 
-/// How the door was passed.
-public enum DoorVerdict {
+/// How the lock was passed.
+public enum BiometricVerdict {
     /// The sensor authorized: an evaluated context, ready for
     /// `kSecUseAuthenticationContext` keychain reads with no second prompt.
     case biometry(LAContext)
-    /// The typed fallback secret. The CONSUMER verifies it - Door cannot.
+    /// The typed fallback secret. The CONSUMER verifies it - the lock cannot.
     case secret(String)
 }
 
-/// The consumer's answer to a verdict. `.rejected` keeps the door up:
+/// The consumer's answer to a verdict. `.rejected` keeps the lock up:
 /// the message lands in the status slot (same slot, no layout shift),
 /// a typed secret shakes the field and clears it.
-public enum DoorJudgment {
+public enum BiometricJudgment {
     case accepted
     case rejected(String)
 }
 
-public struct Door: View {
+/// A window's content behind a lock, opened by a finger or a typed secret.
+public struct BiometricLock: View {
     private let icon: String
     private let title: String
     private let subtitle: String
     private let inactiveSubtitle: String?
     private let prompt: String
     private let reason: String
-    private let ask: DoorAsk
+    private let ask: BiometricAsk
     private let surface: Color
-    private let judge: @MainActor (DoorVerdict) async -> DoorJudgment
+    private let judge: @MainActor (BiometricVerdict) async -> BiometricJudgment
 
     // One attempt = one fresh LAContext + one fresh sensor view (`.id`).
     // nil context = no biometry on this machine (or lockout downgraded it):
-    // the sensor hides and the door is password-only, Safari-style.
+    // the sensor hides and the lock is password-only, Safari-style.
     @State private var attempt = 0
     @State private var context: LAContext?
     @State private var note: String?
@@ -78,7 +79,7 @@ public struct Door: View {
     @Environment(\.controlActiveState) private var activeState
 
     /// - Parameters:
-    ///   - icon: SF Symbol for the door's glyph (the lock by default).
+    ///   - icon: SF Symbol for the lock's glyph (a padlock by default).
     ///   - title: what is locked ("Private Browsing Is Locked" register).
     ///   - subtitle: how to open it; also the fixed slot rejection
     ///     messages replace, so the layout never shifts.
@@ -89,16 +90,16 @@ public struct Door: View {
     ///   - reason: the evaluation reason macOS requires (never shown by the
     ///     embedded sensor, but mandatory and user-visible in Settings).
     ///   - ask: what a successful touch authorizes (`.biometry` default).
-    ///   - surface: the door's stage. Door paints its OWN full-bleed solid
+    ///   - surface: the lock's stage. It paints its OWN full-bleed solid
     ///     background and fills the badge disc with the SAME color, so the
     ///     badge reads as a cutout of the lock's corner (Safari's trick)
     ///     and the cutout is exact by construction. Solid on purpose:
-    ///     translucency/materials under the door wash the system glyph
+    ///     translucency/materials under the lock wash the system glyph
     ///     into low contrast (learned live). Default: the system window
     ///     background.
     ///   - judge: receives every verdict; return `.accepted` to pass or
-    ///     `.rejected(message)` to keep the door up. The consumer owns
-    ///     dismissal - on `.accepted`, swap the door out of the hierarchy.
+    ///     `.rejected(message)` to keep the lock up. The consumer owns
+    ///     dismissal - on `.accepted`, swap the lock out of the hierarchy.
     public init(
         icon: String = "lock.fill",
         title: String,
@@ -106,9 +107,9 @@ public struct Door: View {
         inactiveSubtitle: String? = nil,
         prompt: String = "Enter password",
         reason: String,
-        ask: DoorAsk = .biometry,
+        ask: BiometricAsk = .biometry,
         surface: Color = Color(nsColor: .windowBackgroundColor),
-        judge: @escaping @MainActor (DoorVerdict) async -> DoorJudgment
+        judge: @escaping @MainActor (BiometricVerdict) async -> BiometricJudgment
     ) {
         self.icon = icon
         self.title = title
@@ -142,7 +143,7 @@ public struct Door: View {
                         // to the floating system alert. .small and a hard
                         // frame: .regular ignores the frame and explodes
                         // over the lock (tried, reverted).
-                        DoorSensor(context: context, controlSize: .small) {
+                        BiometricSensor(context: context, controlSize: .small) {
                             startSensor(context)
                         }
                         .id(attempt)
@@ -277,12 +278,12 @@ public struct Door: View {
         Task { await deliver(.secret(typed)) }
     }
 
-    private func deliver(_ verdict: DoorVerdict) async {
+    private func deliver(_ verdict: BiometricVerdict) async {
         judging = true
         defer { judging = false }
         switch await judge(verdict) {
         case .accepted:
-            break  // the consumer swaps the door away
+            break  // the consumer swaps the lock away
         case .rejected(let message):
             note = message
             if case .secret = verdict {

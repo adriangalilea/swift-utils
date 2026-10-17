@@ -17,7 +17,7 @@ import SwiftUI
 // carries the reason. A context is single-use per attempt - re-arming means
 // a fresh context AND a fresh view, so hosts recreate the sensor
 // (`.id(attempt)`) rather than mutate it.
-public struct DoorSensor: NSViewRepresentable {
+public struct BiometricSensor: NSViewRepresentable {
     let context: LAContext
     let controlSize: NSControl.ControlSize
     let onReady: @MainActor () -> Void

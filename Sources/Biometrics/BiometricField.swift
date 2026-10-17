@@ -3,7 +3,7 @@ import AppKit
 import LocalAuthentication
 import SwiftUI
 
-// The compact form of Door: secret-entry FIELDS with the biometric door
+// The compact form of BiometricLock: secret-entry FIELDS with the sensor
 // built in, for sheets where the window cannot be the prompt. Presentation
 // is hollow's original styled box + 1Password's accessory grammar (quiet
 // eye, hairline, quiet fingerprint - Adrian-matched); the MECHANIC is the
@@ -20,7 +20,7 @@ import SwiftUI
 // wrong-finger shake are the feedback (Adrian: "good for now").
 
 // The one field container: every secret-entry surface wears this box, so
-// SecretField and DoorField's authorized state can't drift apart.
+// SecretField and BiometricField's authorized state can't drift apart.
 struct SecretBox: ViewModifier {
     let border: Color
     func body(content: Content) -> some View {
@@ -34,7 +34,7 @@ struct SecretBox: ViewModifier {
 }
 
 /// A password field with a reveal toggle. `trailing` is the accessory slot
-/// beside the eye (DoorField puts the sensor there).
+/// beside the eye (BiometricField puts the sensor there).
 public struct SecretField<Trailing: View>: View {
     let prompt: String
     @Binding var text: String
@@ -108,16 +108,16 @@ extension SecretField where Trailing == EmptyView {
     }
 }
 
-/// The biometric door a DoorField opens: why (the evaluation reason) and
+/// What a finger on a BiometricField opens: why (the evaluation reason) and
 /// what a passed evaluation unlocks. A struct, not a tuple: the first real
 /// consumer proved an inline tuple+closure defeats the type checker, and a
 /// nominal type anchors inference so call sites stay inline:
 ///
-///     DoorField(prompt: "password", text: $text, key: $key,
-///               door: hasTouchID ? DoorUnlock(reason: "unlock the vault") { ctx in
-///                   try? fetchKey(context: ctx)
-///               } : nil)
-public struct DoorUnlock<Key> {
+///     BiometricField(prompt: "password", text: $text, key: $key,
+///                    biometric: hasTouchID ? BiometricUnlock(reason: "unlock the vault") { ctx in
+///                        try? fetchKey(context: ctx)
+///                    } : nil)
+public struct BiometricUnlock<Key> {
     let reason: String
     let unlock: @MainActor (LAContext) -> Key?
 
@@ -127,20 +127,20 @@ public struct DoorUnlock<Key> {
     }
 }
 
-/// The authorization field: a SecretField with the biometric door built in.
+/// The authorization field: a SecretField with the Touch ID sensor built in.
 /// Three ways through: type the secret (the caller resolves what it is),
 /// REST A FINGER (embedded evaluation, armed while the window is key, no
 /// click, no alert), or click the fingerprint (the classic system prompt,
 /// for anyone who does not discover the rest gesture). On success the field
-/// calls `door.unlock` with the evaluated context - keychain reads through
+/// calls `biometric.unlock` with the evaluated context - keychain reads through
 /// `kSecUseAuthenticationContext` prompt nothing - and a non-nil Key locks
 /// the field into the authorized state, undoable back to typing. Pass
-/// `door: nil` where only a typed secret counts.
-public struct DoorField<Key>: View {
+/// `biometric: nil` where only a typed secret counts.
+public struct BiometricField<Key>: View {
     let prompt: String
     @Binding var text: String
-    @Binding var key: Key?  // set = the biometric door passed
-    let door: DoorUnlock<Key>?
+    @Binding var key: Key?  // set = the finger passed
+    let biometric: BiometricUnlock<Key>?
 
     @State private var attempt = 0
     @State private var context: LAContext?
@@ -150,12 +150,12 @@ public struct DoorField<Key>: View {
 
     public init(
         prompt: String, text: Binding<String>, key: Binding<Key?>,
-        door: DoorUnlock<Key>? = nil
+        biometric: BiometricUnlock<Key>? = nil
     ) {
         self.prompt = prompt
         self._text = text
         self._key = key
-        self.door = door
+        self.biometric = biometric
     }
 
     public var body: some View {
@@ -178,11 +178,11 @@ public struct DoorField<Key>: View {
                 .modifier(SecretBox(border: .green.opacity(0.8)))
             } else {
                 SecretField(prompt: prompt, text: $text) {
-                    if door != nil {
+                    if biometric != nil {
                         Divider().frame(height: 13)
                         ZStack {
                             if let context, activeState != .inactive {
-                                DoorSensor(context: context, controlSize: .small) {
+                                BiometricSensor(context: context, controlSize: .small) {
                                     startSensor(context)
                                 }
                                 .id(attempt)
@@ -224,18 +224,18 @@ public struct DoorField<Key>: View {
             }
         }
         .onChange(of: key == nil) {
-            // Undo (x) re-opens the door: a fresh sensor arms for the next touch.
+            // Undo (x) re-opens the field: a fresh sensor arms for the next touch.
             if key == nil { rearm() } else { context = nil }
         }
     }
 
     private func rearm() {
-        guard door != nil, key == nil, activeState != .inactive else {
+        guard biometric != nil, key == nil, activeState != .inactive else {
             context = nil
             return
         }
         let ctx = LAContext()
-        // Biometrics ONLY (no Watch): the door typically guards a
+        // Biometrics ONLY (no Watch): the field typically guards a
         // .biometryCurrentSet keychain item, which a companion evaluation
         // would not satisfy - the read would throw the system alert this
         // component exists to kill.
@@ -249,13 +249,13 @@ public struct DoorField<Key>: View {
     }
 
     private func startSensor(_ ctx: LAContext) {
-        guard let door else { return }
-        ctx.localizedReason = door.reason
+        guard let biometric else { return }
+        ctx.localizedReason = biometric.reason
         Task {
             do {
                 try await ctx.evaluatePolicy(
-                    .deviceOwnerAuthenticationWithBiometrics, localizedReason: door.reason)
-                if let unlocked = door.unlock(ctx) {
+                    .deviceOwnerAuthenticationWithBiometrics, localizedReason: biometric.reason)
+                if let unlocked = biometric.unlock(ctx) {
                     recognized += 1
                     key = unlocked
                     text = ""
@@ -275,17 +275,17 @@ public struct DoorField<Key>: View {
     // The dense-user path: a fresh UNPAIRED context, so the system shows
     // its classic prompt. Also re-arms the ambient sensor afterwards.
     private func clickFallback() {
-        guard let door else { return }
+        guard let biometric else { return }
         context?.invalidate()
         context = nil
         let ctx = LAContext()
-        ctx.localizedReason = door.reason
+        ctx.localizedReason = biometric.reason
         Task {
             defer { rearm() }
             do {
                 try await ctx.evaluatePolicy(
-                    .deviceOwnerAuthenticationWithBiometrics, localizedReason: door.reason)
-                if let unlocked = door.unlock(ctx) {
+                    .deviceOwnerAuthenticationWithBiometrics, localizedReason: biometric.reason)
+                if let unlocked = biometric.unlock(ctx) {
                     recognized += 1
                     key = unlocked
                     text = ""
