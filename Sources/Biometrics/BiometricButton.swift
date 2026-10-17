@@ -1,15 +1,18 @@
+import Ink
 import LocalAuthentication
 import SwiftUI
 
-// A button whose press needs biometrics, one look on every device: the label
-// says what the press does ("Book it"), and a small well inside the same
-// capsule holds the biometric glyph, so it reads before anyone presses that
-// this press is also a finger or a face.
+// A button whose press needs biometrics, one look on every device: Ink's
+// prominent capsule (it keeps its color whether or not its window holds the
+// keyboard), the label saying what the press does ("Book it"), and a round
+// well at the trailing cap, concentric with it, holding the biometric glyph,
+// so it reads before anyone presses that this press is also a finger or a
+// face. The host's `.tint` colors it.
 //
-// On a Mac the well IS the sensor: BiometricField's in-field Touch ID, installed
-// under the glyph, red and alive while armed (the system's own semantic for a
-// live sensor), so a finger is the press and its proof in one gesture with no
-// system dialog after it. The system sensor (`BiometricSensor`) sits nearly
+// On a Mac the well IS the sensor: BiometricField's in-field Touch ID,
+// installed under the glyph, the glyph alive (pulsing) while armed, so a
+// finger is the press and its proof in one gesture with no system dialog
+// after it. The system sensor (`BiometricSensor`) sits nearly
 // invisible under the glyph: it must be in a window for Touch ID to render in
 // place, and the host starts evaluating only from `onReady`. One context per
 // attempt: a fresh context is a fresh sensor. A click stays a press; the host
@@ -41,6 +44,10 @@ public struct BiometricButton: View {
         self.action = action
     }
 
+    /// The well's diameter: the capsule's height less an inset of 4 on
+    /// every side, so its circle is concentric with the cap's.
+    static let well = InkButtonStyle.height - 8
+
     public var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
@@ -52,28 +59,22 @@ public struct BiometricButton: View {
                                 onReady(context)
                             }
                             .id(ObjectIdentifier(context))
-                            .frame(width: 22, height: 22)
+                            .frame(width: Self.well, height: Self.well)
                             .opacity(0.02)
                             .allowsHitTesting(false)
                         }
                     #endif
                     Image(systemName: Self.glyph)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(
-                            armed
-                                ? AnyShapeStyle(Color.red.opacity(0.9))
-                                : AnyShapeStyle(.white.opacity(0.85))
-                        )
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(armed ? 1 : 0.8))
                         .symbolEffect(.pulse, options: .repeating, isActive: armed)
                 }
-                .frame(width: 16, height: 16)
-                .padding(3)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous).fill(.black.opacity(0.22))
-                )
+                .frame(width: Self.well, height: Self.well)
+                .background(Circle().fill(.white.opacity(0.16)))
             }
         }
-        .buttonStyle(.borderedProminent)
+        // The cap's inset on the trailing edge is the well's own: 4.
+        .buttonStyle(InkButtonStyle(.prominent, trailing: 4))
         .help(armed ? "Rest your finger on Touch ID, or click" : "Asks for \(Self.proof)")
     }
 

@@ -8,6 +8,8 @@ The styling atoms every product builds on: the `ink*` fill ladder for dark-glass
 
 Ink also carries the pieces every surface repeats: `Pill` / `PersonPill` / `PillButtonStyle` (the leading slot - avatar or icon, always - is a circle whose diameter is the pill's height, flush at the left end, so its curvature IS the cap's curvature), `inkEdgeFade` (the law of scrolling regions: content near a scroll edge fades, never cuts mid-element; mask-based, so it works over any background), `MicButton` + `PushToTalk` (THE mic affordance, designed once: the messaging-app grammar - hold to talk, quick tap latches with a lock badge, next tap stops - one state machine shared by the pointer gesture and any key binding's press/release, a live Siri-family gradient waveform while hot (glowing mirrored ribbon, bright on voice activity - deliberately not red: a live mic is a state, not an error); the studio's signal source is listen's `AudioSpectrum` over `MicCapture` in github.com/adriangalilea/swift-senses - Ink owns the FEEL, listen owns the DSP), and the brand-mark machinery below.
 
+A surface that asks something is two sections, designed once: `InkSections { what is asked } footer: { where it is answered }`, the footer a band of the same material a step deeper (a hairline, a faint shade) that runs to the rounded edge, never a second glass laid over the first; its host gives the material (`inkGlass()` for a floating HUD, a card's background) and no padding. Its buttons are `InkButtonStyle`: `.inkProminent` (the host's `.tint`, deepened so white text reads on any hue) and `.ink` (a faint fill), drawn by Ink rather than the platform's bordered styles, which grey out whenever their window does not hold the keyboard (a floating HUD before hover). A yes takes the accent, not green: a yes can delete.
+
 ## Releases (`ship`)
 
 A Mac app's release outside the App Store, one implementation for every app. The app builds its bundle; `ship` does everything after it, from the app's own repo with `VERSION` in its environment and the release body in `notes/$VERSION.md`:
@@ -215,12 +217,13 @@ typed fallback for curtains that gate nothing keychain-bound - Safari's
 own semantics (the user's LOGIN password, via OpenDirectory; unsandboxed
 apps only).
 
-**`BiometricButton`** is a press that needs biometrics, on every device: a
-prominent button whose small inset well holds the biometric glyph, so it
-reads as a finger or a face before anyone presses. On a Mac the well IS the
-sensor (the field's invisible-sensor-under-the-glyph, red while armed), so a
-resting finger is the press and its proof in one gesture; on an iPhone it
-holds Face ID's glyph and the press asks for it. `BiometricButton("Book it",
+**`BiometricButton`** is a press that needs biometrics, on every device:
+Ink's prominent capsule (`InkButtonStyle`, colored by the host's `.tint`)
+whose round well, concentric with the trailing cap, holds the biometric
+glyph, so it reads as a finger or a face before anyone presses. On a Mac the
+well IS the sensor (the field's invisible-sensor-under-the-glyph, the glyph
+pulsing while armed), so a resting finger is the press and its proof in one
+gesture; on an iPhone it holds Face ID's glyph and the press asks for it. `BiometricButton("Book it",
 context: armed, onReady: { start($0) }) { click() }`; the lock, the field and
 the sensor build on macOS alone, the button everywhere.
 

@@ -122,7 +122,8 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .target(name: "Entitlement", resources: [.process("Resources")]),
-        .target(name: "Biometrics"),
+        // The yes it draws wears Ink's prominent button.
+        .target(name: "Biometrics", dependencies: ["Ink"]),
         .target(name: "Grant"),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
