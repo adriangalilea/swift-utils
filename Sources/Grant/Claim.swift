@@ -169,3 +169,7 @@ public final class Claim<Reason: Equatable> {
         log.notice("\(line, privacy: .public)")
     }
 }
+
+/// An intent is a value: it crosses actors as freely as its reason does
+/// (an app reads it on a background probe and applies it on the main actor).
+extension Claim.Intent: Sendable where Reason: Sendable {}
