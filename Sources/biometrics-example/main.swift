@@ -22,15 +22,19 @@ struct DemoView: View {
                     Text("open").font(.title2.weight(.semibold))
                     Button("lock again") { open = false }
                     Divider().frame(width: 280).padding(.vertical, 8)
-                    Text("the compact form: BiometricField").font(.caption).foregroundStyle(.secondary)
+                    Text("the compact form: BiometricField").font(.caption).foregroundStyle(
+                        .secondary)
                     BiometricField(
                         prompt: "type the secret",
                         text: $fieldSecret, key: $fieldKey,
-                        biometric: BiometricUnlock(reason: "authorize the demo field") { _ in "authorized" }
+                        biometric: BiometricUnlock(reason: "authorize the demo field") { _ in
+                            "authorized"
+                        }
                     )
-                    Text("a press a finger can make: BiometricButton").font(.caption).foregroundStyle(.secondary)
-                    BiometricButton("Open it", context: nil) { open = true }
                     .frame(width: 280)
+                    Text("a press a finger can make: BiometricButton").font(.caption)
+                        .foregroundStyle(.secondary)
+                    BiometricButton("Open it", context: nil) { open = true }
                 }
             } else {
                 BiometricLock(

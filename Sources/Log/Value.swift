@@ -102,7 +102,10 @@ func encode(_ value: Any, into b: inout String) {
     case let d as [String: Any]:
         encodeObject(sortedPairs(d), into: &b)
     case let d as [AnyHashable: Any]:
-        encodeObject(sortedPairs(Dictionary(d.map { (String(describing: $0.key.base), $0.value) }) { a, _ in a }), into: &b)
+        encodeObject(
+            sortedPairs(
+                Dictionary(d.map { (String(describing: $0.key.base), $0.value) }) { a, _ in a }),
+            into: &b)
     case let a as [Any]:
         b += "["
         for (i, x) in a.enumerated() {
@@ -118,7 +121,10 @@ func encode(_ value: Any, into b: inout String) {
                 encode(child.value, into: &s)
                 return s
             }
-            b += "[" + items.sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }.joined(separator: ",") + "]"
+            b +=
+                "["
+                + items.sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }.joined(separator: ",")
+                + "]"
         } else if let e = v as? any Encodable, let json = encodable(e) {
             b += json
         } else {
@@ -170,7 +176,9 @@ private func encodeError(_ e: any Error, into b: inout String) {
     appendString(&b, String(describing: type(of: e)))
     b += ",\"message\":"
     appendString(&b, errorMessage(e))
-    if type(of: e) is NSError.Type, let cause = (e as NSError).userInfo[NSUnderlyingErrorKey] as? any Error {
+    if type(of: e) is NSError.Type,
+        let cause = (e as NSError).userInfo[NSUnderlyingErrorKey] as? any Error
+    {
         b += ",\"cause\":"
         encodeError(cause, into: &b)
     }

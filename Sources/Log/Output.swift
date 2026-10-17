@@ -81,7 +81,9 @@ func env(_ name: String) -> String? {
 
 func parseLevel(_ source: String, _ value: String) -> LogLevel {
     guard let level = LogLevel(parsing: value) else {
-        fatalError("\(source): unknown log level \"\(value)\" (want silent, error, warn, info, debug, trace)")
+        fatalError(
+            "\(source): unknown log level \"\(value)\" (want silent, error, warn, info, debug, trace)"
+        )
     }
     return level
 }
@@ -99,7 +101,8 @@ func levelVariable(_ scope: [String]) -> String {
         String(
             String.UnicodeScalarView(
                 segment.uppercased().unicodeScalars.map {
-                    ($0.isASCII && ($0.properties.isAlphabetic || ("0"..."9").contains($0))) ? $0 : "_"
+                    ($0.isASCII && ($0.properties.isAlphabetic || ("0"..."9").contains($0)))
+                        ? $0 : "_"
                 }))
     }
     return segments.joined(separator: "_") + "_LOG_LEVEL"
@@ -148,7 +151,8 @@ func format() -> Format {
 
 func timeOn() -> Bool {
     if let value = env("LOG_TIME") {
-        precondition(value == "1" || value == "0", "LOG_TIME: unknown value \"\(value)\" (want 1, 0)")
+        precondition(
+            value == "1" || value == "0", "LOG_TIME: unknown value \"\(value)\" (want 1, 0)")
         return value == "1"
     }
     return settings.withLock { $0.time }
@@ -156,7 +160,8 @@ func timeOn() -> Bool {
 
 func osLogOn() -> Bool {
     if let value = env("LOG_OSLOG") {
-        precondition(value == "1" || value == "0", "LOG_OSLOG: unknown value \"\(value)\" (want 1, 0)")
+        precondition(
+            value == "1" || value == "0", "LOG_OSLOG: unknown value \"\(value)\" (want 1, 0)")
         return value == "1"
     }
     return settings.withLock { $0.osLog }
@@ -222,7 +227,8 @@ func humanDuration(_ ms: Double) -> String {
     case ..<10: String(format: "%.1fms", ms)
     case ..<1000: String(format: "%.0fms", ms)
     case ..<60_000: String(format: "%.2fs", ms / 1000)
-    default: "\(Int(ms / 60_000))m\(Int((ms.truncatingRemainder(dividingBy: 60_000) / 1000).rounded()))s"
+    default:
+        "\(Int(ms / 60_000))m\(Int((ms.truncatingRemainder(dividingBy: 60_000) / 1000).rounded()))s"
     }
 }
 
@@ -257,11 +263,13 @@ private func osLogger(_ scope: [String]) -> os.Logger {
 /// started through a symlink (`~/.local/bin/x` → `X.app/Contents/MacOS/x`)
 /// has no `Bundle.main` identifier: Bundle reads the path it was launched
 /// by, so the link is resolved and the bundle found from the real path.
-private let subsystem: String? = Bundle.main.bundleIdentifier
+private let subsystem: String? =
+    Bundle.main.bundleIdentifier
     ?? Bundle.main.executableURL.flatMap { url -> String? in
         let real = url.resolvingSymlinksInPath()
         // …/X.app/Contents/MacOS/x: three levels up is the bundle.
-        let bundle = real.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let bundle = real.deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
         return bundle.pathExtension == "app" ? Bundle(url: bundle)?.bundleIdentifier : nil
     }
 
@@ -286,7 +294,9 @@ func emit(_ e: Event, _ reach: Reach) {
     let json = fmt == .json || target != nil || reach.contains(.record) ? e.json : ""
     let tooLarge: Int? = output.withLock { out in
         if reach.contains(.stream) {
-            let text = fmt == .json ? json + "\n" : out.human.render(e, clock: showClock, color: color(out.fd))
+            let text =
+                fmt == .json
+                ? json + "\n" : out.human.render(e, clock: showClock, color: color(out.fd))
             writeAll(out.fd, text)
         }
         if reach.contains(.record) {

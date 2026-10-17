@@ -30,19 +30,29 @@ public struct Traceparent: Sendable, Hashable, CustomStringConvertible, Codable 
         func reject(_ reason: String) -> Malformed { Malformed(value: v, reason: reason) }
         let b = Array(v.utf8)
         guard b.count >= 55 else { throw reject("shorter than 55 characters") }
-        guard b[2] == UInt8(ascii: "-"), b[35] == UInt8(ascii: "-"), b[52] == UInt8(ascii: "-") else {
+        guard b[2] == UInt8(ascii: "-"), b[35] == UInt8(ascii: "-"), b[52] == UInt8(ascii: "-")
+        else {
             throw reject("dashes not at 2, 35 and 52")
         }
-        let version = b[0..<2], trace = b[3..<35], span = b[36..<52], flags = b[53..<55]
-        guard [version, trace, span, flags].allSatisfy(lowerHex) else { throw reject("not lowercase hex") }
+        let version = b[0..<2]
+        let trace = b[3..<35]
+        let span = b[36..<52]
+        let flags = b[53..<55]
+        guard [version, trace, span, flags].allSatisfy(lowerHex) else {
+            throw reject("not lowercase hex")
+        }
         guard !version.elementsEqual("ff".utf8) else { throw reject("version ff") }
         if version.elementsEqual("00".utf8) {
             guard b.count == 55 else { throw reject("version 00 with trailing data") }
         } else if b.count > 55, b[55] != UInt8(ascii: "-") {
             throw reject("a later version's extra fields must follow a dash")
         }
-        guard trace.contains(where: { $0 != UInt8(ascii: "0") }) else { throw reject("all-zero trace id") }
-        guard span.contains(where: { $0 != UInt8(ascii: "0") }) else { throw reject("all-zero parent id") }
+        guard trace.contains(where: { $0 != UInt8(ascii: "0") }) else {
+            throw reject("all-zero trace id")
+        }
+        guard span.contains(where: { $0 != UInt8(ascii: "0") }) else {
+            throw reject("all-zero parent id")
+        }
         traceID = String(decoding: trace, as: UTF8.self)
         spanID = String(decoding: span, as: UTF8.self)
         self.flags = UInt8(String(decoding: flags, as: UTF8.self), radix: 16)!

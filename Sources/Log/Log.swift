@@ -73,7 +73,10 @@ public struct LogWriter: Logging, Sendable {
 
     public var writer: LogWriter { self }
 
-    init(scope: [String] = [], levelVariables: [String] = [], span: Span? = nil, remote: Traceparent? = nil) {
+    init(
+        scope: [String] = [], levelVariables: [String] = [], span: Span? = nil,
+        remote: Traceparent? = nil
+    ) {
         self.scope = scope
         self.levelVariables = levelVariables
         self.span = span
@@ -95,7 +98,8 @@ public struct LogWriter: Logging, Sendable {
     func write(_ verb: Verb, _ message: String, _ fields: Fields, _ reach: Reach) {
         var e = Event(time: Date(), verb: verb, msg: message, service: service(), scope: scope)
         if let span {
-            precondition(!span.ended, "\"\(message)\" written to span \"\(span.name)\" after it ended")
+            precondition(
+                !span.ended, "\"\(message)\" written to span \"\(span.name)\" after it ended")
             if let anchor = span.anchor {
                 e.traceID = span.traceID
                 e.spanID = anchor
@@ -143,7 +147,8 @@ extension Logging {
     public func warnOnce(_ message: String, _ fields: @autoclosure () -> Fields = [:]) {
         let w = writer
         let reach = w.reach(.warn)
-        guard !reach.isEmpty, firstTime(w.scope.joined(separator: "\u{0}") + "\u{1}" + message) else { return }
+        guard !reach.isEmpty, firstTime(w.scope.joined(separator: "\u{0}") + "\u{1}" + message)
+        else { return }
         w.write(.warn, message, fields(), reach)
     }
 
@@ -169,7 +174,9 @@ extension Logging {
         } catch {
             let reach = w.reach(.warn)
             if !reach.isEmpty, firstTime("\u{2}" + traceparent) {
-                w.write(.warn, "malformed traceparent ignored", ["traceparent": traceparent, "why": error.reason], reach)
+                w.write(
+                    .warn, "malformed traceparent ignored",
+                    ["traceparent": traceparent, "why": error.reason], reach)
             }
             return w
         }
@@ -191,7 +198,8 @@ extension Logging {
         let traceID: String
         let parentID: String?
         if let parent = w.span {
-            precondition(!parent.ended, "span \"\(name)\" opened in \"\(parent.name)\" after it ended")
+            precondition(
+                !parent.ended, "span \"\(name)\" opened in \"\(parent.name)\" after it ended")
             traceID = parent.traceID
             parentID = parent.anchor
         } else if let remote = w.remote ?? environmentTraceparent {
@@ -214,7 +222,9 @@ extension Logging {
 
     /// `begin` and `end` round a block: an error thrown out of it ends the span
     /// failed (fields.err) and is rethrown.
-    public func span<T>(_ name: String, _ fields: Fields = [:], _ body: (Span) throws -> T) rethrows -> T {
+    public func span<T>(_ name: String, _ fields: Fields = [:], _ body: (Span) throws -> T) rethrows
+        -> T
+    {
         let s = begin(name, fields)
         do {
             let result = try body(s)
@@ -282,7 +292,9 @@ public final class Span: Logging, Sendable {
     let scope: [String]
     let levelVariables: [String]
 
-    public var writer: LogWriter { LogWriter(scope: scope, levelVariables: levelVariables, span: self) }
+    public var writer: LogWriter {
+        LogWriter(scope: scope, levelVariables: levelVariables, span: self)
+    }
 
     private struct State {
         var fields: Fields
@@ -343,7 +355,8 @@ public final class Span: Logging, Sendable {
             let failReach = writer.reach(.error)
             if error != nil, !failReach.isEmpty {
                 all["dur_ms"] = durMs
-                var e = Event(time: Date(), verb: .fail, msg: name, service: service(), scope: writer.scope)
+                var e = Event(
+                    time: Date(), verb: .fail, msg: name, service: service(), scope: writer.scope)
                 if let anchor {
                     e.traceID = traceID
                     e.spanID = anchor
@@ -361,7 +374,8 @@ public final class Span: Logging, Sendable {
 
     func own(_ verb: Verb, _ phase: Phase) -> Event {
         Event(
-            time: Date(), verb: verb, msg: name, service: service(), scope: writer.scope, phase: phase,
+            time: Date(), verb: verb, msg: name, service: service(), scope: writer.scope,
+            phase: phase,
             traceID: traceID, spanID: spanID, parentID: parentID)
     }
 }

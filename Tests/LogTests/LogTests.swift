@@ -15,7 +15,9 @@ import Testing
     let decoded = try JSONDecoder().decode(Traceparent.self, from: JSONEncoder().encode(t))
     #expect(decoded == t)
     // A later version may carry more after a dash; it is written back as 00.
-    #expect(try Traceparent(parsing: "01-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-00-x").flags == 0)
+    #expect(
+        try Traceparent(parsing: "01-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-00-x").flags
+            == 0)
 }
 
 @Test(arguments: [
@@ -61,29 +63,45 @@ func traceparentRejects(_ value: String) {
 }
 
 struct Broken: Error, CustomStringConvertible { let description: String }
-struct Receipt: Encodable { let id: String; let cents: Int; let at: Date }
+struct Receipt: Encodable {
+    let id: String
+    let cents: Int
+    let at: Date
+}
 
 // Field values by the contract's table, keys sorted at every depth.
 @Test func fieldValues() {
     func json(_ f: Fields) -> String {
         "{" + encodeFields(f).map { "\"\($0.key)\":\($0.json)" }.joined(separator: ",") + "}"
     }
-    #expect(json(["took": 1.5, "nested": ["b": [true, nil] as [Bool?], "a": 1] as Fields]) ==
-        #"{"nested":{"a":1,"b":[true,null]},"took":1.5}"#)
-    #expect(json(["err": Broken(description: "boom")]) == #"{"err":{"type":"Broken","message":"boom"}}"#)
+    #expect(
+        json(["took": 1.5, "nested": ["b": [true, nil] as [Bool?], "a": 1] as Fields])
+            == #"{"nested":{"a":1,"b":[true,null]},"took":1.5}"#)
+    #expect(
+        json(["err": Broken(description: "boom")]) == #"{"err":{"type":"Broken","message":"boom"}}"#
+    )
     #expect(json(["n": 9_007_199_254_740_993, "m": -3]) == #"{"m":-3,"n":"9007199254740993"}"#)
     #expect(json(["s": "a\"b\n\u{1}é"]) == #"{"s":"a\"b\n\u0001é"}"#)
-    #expect(json(["t": Date(timeIntervalSince1970: 1_760_271_639.1239)]) == #"{"t":"2025-10-12T12:20:39.123Z"}"#)
-    #expect(json(["d": Duration.milliseconds(1500), "b": Data([1, 2, 3])]) == #"{"b":"AQID","d":1500}"#)
+    #expect(
+        json(["t": Date(timeIntervalSince1970: 1_760_271_639.1239)])
+            == #"{"t":"2025-10-12T12:20:39.123Z"}"#)
+    #expect(
+        json(["d": Duration.milliseconds(1500), "b": Data([1, 2, 3])]) == #"{"b":"AQID","d":1500}"#)
     #expect(json(["set": Set([3, 1, 2]), "map": [2: "x"]]) == #"{"map":{"2":"x"},"set":[1,2,3]}"#)
-    #expect(json(["r": Receipt(id: "r1", cents: 250, at: Date(timeIntervalSince1970: 0))]) ==
-        #"{"r":{"at":"1970-01-01T00:00:00.000Z","cents":250,"id":"r1"}}"#)
+    #expect(
+        json(["r": Receipt(id: "r1", cents: 250, at: Date(timeIntervalSince1970: 0))])
+            == #"{"r":{"at":"1970-01-01T00:00:00.000Z","cents":250,"id":"r1"}}"#)
     let underlying = NSError(domain: "x", code: 1, userInfo: [NSLocalizedDescriptionKey: "inner"])
-    let outer = NSError(domain: "x", code: 2, userInfo: [NSLocalizedDescriptionKey: "outer", NSUnderlyingErrorKey: underlying])
-    #expect(json(["err": outer]) ==
-        #"{"err":{"type":"NSError","message":"outer","cause":{"type":"NSError","message":"inner"}}}"#)
-    #expect(encodeFields(["msg": "two words", "plain": "x", "err": Broken(description: "no")]).map(\.human) ==
-        ["no", "\"two words\"", "x"])
+    let outer = NSError(
+        domain: "x", code: 2,
+        userInfo: [NSLocalizedDescriptionKey: "outer", NSUnderlyingErrorKey: underlying])
+    #expect(
+        json(["err": outer])
+            == #"{"err":{"type":"NSError","message":"outer","cause":{"type":"NSError","message":"inner"}}}"#
+    )
+    #expect(
+        encodeFields(["msg": "two words", "plain": "x", "err": Broken(description: "no")]).map(
+            \.human) == ["no", "\"two words\"", "x"])
 }
 
 @Test func scopeVariables() {
@@ -126,24 +144,39 @@ func events(_ text: String) -> [[String: Any]] {
             _ = try? log.span("deploy") { _ -> Void in throw Broken(description: "boom") }
         }
         let e = events(out)
-        #expect(e.map { $0["msg"] as! String } == ["sync", "cloned", "build", "slow step", "build", "sync", "deploy", "deploy"])
-        #expect(e.map { $0["phase"] as? String } == ["start", nil, "start", nil, "end", "end", "start", "end"])
-        let sync = e[0]["span_id"] as! String, build = e[2]["span_id"] as! String
+        #expect(
+            e.map { $0["msg"] as! String } == [
+                "sync", "cloned", "build", "slow step", "build", "sync", "deploy", "deploy",
+            ])
+        #expect(
+            e.map { $0["phase"] as? String } == [
+                "start", nil, "start", nil, "end", "end", "start", "end",
+            ])
+        let sync = e[0]["span_id"] as! String
+        let build = e[2]["span_id"] as! String
         #expect(e[1]["span_id"] as? String == sync)
         #expect(e[2]["parent_id"] as? String == sync)
         #expect(e[3]["span_id"] as? String == build)
         #expect(Set(e[0..<6].map { $0["trace_id"] as! String }).count == 1)
         #expect(e[6]["trace_id"] as? String != e[0]["trace_id"] as? String)
         #expect(e[5]["fields"] as? [String: AnyHashable] == ["pushed": true, "repo": "ui"])
-        #expect(e[7]["status"] as? String == "error" && e[7]["verb"] as? String == "fail" && e[7]["level"] as? String == "error")
-        #expect((e[7]["fields"] as! [String: Any])["err"] as? [String: String] == ["type": "Broken", "message": "boom"])
+        #expect(
+            e[7]["status"] as? String == "error" && e[7]["verb"] as? String == "fail"
+                && e[7]["level"] as? String == "error")
+        #expect(
+            (e[7]["fields"] as! [String: Any])["err"] as? [String: String] == [
+                "type": "Broken", "message": "boom",
+            ])
         // Keys in the contract's order.
         #expect(out.split(separator: "\n")[4].hasPrefix(#"{"time":"#))
-        #expect(out.split(separator: "\n")[4].contains(#""msg":"build","service":"probe","phase":"end","trace_id":"#))
+        #expect(
+            out.split(separator: "\n")[4].contains(
+                #""msg":"build","service":"probe","phase":"end","trace_id":"#))
     }
 
     @Test func joinContinuesRemote() throws {
-        let remote = try Traceparent(parsing: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")
+        let remote = try Traceparent(
+            parsing: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01")
         var handed: Traceparent?
         let out = capture {
             log.join(remote.description).span("handle") { s in handed = s.traceparent }
@@ -182,7 +215,9 @@ func events(_ text: String) -> [[String: Any]] {
         let outerID = e[0]["span_id"] as! String
         #expect(e[1]["span_id"] as? String == outerID)
         // Its failure is never lost: a fail line in the shown span, no phase.
-        #expect(e[2]["verb"] as? String == "fail" && e[2]["phase"] == nil && e[2]["span_id"] as? String == outerID)
+        #expect(
+            e[2]["verb"] as? String == "fail" && e[2]["phase"] == nil
+                && e[2]["span_id"] as? String == outerID)
         #expect((e[2]["fields"] as! [String: Any])["dur_ms"] is Double)
         #expect(e[4]["span_id"] == nil && e[4]["trace_id"] == nil)
     }

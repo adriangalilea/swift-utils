@@ -35,7 +35,8 @@ public func setLogShipToken(_ token: String) {
 }
 
 private func parseShip(_ source: String, _ value: String) -> String {
-    guard let url = URL(string: value), url.scheme == "http" || url.scheme == "https", url.host != nil
+    guard let url = URL(string: value), url.scheme == "http" || url.scheme == "https",
+        url.host != nil
     else { fatalError("\(source): unknown URL \"\(value)\" (want an http(s) URL)") }
     return value
 }

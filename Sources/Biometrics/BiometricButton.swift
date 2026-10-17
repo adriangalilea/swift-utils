@@ -31,7 +31,8 @@ public struct BiometricButton: View {
     ///   - onReady: the sensor is in a window: start evaluating on `context`.
     ///   - action: a click or a tap.
     public init(
-        _ label: String, context: LAContext?, onReady: @escaping @MainActor (LAContext) -> Void = { _ in },
+        _ label: String, context: LAContext?,
+        onReady: @escaping @MainActor (LAContext) -> Void = { _ in },
         action: @escaping () -> Void
     ) {
         self.label = label
@@ -47,21 +48,29 @@ public struct BiometricButton: View {
                 ZStack {
                     #if os(macOS)
                         if let context {
-                            BiometricSensor(context: context, controlSize: .small) { onReady(context) }
-                                .id(ObjectIdentifier(context))
-                                .frame(width: 22, height: 22)
-                                .opacity(0.02)
-                                .allowsHitTesting(false)
+                            BiometricSensor(context: context, controlSize: .small) {
+                                onReady(context)
+                            }
+                            .id(ObjectIdentifier(context))
+                            .frame(width: 22, height: 22)
+                            .opacity(0.02)
+                            .allowsHitTesting(false)
                         }
                     #endif
                     Image(systemName: Self.glyph)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(armed ? AnyShapeStyle(Color.red.opacity(0.9)) : AnyShapeStyle(.white.opacity(0.85)))
+                        .foregroundStyle(
+                            armed
+                                ? AnyShapeStyle(Color.red.opacity(0.9))
+                                : AnyShapeStyle(.white.opacity(0.85))
+                        )
                         .symbolEffect(.pulse, options: .repeating, isActive: armed)
                 }
                 .frame(width: 16, height: 16)
                 .padding(3)
-                .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(.black.opacity(0.22)))
+                .background(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous).fill(.black.opacity(0.22))
+                )
             }
         }
         .buttonStyle(.borderedProminent)
