@@ -187,6 +187,33 @@ func events(_ text: String) -> [[String: Any]] {
         #expect(e[4]["span_id"] == nil && e[4]["trace_id"] == nil)
     }
 
+    /// The record (the unified log) has its own threshold: a process quiet
+    /// on its stream still records its spans and lines, and the record's
+    /// own threshold holds whatever the stream's.
+    @Test func theRecordKeepsWhatTheStreamHides() {
+        setLogLevel("warn")
+        defer {
+            setLogLevel("info")
+            setLogOSLog(false)
+            unsetenv("LOG_RECORD_LEVEL")
+        }
+        var recorded: Reach = []
+        let out = capture {
+            setLogOSLog(true)
+            let span = log.begin("ask")
+            recorded = span.reach
+            span.info("quiet here")
+            span.end()
+        }
+        #expect(out.isEmpty)
+        #expect(recorded == .record)
+        setenv("LOG_RECORD_LEVEL", "warn", 1)
+        #expect(log.writer.reach(.info).isEmpty)
+        #expect(log.writer.reach(.warn) == [.stream, .record])
+        setLogOSLog(false)
+        #expect(log.writer.reach(.warn) == .stream)
+    }
+
     @Test func levelsOffBuildNothing() {
         var built = false
         func expensive() -> Fields {

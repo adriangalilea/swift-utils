@@ -40,7 +40,12 @@ import Synchronization
 /// `log.join(value)` returns a logger whose spans are its children. A process
 /// started with TRACEPARENT set joins it for its root spans.
 ///
-/// Output goes to stderr (stdout is data) and to Apple's unified log.
+/// Output goes to stderr (stdout is data) and to Apple's unified log, each
+/// by its own threshold: the stream (stderr, and what ships) by LOG_LEVEL
+/// and the scope variables, for whoever reads this process; the unified log,
+/// the record, by LOG_RECORD_LEVEL (`setLogRecordLevel`, default info), so a
+/// command quiet at its terminal still records its spans and a trace that
+/// crosses it has its part.
 /// LOG_FORMAT=json writes one JSON event per line; human writes symbols,
 /// colour, dim key=value fields and indented spans; the default is human at a
 /// terminal, json elsewhere. LOG_TIME=1 opens human lines with the local
@@ -75,16 +80,19 @@ public struct LogWriter: Logging, Sendable {
         self.remote = remote
     }
 
-    func enabled(_ level: LogLevel) -> Bool { level <= threshold(levelVariables) }
+    /// Where an event at `level` goes from here (the stream, the record).
+    func reach(_ level: LogLevel) -> Reach { Reach(level, levelVariables: levelVariables) }
+    func enabled(_ level: LogLevel) -> Bool { !reach(level).isEmpty }
 
     func line(_ verb: Verb, _ message: String, _ fields: () -> Fields) {
-        guard enabled(verb.level) else { return }
-        write(verb, message, fields())
+        let reach = reach(verb.level)
+        guard !reach.isEmpty else { return }
+        write(verb, message, fields(), reach)
     }
 
     /// A line. Inside a span it carries the trace and the nearest shown span;
     /// with none shown it carries no ids, like a line outside any span.
-    func write(_ verb: Verb, _ message: String, _ fields: Fields) {
+    func write(_ verb: Verb, _ message: String, _ fields: Fields, _ reach: Reach) {
         var e = Event(time: Date(), verb: verb, msg: message, service: service(), scope: scope)
         if let span {
             precondition(!span.ended, "\"\(message)\" written to span \"\(span.name)\" after it ended")
@@ -94,7 +102,7 @@ public struct LogWriter: Logging, Sendable {
             }
         }
         e.fields = encodeFields(fields)
-        emit(e)
+        emit(e, reach)
     }
 }
 
@@ -134,8 +142,9 @@ extension Logging {
     /// warning filtered out does not count as seen.
     public func warnOnce(_ message: String, _ fields: @autoclosure () -> Fields = [:]) {
         let w = writer
-        guard w.enabled(.warn), firstTime(w.scope.joined(separator: "\u{0}") + "\u{1}" + message) else { return }
-        w.write(.warn, message, fields())
+        let reach = w.reach(.warn)
+        guard !reach.isEmpty, firstTime(w.scope.joined(separator: "\u{0}") + "\u{1}" + message) else { return }
+        w.write(.warn, message, fields(), reach)
     }
 
     /// A child whose events carry `name` after this logger's scope and whose
@@ -158,8 +167,9 @@ extension Logging {
         do throws(Traceparent.Malformed) {
             return join(try Traceparent(parsing: traceparent))
         } catch {
-            if w.enabled(.warn), firstTime("\u{2}" + traceparent) {
-                w.write(.warn, "malformed traceparent ignored", ["traceparent": traceparent, "why": error.reason])
+            let reach = w.reach(.warn)
+            if !reach.isEmpty, firstTime("\u{2}" + traceparent) {
+                w.write(.warn, "malformed traceparent ignored", ["traceparent": traceparent, "why": error.reason], reach)
             }
             return w
         }
@@ -173,9 +183,9 @@ extension Logging {
 
     /// Opens a span and returns it; it stays open until `end` is called, once.
     /// Under a span it is that span's child, else a root span (of the joined
-    /// remote span, else of TRACEPARENT's, else a new trace). Whether it is
-    /// shown is decided now, by its start's level against its scope's
-    /// threshold; its end follows that decision.
+    /// remote span, else of TRACEPARENT's, else a new trace). Where it is
+    /// shown is decided now, by its start's level against the stream's and
+    /// the record's thresholds; its end follows that decision.
     public func begin(_ name: String, _ fields: Fields = [:]) -> Span {
         let w = writer
         let traceID: String
@@ -193,11 +203,11 @@ extension Logging {
         }
         let s = Span(
             name: name, scope: w.scope, levelVariables: w.levelVariables, traceID: traceID,
-            parentID: parentID, top: w.span == nil, shown: w.enabled(Verb.wait.level), fields: fields)
+            parentID: parentID, top: w.span == nil, reach: w.reach(Verb.wait.level), fields: fields)
         if s.shown {
             var e = s.own(.wait, .start)
             e.fields = encodeFields(fields)
-            emit(e)
+            emit(e, s.reach)
         }
         return s
     }
@@ -259,8 +269,11 @@ public final class Span: Logging, Sendable {
     let spanID: String
     /// The shown span (or remote span) this one hangs from; nil for a root.
     let parentID: String?
-    /// Its start was written, so its end will be.
-    let shown: Bool
+    /// Where its start was written (the stream, the record), so its end
+    /// will be there too.
+    let reach: Reach
+    /// Its start was written somewhere.
+    var shown: Bool { !reach.isEmpty }
     /// What it holds belongs to: its own id when shown, else its parent's.
     let anchor: String?
     /// Opened outside any span of this process: its end ships what waits.
@@ -279,15 +292,15 @@ public final class Span: Logging, Sendable {
 
     init(
         name: String, scope: [String], levelVariables: [String], traceID: String, parentID: String?,
-        top: Bool, shown: Bool, fields: Fields
+        top: Bool, reach: Reach, fields: Fields
     ) {
         precondition(!name.isEmpty, "a span needs a name")
         self.name = name
         self.traceID = traceID
         self.spanID = newID(bytes: 8)
         self.parentID = parentID
-        self.shown = shown
-        self.anchor = shown ? spanID : parentID
+        self.reach = reach
+        self.anchor = reach.isEmpty ? parentID : spanID
         self.top = top
         self.start = .now
         self.state = Mutex(State(fields: fields))
@@ -327,7 +340,8 @@ public final class Span: Logging, Sendable {
         var all = fields
         if let error { all["err"] = error }
         guard shown else {
-            if error != nil, writer.enabled(.error) {
+            let failReach = writer.reach(.error)
+            if error != nil, !failReach.isEmpty {
                 all["dur_ms"] = durMs
                 var e = Event(time: Date(), verb: .fail, msg: name, service: service(), scope: writer.scope)
                 if let anchor {
@@ -335,14 +349,14 @@ public final class Span: Logging, Sendable {
                     e.spanID = anchor
                 }
                 e.fields = encodeFields(all)
-                emit(e)
+                emit(e, failReach)
             }
             return
         }
         var e = own(error == nil ? .success : .fail, .end)
         e.durMs = durMs
         e.fields = encodeFields(all)
-        emit(e)
+        emit(e, reach)
     }
 
     func own(_ verb: Verb, _ phase: Phase) -> Event {

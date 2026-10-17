@@ -10,6 +10,7 @@ import os
 
 struct Settings: Sendable {
     var level: LogLevel = .info
+    var recordLevel: LogLevel = .info
     var format: Format? = nil
     var time = false
     var service: String? = nil
@@ -34,6 +35,16 @@ func locked<Value: ~Copyable>(_ value: consuming sending Value) -> Mutex<Value> 
 public func setLogLevel(_ level: String) {
     let parsed = parseLevel("setLogLevel", level)
     settings.withLock { $0.level = parsed }
+}
+
+/// The unified log's threshold, apart from the stream's: the stream (stderr,
+/// and what ships) is for whoever reads this process, the unified log is the
+/// record. A command line quiet at its terminal (`setLogLevel("warn")`)
+/// still records its spans, so a trace that crosses it has its part.
+/// Default info; LOG_RECORD_LEVEL overrides it.
+public func setLogRecordLevel(_ level: String) {
+    let parsed = parseLevel("setLogRecordLevel", level)
+    settings.withLock { $0.recordLevel = parsed }
 }
 
 /// The program's default rendering, "human" or "json"; LOG_FORMAT overrides it.
@@ -101,6 +112,30 @@ func threshold(_ variables: [String]) -> LogLevel {
     }
     if let value = env("LOG_LEVEL") { return parseLevel("LOG_LEVEL", value) }
     return settings.withLock { $0.level }
+}
+
+/// The record's threshold: LOG_RECORD_LEVEL, then setLogRecordLevel, then info.
+func recordThreshold() -> LogLevel {
+    if let value = env("LOG_RECORD_LEVEL") { return parseLevel("LOG_RECORD_LEVEL", value) }
+    return settings.withLock { $0.recordLevel }
+}
+
+/// Where an event goes: the stream (stderr, and the ship batch, which sends
+/// the stream's bytes) by its scope's threshold, the record (the unified
+/// log, when on) by the record's. Empty: nowhere, and nothing is built.
+struct Reach: OptionSet, Sendable {
+    let rawValue: UInt8
+    static let stream = Reach(rawValue: 1)
+    static let record = Reach(rawValue: 2)
+
+    init(rawValue: UInt8) { self.rawValue = rawValue }
+
+    init(_ level: LogLevel, levelVariables: [String]) {
+        var reach: Reach = []
+        if level <= threshold(levelVariables) { reach.insert(.stream) }
+        if osLogOn(), level <= recordThreshold() { reach.insert(.record) }
+        self = reach
+    }
 }
 
 private let stderrTTY = isatty(STDERR_FILENO) == 1
@@ -226,19 +261,22 @@ private func osLogType(_ level: LogLevel) -> OSLogType {
     }
 }
 
-/// Writes the event to stderr in the format chosen, to the unified log, and
-/// to the ship batch when LOG_SHIP is set. Every knob resolves on every
-/// event, so a bad variable screams under any rendering.
-func emit(_ e: Event) {
+/// Writes the event where it reaches: the stream (stderr in the format
+/// chosen, and the ship batch when LOG_SHIP is set) and the record (the
+/// unified log). Every knob resolves on every event, so a bad variable
+/// screams under any rendering.
+func emit(_ e: Event, _ reach: Reach) {
+    guard !reach.isEmpty else { return }
     let fmt = format()
     let showClock = timeOn()
-    let target = shipTarget()
-    let useOSLog = osLogOn()
-    let json = fmt == .json || target != nil || useOSLog ? e.json : ""
+    let target = reach.contains(.stream) ? shipTarget() : nil
+    let json = fmt == .json || target != nil || reach.contains(.record) ? e.json : ""
     let tooLarge: Int? = output.withLock { out in
-        let text = fmt == .json ? json + "\n" : out.human.render(e, clock: showClock, color: color(out.fd))
-        writeAll(out.fd, text)
-        if useOSLog {
+        if reach.contains(.stream) {
+            let text = fmt == .json ? json + "\n" : out.human.render(e, clock: showClock, color: color(out.fd))
+            writeAll(out.fd, text)
+        }
+        if reach.contains(.record) {
             osLogger(e.scope).log(level: osLogType(e.verb.level), "\(json, privacy: .public)")
         }
         guard let target else { return nil }
