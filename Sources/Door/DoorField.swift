@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import LocalAuthentication
 import SwiftUI
@@ -293,3 +294,4 @@ public struct DoorField<Key>: View {
         }
     }
 }
+#endif

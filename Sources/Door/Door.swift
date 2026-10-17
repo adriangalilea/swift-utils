@@ -1,3 +1,4 @@
+#if os(macOS)
 import LocalAuthentication
 import Security
 import SwiftUI
@@ -306,3 +307,4 @@ struct Shake: GeometryEffect {
             CGAffineTransform(translationX: 8 * sin(times * .pi * 4), y: 0))
     }
 }
+#endif

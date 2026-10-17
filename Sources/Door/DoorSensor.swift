@@ -1,3 +1,4 @@
+#if os(macOS)
 import LocalAuthentication
 import LocalAuthenticationEmbeddedUI
 import SwiftUI
@@ -81,3 +82,4 @@ public final class SensorHost: NSView {
         DispatchQueue.main.async { [onReady] in onReady() }
     }
 }
+#endif

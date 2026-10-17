@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import OpenDirectory
 
@@ -21,3 +22,4 @@ public enum LoginPassword {
     /// The name for the subtitle ("enter the password for NAME").
     public static var userDisplayName: String { NSFullUserName() }
 }
+#endif
