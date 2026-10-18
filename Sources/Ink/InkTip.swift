@@ -150,22 +150,37 @@ extension View {
 
         private func show() {
             guard let text, let window else { return }
-            let chip = NSHostingView(rootView: InkTipChip(text: text, tint: tint))
-            let size = chip.fittingSize
+            // Measured as it will be drawn: the width proposed (so the text
+            // wraps at the chip's cap before it is measured), the height it
+            // then needs, and room around it for the shadow, which draws
+            // outside the chip and was clipped by a panel cut to the chip.
+            let rootView = InkTipChip(text: text, tint: tint)
+            let size = NSHostingController(rootView: rootView).sizeThatFits(
+                in: NSSize(width: 260, height: 10_000))
+            let shadow: CGFloat = 12
+            let chip = NSHostingView(rootView: rootView)
             // A fixed-frame container between the hosting view and the
             // panel: a hosting view that owns a window installs its own
             // sizing constraints and re-grows the panel after setFrame.
-            let container = NSView(frame: NSRect(origin: .zero, size: size))
-            chip.frame = container.bounds
+            let container = NSView(
+                frame: NSRect(
+                    origin: .zero,
+                    size: NSSize(width: size.width + shadow * 2, height: size.height + shadow * 2)))
+            chip.frame = NSRect(origin: NSPoint(x: shadow, y: shadow), size: size)
             chip.autoresizingMask = []
             container.addSubview(chip)
 
+            // Below the element; above it when the screen has no room below
+            // (a HUD near the Dock). Positions are the chip's; the panel is
+            // the chip plus its shadow margin.
             let anchor = window.convertToScreen(convert(bounds, to: nil))
             var x = anchor.midX - size.width / 2
+            var y = anchor.minY - 8 - size.height
             if let screen = window.screen?.visibleFrame {
                 x = min(max(x, screen.minX + 4), screen.maxX - size.width - 4)
+                if y < screen.minY + 4 { y = anchor.maxY + 8 }
             }
-            let origin = NSPoint(x: x, y: anchor.minY - 8 - size.height)
+            let origin = NSPoint(x: x - shadow, y: y - shadow)
 
             if panel == nil {
                 let p = NSPanel(
@@ -183,7 +198,7 @@ extension View {
                 panel = p
             }
             panel!.contentView = container
-            panel!.setFrame(NSRect(origin: origin, size: size), display: true)
+            panel!.setFrame(NSRect(origin: origin, size: container.frame.size), display: true)
             panel!.orderFront(nil)
         }
 

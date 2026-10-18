@@ -89,6 +89,14 @@ public final class CapsLockKey {
 
     /// The Caps Lock LED on every keyboard that has one.
     private func light(_ on: Bool) {
+        // Never open a keyboard before the person allowed it: an open
+        // without access is recorded by macOS as a DENIAL, silently, and a
+        // denied app is never prompted again (the request belongs to the
+        // host's grant, asked by the person's own click).
+        guard IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted else {
+            refused("Input Monitoring is not allowed yet: the light waits for it")
+            return
+        }
         if keyboards == nil {
             let manager = IOHIDManagerCreate(
                 kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
