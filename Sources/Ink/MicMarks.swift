@@ -70,6 +70,7 @@ public struct InkMeter: View {
 /// The AirPods mark tilting with the wearer's head (`angle`, degrees, + is a
 /// nod down), so "is it reading my head" is answered by looking. nil angle:
 /// the AirPods are the route but no motion arrives; drawn still and dim.
+/// A mark, no words: the host says what it means (its `.help`).
 public struct InkHeadBadge: View {
     let angle: Double?
     let size: CGFloat
@@ -85,6 +86,5 @@ public struct InkHeadBadge: View {
             .rotationEffect(.degrees(-(angle ?? 0)))
             .opacity(angle == nil ? 0.45 : 1)
             .animation(.linear(duration: 0.066), value: angle ?? 0)
-            .help(angle == nil ? "AirPods: no head motion" : "AirPods: reading your head")
     }
 }
