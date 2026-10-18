@@ -106,6 +106,11 @@
                 return openSettings(pane: "Privacy_ListenEvent")
             }
             UserDefaults.standard.set(true, forKey: listenPromptedKey)
+            // The app must be active for macOS to ask: from a menu bar app
+            // whose floating panel never activates it, the request made no
+            // TCC row and no prompt; brought forward first, it prompted
+            // (verified 2026-10-18, utter).
+            NSApp.activate()
             _ = CGRequestListenEventAccess()
         }
 
