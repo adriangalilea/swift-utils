@@ -110,15 +110,22 @@ public struct InkCloseButton: View {
 
     public var body: some View {
         Button(action: action) {
+            // ONE surface: the key's word and the X in a single capsule, so
+            // the key and the click read as the same act.
             HStack(spacing: 5) {
-                if let key { InkKey(key, size: 9.5).opacity(hovering ? 1 : 0.7) }
+                if let key {
+                    Text(key)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.primary.opacity(hovering ? 0.85 : 0.55))
+                }
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundStyle(.primary.opacity(hovering ? 0.9 : 0.6))
-                    .frame(width: 20, height: 20)
-                    .background(Circle().fill(.primary.opacity(hovering ? 0.16 : 0.08)))
             }
-            .padding(2)
+            .padding(.horizontal, key == nil ? 6 : 8)
+            .frame(minWidth: 22, minHeight: 22)
+            .background(Capsule().fill(.primary.opacity(hovering ? 0.16 : 0.08)))
+            .overlay(Capsule().strokeBorder(.primary.opacity(0.1), lineWidth: 0.5))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -126,6 +133,5 @@ public struct InkCloseButton: View {
         .onHover { hovering = $0 }
         .animation(.easeOut(duration: 0.12), value: hovering)
         .accessibilityLabel("Close")
-        .help(key.map { "Close (\($0))" } ?? "Close")
     }
 }
