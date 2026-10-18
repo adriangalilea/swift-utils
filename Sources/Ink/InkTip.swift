@@ -135,9 +135,12 @@ extension View {
             trackingAreas.forEach(removeTrackingArea)
             // `.activeAlways`: a HUD's nonactivating panel belongs to an app
             // that is usually not the active one.
+            // `.inVisibleRect`: the area follows the view's size (registered
+            // before layout it was zero-sized, and no hover ever arrived).
             addTrackingArea(
                 NSTrackingArea(
-                    rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self))
+                    rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                    owner: self))
         }
 
         override func mouseEntered(with event: NSEvent) { show() }
