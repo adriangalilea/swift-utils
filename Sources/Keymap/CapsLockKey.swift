@@ -43,6 +43,9 @@ public final class CapsLockKey {
     public private(set) var armed = false
     private var hotkey: PressReleaseHotkey?
     private var keyboards: IOHIDManager?
+    /// The light's refusal is said once per arming; every press still
+    /// tries, so a grant given meanwhile lights the next one.
+    private var refusalSaid = false
 
     private init() {
         push.onChange = { [weak self] engaged in
@@ -69,6 +72,7 @@ public final class CapsLockKey {
         }
         self.hotkey = hotkey
         armed = true
+        refusalSaid = false
         light(false)
         onEvent?(.armed)
     }
@@ -93,7 +97,7 @@ public final class CapsLockKey {
                     as CFDictionary)
             let opened = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
             guard opened == kIOReturnSuccess else {
-                onEvent?(.lightRefused("keyboards not opened (\(String(opened, radix: 16))): Input Monitoring?"))
+                refused("keyboards not opened (\(String(opened, radix: 16))): Input Monitoring is not allowed")
                 return
             }
             keyboards = manager
@@ -111,7 +115,13 @@ public final class CapsLockKey {
                 if IOHIDDeviceSetValue(device, led, value) == kIOReturnSuccess { lit += 1 }
             }
         }
-        if lit == 0 { onEvent?(.lightRefused("no keyboard took the Caps Lock light")) }
+        if lit == 0 { refused("no keyboard took the Caps Lock light") }
+    }
+
+    private func refused(_ why: String) {
+        guard !refusalSaid else { return }
+        refusalSaid = true
+        onEvent?(.lightRefused(why))
     }
 
     /// Writes the HID system's key mapping: each pair maps a source usage to
