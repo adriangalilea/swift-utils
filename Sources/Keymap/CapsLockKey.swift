@@ -109,7 +109,9 @@ public final class CapsLockKey {
         // without access is recorded by macOS as a DENIAL, silently, and a
         // denied app is never prompted again (the request belongs to the
         // host's grant, asked by the person's own click).
-        guard IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted else {
+        // Read the way the grant reads it (CoreGraphics, the WindowServer
+        // route to tccd): one answer for the switch and the key.
+        guard CGPreflightListenEventAccess() else {
             refused("Input Monitoring is not allowed yet: the light waits for it")
             return
         }

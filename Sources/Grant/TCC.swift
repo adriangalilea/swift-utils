@@ -1,7 +1,6 @@
 #if os(macOS)
     import AppKit
     import ApplicationServices
-    import IOKit.hid
 
     /// The TCC probe + request primitives, each answering the tri-state a
     /// Standing derives from: true = granted, false = denied, nil = never
@@ -83,27 +82,31 @@
             }
         }
 
-        // MARK: Input Monitoring (open a keyboard through IOHID)
+        // MARK: Input Monitoring (listen to the keyboard, light its LEDs)
 
-        /// IOHID's own readout, which unlike Accessibility tells denied from
-        /// never asked.
+        private static let listenPromptedKey = "grant.inputMonitoringPrompted"
+
+        /// CoreGraphics' readout (`CGPreflightListenEventAccess`): granted
+        /// or not; never asked (nil) is remembered here, as Accessibility's.
         public static func inputMonitoring() -> Bool? {
-            switch IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) {
-            case kIOHIDAccessTypeGranted: true
-            case kIOHIDAccessTypeDenied: false
-            default: nil
-            }
+            if CGPreflightListenEventAccess() { return true }
+            return UserDefaults.standard.bool(forKey: listenPromptedKey) ? false : nil
         }
 
-        /// The request ALWAYS goes first: it prompts when macOS may still ask
-        /// and lists the app in Settings either way (IOHIDCheckAccess reads
-        /// "denied" for an app never asked, so deciding from it went
-        /// straight to a Settings pane the app was not even in). Only a
-        /// request that comes back refused opens Settings, where the app
-        /// now sits ready to be switched on.
+        /// First ask: `CGRequestListenEventAccess` ("requests event
+        /// listening access if absent, potentially prompting", CGEvent.h),
+        /// the route WindowServer takes to tccd, which prompts and lists the
+        /// app in Privacy & Security › Input Monitoring.
+        /// `IOHIDRequestAccess` from a menu bar app never reached tccd
+        /// (no request in its log, 2026-10-18), so it is not used. Once
+        /// asked, macOS never prompts again: ask again and this deep-links
+        /// to the pane, where the app sits ready to be switched on.
         public static func requestInputMonitoring() {
-            guard !IOHIDRequestAccess(kIOHIDRequestTypeListenEvent) else { return }
-            openSettings(pane: "Privacy_ListenEvent")
+            guard inputMonitoring() != false else {
+                return openSettings(pane: "Privacy_ListenEvent")
+            }
+            UserDefaults.standard.set(true, forKey: listenPromptedKey)
+            _ = CGRequestListenEventAccess()
         }
 
         // MARK: System Settings
