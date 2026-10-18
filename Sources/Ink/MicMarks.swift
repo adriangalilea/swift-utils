@@ -49,34 +49,6 @@ public struct InkSegments<Value: Hashable>: View {
     }
 }
 
-/// A key as a keycap ("⇪"), lit in `tint` while `lit` (held, latched), dim
-/// otherwise: the talk key says how to talk and whether it is talking.
-public struct InkKeycap: View {
-    let text: String
-    let lit: Bool
-    let tint: Color
-    let size: CGFloat
-
-    public init(_ text: String, lit: Bool, tint: Color = .accentColor, size: CGFloat = 12) {
-        self.text = text
-        self.lit = lit
-        self.tint = tint
-        self.size = size
-    }
-
-    public var body: some View {
-        Text(text)
-            .font(.system(size: size, weight: .semibold))
-            .padding(.horizontal, size * 0.42).padding(.vertical, size * 0.17)
-            .background(
-                lit ? AnyShapeStyle(tint.opacity(0.9)) : AnyShapeStyle(.quaternary),
-                in: RoundedRectangle(cornerRadius: size / 3)
-            )
-            .foregroundStyle(lit ? Color.white : Color.secondary)
-            .animation(.easeOut(duration: 0.12), value: lit)
-    }
-}
-
 /// Four bars lighting left to right with a 0-1 level: the mic breathing.
 public struct InkMeter: View {
     let level: Double
