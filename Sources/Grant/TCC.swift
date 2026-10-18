@@ -1,6 +1,7 @@
 #if os(macOS)
     import AppKit
     import ApplicationServices
+    import IOKit.hid
 
     /// The TCC probe + request primitives, each answering the tri-state a
     /// Standing derives from: true = granted, false = denied, nil = never
@@ -80,6 +81,25 @@
                     DispatchQueue.main.async { sessionGranted.insert(bundleID) }
                 }
             }
+        }
+
+        // MARK: Input Monitoring (open a keyboard through IOHID)
+
+        /// IOHID's own readout, which unlike Accessibility tells denied from
+        /// never asked.
+        public static func inputMonitoring() -> Bool? {
+            switch IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) {
+            case kIOHIDAccessTypeGranted: true
+            case kIOHIDAccessTypeDenied: false
+            default: nil
+            }
+        }
+
+        /// First ask fires the system prompt; once denied only System
+        /// Settings can flip it, so ask again and this deep-links there.
+        public static func requestInputMonitoring() {
+            guard inputMonitoring() != false else { return openSettings(pane: "Privacy_ListenEvent") }
+            _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
         }
 
         // MARK: System Settings
