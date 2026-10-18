@@ -2,12 +2,12 @@ import Carbon.HIToolbox
 import Foundation
 import IOKit.hid
 import IOKit.hidsystem
-import Ink
 
-/// Caps Lock, owned whole as a talk key: it types no capitals anywhere,
-/// holding it is engaged while held, tapping it latches until the next tap
-/// (Ink's `PushToTalk`, the mic button's grammar), and its own light says
-/// when it is engaged.
+/// Caps Lock, owned whole: it types no capitals anywhere, and says what the
+/// hand did with it (`onHand`): down, then up as a hold or a tap. Its light is the host's to set
+/// (`light(_:)`): the key knows hands and LEDs, the host knows what they
+/// mean (a talk key: a tap switches the mic open, a hold talks while held,
+/// the light shows the mic open).
 ///
 /// How: the HID system maps Caps Lock to F18 on every keyboard (the public
 /// `IOHIDEventSystemClient` "UserKeyMapping" property, the one hidutil
@@ -26,11 +26,20 @@ public final class CapsLockKey {
     static let capsLock: UInt64 = 0x7_0000_0039
     static let f18: UInt64 = 0x7_0000_006D
 
-    public let push = PushToTalk()
-    /// Engaged (held or latched) changed; `push.latched` says which.
-    public var onChange: ((_ engaged: Bool) -> Void)?
+    /// What the hand did: `down` at every press (a hold may be starting:
+    /// act from the first instant), then `up`, a `tap` when the press was
+    /// shorter than `holdThreshold`.
+    public enum Hand: Sendable, Equatable {
+        case down
+        case up(tap: Bool)
+    }
+
+    /// Presses shorter than this are taps (Ink's `PushToTalk` measure).
+    public var holdThreshold: TimeInterval = 0.35
+    public var onHand: ((Hand) -> Void)?
     /// What happened, for the host's log: armed, refused, light refused.
     public var onEvent: ((_ event: Event) -> Void)?
+    private var pressedAt: Date?
 
     public enum Event: Sendable, Equatable {
         case armed
@@ -47,12 +56,18 @@ public final class CapsLockKey {
     /// tries, so a grant given meanwhile lights the next one.
     private var refusalSaid = false
 
-    private init() {
-        push.onChange = { [weak self] engaged in
-            guard let self else { return }
-            self.light(engaged)
-            self.onChange?(engaged)
-        }
+    private init() {}
+
+    private func pressed() {
+        guard pressedAt == nil else { return }
+        pressedAt = Date()
+        onHand?(.down)
+    }
+
+    private func released() {
+        guard let at = pressedAt else { return }
+        pressedAt = nil
+        onHand?(.up(tap: Date().timeIntervalSince(at) < holdThreshold))
     }
 
     public func arm() {
@@ -61,10 +76,10 @@ public final class CapsLockKey {
             onEvent?(.mappingRefused)
             return
         }
-        let push = push
         let hotkey = PressReleaseHotkey(
             keyCode: UInt16(kVK_F18), carbonModifiers: 0,
-            onPress: { push.pressBegan() }, onRelease: { push.pressEnded() })
+            onPress: { [weak self] in self?.pressed() },
+            onRelease: { [weak self] in self?.released() })
         guard hotkey.registered else {
             _ = Self.map([])
             onEvent?(.f18Taken)
@@ -80,15 +95,16 @@ public final class CapsLockKey {
     public func disarm() {
         guard armed else { return }
         hotkey = nil
-        push.stop()
+        pressedAt = nil
         light(false)
         keyboards = nil
         armed = !Self.map([])
         onEvent?(.disarmed)
     }
 
-    /// The Caps Lock LED on every keyboard that has one.
-    private func light(_ on: Bool) {
+    /// The Caps Lock LED on every keyboard that has one: the host's state,
+    /// shown on the key.
+    public func light(_ on: Bool) {
         // Never open a keyboard before the person allowed it: an open
         // without access is recorded by macOS as a DENIAL, silently, and a
         // denied app is never prompted again (the request belongs to the
