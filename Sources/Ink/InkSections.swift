@@ -37,9 +37,9 @@ public struct InkSections<Content: View, Footer: View>: View {
                 .padding(.vertical, 11)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background {
-                    Color.black.opacity(0.2)
+                    Color.black.opacity(0.18)
                         .overlay(alignment: .top) {
-                            Rectangle().fill(.white.opacity(0.08)).frame(height: 1)
+                            Rectangle().fill(.primary.opacity(0.12)).frame(height: 1)
                         }
                 }
         }
@@ -49,11 +49,12 @@ public struct InkSections<Content: View, Footer: View>: View {
 
 extension View {
     /// The floating HUD's Liquid Glass for content that pads itself (an
-    /// `InkSections`): clear glass, faintly darkened so words read over
-    /// anything, on the panel's continuous rounded rect.
+    /// `InkSections`): the regular variant, Apple's register for a control
+    /// surface over arbitrary content, which keeps its own legibility over
+    /// anything (clear glass is for media-rich backgrounds and needs a
+    /// dimming layer to be read; over a busy page it read as no panel at
+    /// all), on the panel's continuous rounded rect.
     public func inkGlass(cornerRadius: CGFloat = .inkPanel) -> some View {
-        glassEffect(
-            .clear.tint(Color.black.opacity(0.22)),
-            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        glassEffect(.regular, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
