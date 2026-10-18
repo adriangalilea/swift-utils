@@ -202,7 +202,10 @@ extension View {
             }
             panel!.contentView = container
             panel!.setFrame(NSRect(origin: origin, size: container.frame.size), display: true)
-            panel!.orderFront(nil)
+            // Regardless: the host is often not the active app (a HUD over
+            // someone else's window), and plain `orderFront` from an
+            // inactive app leaves the chip behind that window.
+            panel!.orderFrontRegardless()
         }
 
         private func hide() { panel?.orderOut(nil) }
