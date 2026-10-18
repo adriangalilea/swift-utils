@@ -33,7 +33,10 @@ public struct InkSegments<Value: Hashable>: View {
                 Text(label(value))
                     .font(.system(size: size, weight: on ? .semibold : .regular))
                     .padding(.horizontal, size * 0.65).padding(.vertical, size * 0.2)
-                    .background(on ? AnyShapeStyle(Color.accentColor.opacity(0.85)) : AnyShapeStyle(.clear), in: Capsule())
+                    .background(
+                        on ? AnyShapeStyle(Color.accentColor.opacity(0.85)) : AnyShapeStyle(.clear),
+                        in: Capsule()
+                    )
                     .foregroundStyle(on ? Color.white : Color.secondary)
                     .contentShape(Capsule())
                     .onTapGesture { withAnimation(.spring(duration: 0.2)) { choose(value) } }
@@ -65,7 +68,10 @@ public struct InkKeycap: View {
         Text(text)
             .font(.system(size: size, weight: .semibold))
             .padding(.horizontal, size * 0.42).padding(.vertical, size * 0.17)
-            .background(lit ? AnyShapeStyle(tint.opacity(0.9)) : AnyShapeStyle(.quaternary), in: RoundedRectangle(cornerRadius: size / 3))
+            .background(
+                lit ? AnyShapeStyle(tint.opacity(0.9)) : AnyShapeStyle(.quaternary),
+                in: RoundedRectangle(cornerRadius: size / 3)
+            )
             .foregroundStyle(lit ? Color.white : Color.secondary)
             .animation(.easeOut(duration: 0.12), value: lit)
     }

@@ -90,14 +90,20 @@ public final class CapsLockKey {
     /// The Caps Lock LED on every keyboard that has one.
     private func light(_ on: Bool) {
         if keyboards == nil {
-            let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+            let manager = IOHIDManagerCreate(
+                kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
             IOHIDManagerSetDeviceMatching(
                 manager,
-                [kIOHIDDeviceUsagePageKey: kHIDPage_GenericDesktop, kIOHIDDeviceUsageKey: kHIDUsage_GD_Keyboard]
+                [
+                    kIOHIDDeviceUsagePageKey: kHIDPage_GenericDesktop,
+                    kIOHIDDeviceUsageKey: kHIDUsage_GD_Keyboard,
+                ]
                     as CFDictionary)
             let opened = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
             guard opened == kIOReturnSuccess else {
-                refused("keyboards not opened (\(String(opened, radix: 16))): Input Monitoring is not allowed")
+                refused(
+                    "keyboards not opened (\(String(opened, radix: 16))): Input Monitoring is not allowed"
+                )
                 return
             }
             keyboards = manager
@@ -108,10 +114,15 @@ public final class CapsLockKey {
             let leds =
                 IOHIDDeviceCopyMatchingElements(
                     device,
-                    [kIOHIDElementUsagePageKey: kHIDPage_LEDs, kIOHIDElementUsageKey: kHIDUsage_LED_CapsLock]
-                        as CFDictionary, IOOptionBits(kIOHIDOptionsTypeNone)) as? [IOHIDElement] ?? []
+                    [
+                        kIOHIDElementUsagePageKey: kHIDPage_LEDs,
+                        kIOHIDElementUsageKey: kHIDUsage_LED_CapsLock,
+                    ]
+                        as CFDictionary, IOOptionBits(kIOHIDOptionsTypeNone)) as? [IOHIDElement]
+                ?? []
             for led in leds {
-                let value = IOHIDValueCreateWithIntegerValue(kCFAllocatorDefault, led, 0, on ? 1 : 0)
+                let value = IOHIDValueCreateWithIntegerValue(
+                    kCFAllocatorDefault, led, 0, on ? 1 : 0)
                 if IOHIDDeviceSetValue(device, led, value) == kIOReturnSuccess { lit += 1 }
             }
         }
@@ -129,12 +140,20 @@ public final class CapsLockKey {
     static func map(_ pairs: [[UInt64: UInt64]]) -> Bool {
         let client = IOHIDEventSystemClientCreateSimpleClient(kCFAllocatorDefault)
         let mapping = pairs.flatMap {
-            $0.map { ["HIDKeyboardModifierMappingSrc": $0.key, "HIDKeyboardModifierMappingDst": $0.value] }
+            $0.map {
+                [
+                    "HIDKeyboardModifierMappingSrc": $0.key,
+                    "HIDKeyboardModifierMappingDst": $0.value,
+                ]
+            }
         }
-        guard IOHIDEventSystemClientSetProperty(client, "UserKeyMapping" as CFString, mapping as CFArray)
+        guard
+            IOHIDEventSystemClientSetProperty(
+                client, "UserKeyMapping" as CFString, mapping as CFArray)
         else { return false }
         let applied =
-            IOHIDEventSystemClientCopyProperty(client, "UserKeyMapping" as CFString) as? [[String: UInt64]] ?? []
+            IOHIDEventSystemClientCopyProperty(client, "UserKeyMapping" as CFString)
+            as? [[String: UInt64]] ?? []
         return applied.count == mapping.count
     }
 }

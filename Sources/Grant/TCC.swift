@@ -98,7 +98,9 @@
         /// First ask fires the system prompt; once denied only System
         /// Settings can flip it, so ask again and this deep-links there.
         public static func requestInputMonitoring() {
-            guard inputMonitoring() != false else { return openSettings(pane: "Privacy_ListenEvent") }
+            guard inputMonitoring() != false else {
+                return openSettings(pane: "Privacy_ListenEvent")
+            }
             _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
         }
 
