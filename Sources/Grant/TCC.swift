@@ -95,13 +95,15 @@
             }
         }
 
-        /// First ask fires the system prompt; once denied only System
-        /// Settings can flip it, so ask again and this deep-links there.
+        /// The request ALWAYS goes first: it prompts when macOS may still ask
+        /// and lists the app in Settings either way (IOHIDCheckAccess reads
+        /// "denied" for an app never asked, so deciding from it went
+        /// straight to a Settings pane the app was not even in). Only a
+        /// request that comes back refused opens Settings, where the app
+        /// now sits ready to be switched on.
         public static func requestInputMonitoring() {
-            guard inputMonitoring() != false else {
-                return openSettings(pane: "Privacy_ListenEvent")
-            }
-            _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+            guard !IOHIDRequestAccess(kIOHIDRequestTypeListenEvent) else { return }
+            openSettings(pane: "Privacy_ListenEvent")
         }
 
         // MARK: System Settings
