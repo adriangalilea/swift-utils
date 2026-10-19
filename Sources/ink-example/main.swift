@@ -24,6 +24,28 @@ struct Section<Content: View>: View {
     }
 }
 
+struct Toolbar: View {
+    var pinBelow = false
+    private let tools = [
+        ("play.fill", "play"), ("backward.fill", "back 10 seconds"),
+        ("forward.fill", "forward 10 seconds"), ("speaker.wave.2.fill", "volume"),
+        ("captions.bubble", "captions: off. Press c to cycle them."),
+    ]
+
+    var body: some View {
+        HStack(spacing: .inkBlock) {
+            ForEach(Array(tools.enumerated()), id: \.offset) { i, tool in
+                Button {
+                } label: {
+                    Image(systemName: tool.0).font(.title3).frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .inkTip(tool.1, edge: pinBelow && i == tools.count - 1 ? .bottom : nil)
+            }
+        }
+    }
+}
+
 struct DemoView: View {
     @State private var width: CGFloat = 200
     @State private var secret = ""
@@ -150,6 +172,18 @@ struct DemoView: View {
                         "curl -fsSL https://example.com/install.sh | bash -s -- --prefix ~/.local --channel stable"
                     )
                     .frame(maxWidth: width + 160, alignment: .leading)
+                }
+
+                // Sweep the pointer along a row: the first tip waits a beat, the
+                // next ones follow at once; a click puts the tip away. The second
+                // row wears the bubble (HUD and media chrome), above its glyph;
+                // the last glyph pins its tip below.
+                Section(title: "a toolbar's tips") {
+                    Toolbar()
+                    Toolbar(pinBelow: true)
+                        .padding(10)
+                        .background(.black.opacity(0.55), in: Capsule())
+                        .inkTipStyle(.bubble)
                 }
 
                 // Secrets, composed: typed into SecretField; shown as Veiled (a
