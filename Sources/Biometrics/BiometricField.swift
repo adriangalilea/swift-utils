@@ -20,94 +20,9 @@
     // no finger-landed signal, only completion; the recognized-bounce and the
     // wrong-finger shake are the feedback (Adrian: "good for now").
 
-    // The one field container: every secret-entry surface wears this box, so
-    // SecretField and BiometricField's authorized state can't drift apart.
-    struct SecretBox: ViewModifier {
-        let border: Color
-        func body(content: Content) -> some View {
-            content
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 7).fill(.quaternary.opacity(0.5)))
-                .overlay(RoundedRectangle(cornerRadius: 7).stroke(border, lineWidth: 1))
-                .animation(.snappy(duration: 0.15), value: border)
-        }
-    }
-
-    /// A password field with a reveal toggle. `trailing` is the accessory slot
-    /// beside the eye (BiometricField puts the sensor there).
-    public struct SecretField<Trailing: View>: View {
-        let prompt: String
-        @Binding var text: String
-        // .newPassword → the OS offers "Suggest Strong Password" + password-manager
-        // AutoFill (1Password et al. participate as the system provider). .password
-        // → AutoFill an existing one. nil → no AutoFill.
-        var contentType: NSTextContentType?
-        // nil = no validation chrome; true/false = green/attention border once typing.
-        var valid: Bool?
-        @ViewBuilder var trailing: () -> Trailing
-        @State private var visible = false
-
-        public init(
-            prompt: String, text: Binding<String>,
-            contentType: NSTextContentType? = .password, valid: Bool? = nil,
-            @ViewBuilder trailing: @escaping () -> Trailing
-        ) {
-            self.prompt = prompt
-            self._text = text
-            self.contentType = contentType
-            self.valid = valid
-            self.trailing = trailing
-        }
-
-        private var border: Color {
-            guard let valid, !text.isEmpty else { return .secondary.opacity(0.25) }
-            return valid ? .green.opacity(0.8) : .orange.opacity(0.55)
-        }
-
-        public var body: some View {
-            HStack(spacing: 6) {
-                Group {
-                    if visible {
-                        TextField(prompt, text: $text)
-                    } else {
-                        SecureField(prompt, text: $text)
-                    }
-                }
-                .textFieldStyle(.plain)
-                .textContentType(contentType)
-                if valid == true {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                        .transition(.scale.combined(with: .opacity))
-                }
-                // Accessories stay QUIET (Adrian, matched against 1Password's
-                // field): small tertiary glyphs, the text owns the field.
-                Button {
-                    visible.toggle()
-                } label: {
-                    Image(systemName: visible ? "eye.slash" : "eye")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .inkTip(visible ? "hide" : "show")
-                trailing()
-            }
-            .modifier(SecretBox(border: border))
-            .animation(.snappy(duration: 0.15), value: valid)
-        }
-    }
-
-    extension SecretField where Trailing == EmptyView {
-        public init(
-            prompt: String, text: Binding<String>,
-            contentType: NSTextContentType? = .password, valid: Bool? = nil
-        ) {
-            self.init(
-                prompt: prompt, text: text, contentType: contentType,
-                valid: valid, trailing: { EmptyView() })
-        }
-    }
+    // The field itself is Ink's SecretField (and its box, SecretBox): this file
+    // adds the sensor in its trailing slot, and wears the same box once a
+    // finger has authorized it.
 
     /// What a finger on a BiometricField opens: why (the evaluation reason) and
     /// what a passed evaluation unlocks. A struct, not a tuple: the first real

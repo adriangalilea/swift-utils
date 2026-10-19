@@ -41,6 +41,16 @@
         }
       }
     },
+    "hide": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ocultar"
+          }
+        }
+      }
+    },
     "Remove this shortcut": {
       "localizations": {
         "es": {
@@ -57,6 +67,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reintentar"
+          }
+        }
+      }
+    },
+    "reveals for five seconds": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "se muestra cinco segundos"
+          }
+        }
+      }
+    },
+    "show": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mostrar"
+          }
+        }
+      }
+    },
+    "veiled value": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "valor oculto"
           }
         }
       }
