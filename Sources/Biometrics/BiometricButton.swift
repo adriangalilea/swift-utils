@@ -75,7 +75,7 @@ public struct BiometricButton: View {
         }
         // The cap's inset on the trailing edge is the well's own: 4.
         .buttonStyle(InkButtonStyle(.prominent, trailing: 4))
-        .help(armed ? "Rest your finger on Touch ID, or click" : "Asks for \(Self.proof)")
+        .inkTip(armed ? "Rest your finger on Touch ID, or click" : "Asks for \(Self.proof)")
     }
 
     private var armed: Bool { context != nil }

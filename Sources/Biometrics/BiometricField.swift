@@ -1,5 +1,6 @@
 #if os(macOS)
     import AppKit
+    import Ink
     import LocalAuthentication
     import SwiftUI
 
@@ -89,7 +90,7 @@
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
-                .help(visible ? "hide" : "show")
+                .inkTip(visible ? "hide" : "show")
                 trailing()
             }
             .modifier(SecretBox(border: border))
@@ -173,7 +174,7 @@
                             Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
-                        .help("type the secret instead")
+                        .inkTip("type the secret instead")
                     }
                     .modifier(SecretBox(border: .green.opacity(0.8)))
                 } else {
@@ -205,7 +206,7 @@
                                                 : AnyShapeStyle(.secondary))
                                 }
                                 .buttonStyle(.plain)
-                                .help("rest a finger, or click to authorize")
+                                .inkTip("rest a finger, or click to authorize")
                             }
                             .frame(width: 16, height: 16)
                             .modifier(Shake(times: CGFloat(shakes)))

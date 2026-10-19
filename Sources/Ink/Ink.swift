@@ -143,8 +143,8 @@ public struct ShortcutBadge: View {
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .help(String(localized: "Remove this shortcut", bundle: .module))
-            .onHover { hovering = $0 }
+            .inkTip(String(localized: "Remove this shortcut", bundle: .module))
+            .inkHover($hovering)
             .animation(.inkFlick, value: hovering)
         }
     }
@@ -167,7 +167,7 @@ public struct ShortcutBadge: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .onHover { hovering = $0 }
+            .inkHover($hovering)
             .animation(.inkFlick, value: hovering)
         }
     }

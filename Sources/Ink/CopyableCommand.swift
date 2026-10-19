@@ -70,7 +70,7 @@
             .accessibilityHint(String(localized: "Copy to clipboard", bundle: .module))
             .onDisappear { feedback.reset() }
             .onChange(of: command) { _, _ in feedback.reset() }
-            .onHover { hovering = $0 }
+            .inkHover($hovering)
             .animation(.inkFlick, value: hovering)
             .inkTip(tip)
         }

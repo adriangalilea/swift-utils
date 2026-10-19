@@ -182,7 +182,7 @@ public final class PushToTalk: ObservableObject {
                 down ? talk.pressBegan() : talk.pressEnded()
             }
             .onDisappear { talk.stop() }
-            .help(
+            .inkTip(
                 talk.engaged
                     ? (talk.latched ? "Recording (locked) - tap to stop" : "Recording while held")
                     : "Hold to talk; tap to lock on")

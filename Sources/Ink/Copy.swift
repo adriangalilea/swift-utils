@@ -121,7 +121,7 @@
                 if markOnly { well } else { text }
             }
             .buttonStyle(.plain)
-            .onHover { hovering = $0 }
+            .inkHover($hovering)
             .animation(.inkFlick, value: hovering)
             .onChange(of: value) { _, _ in feedback.reset() }
             .onDisappear { feedback.reset() }

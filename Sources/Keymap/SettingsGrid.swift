@@ -136,7 +136,7 @@ public struct KeymapGrid<A: ActionSet>: View {
     {
         if plane == .global, store.deadGlobals.contains(combo) {
             chip.opacity(0.4)
-                .help(
+                .inkTip(
                     String(
                         localized: "Another app owns this system-wide right now - it won't fire",
                         bundle: .module))
@@ -144,7 +144,7 @@ public struct KeymapGrid<A: ActionSet>: View {
             chip.overlay(alignment: .topTrailing) {
                 Circle().fill(.orange).frame(width: 6, height: 6).offset(x: 2, y: -2)
             }
-            .help(
+            .inkTip(
                 String(
                     localized: "macOS also uses this combo system-wide right now - it may not fire",
                     bundle: .module))
@@ -162,7 +162,7 @@ public struct KeymapGrid<A: ActionSet>: View {
         .buttonStyle(.borderless)
         .opacity(store.isCustomized(action) ? 1 : 0)
         .disabled(!store.isCustomized(action))
-        .help(String(localized: "Reset to defaults", bundle: .module))
+        .inkTip(String(localized: "Reset to defaults", bundle: .module))
     }
 
     private func familyRow(_ family: ComboFamily) -> some View {

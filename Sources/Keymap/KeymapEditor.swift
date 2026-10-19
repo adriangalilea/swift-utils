@@ -220,10 +220,10 @@ struct KeymapEditor<A: ActionSet>: View {
             Spacer()
             Text(String(localized: "In-app", bundle: .module))
                 .frame(width: Self.localColumn, alignment: .leading)
-                .help(String(localized: "Works while this app is frontmost", bundle: .module))
+                .inkTip(String(localized: "Works while this app is frontmost", bundle: .module))
             Label(String(localized: "From any app", bundle: .module), systemImage: "globe")
                 .frame(width: Self.globalColumn, alignment: .leading)
-                .help(
+                .inkTip(
                     String(
                         localized: "System-wide - works even when this app is in the background",
                         bundle: .module))
@@ -295,7 +295,7 @@ struct KeymapEditor<A: ActionSet>: View {
                 .frame(width: Self.resetColumn)
                 .opacity(store.isCustomized(action) ? 1 : 0)
                 .disabled(!store.isCustomized(action))
-                .help(String(localized: "Reset to defaults", bundle: .module))
+                .inkTip(String(localized: "Reset to defaults", bundle: .module))
             }
             if let conflict, conflict.action == action {
                 Text(conflict.message)
