@@ -84,24 +84,9 @@ extension View {
     }
 }
 
-/// The one key-cap. Every surface renders combos through it - never
-/// re-styled per site.
-public struct ShortcutBadge: View {
-    let text: String
-    public init(_ text: String) { self.text = text }
-
-    public var body: some View {
-        Text(text)
-            .font(.caption2.monospacedDigit().weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 1)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: .inkChip))
-    }
-}
-
-// Pointer-shaped micro-components (.onHover/.help) - mac-only by nature,
-// not by neglect: a hover affordance has no meaning under a focus engine.
+// Pointer-shaped micro-components (a hover reveals what a click does) -
+// mac-only by nature, not by neglect: a hover affordance has no meaning under
+// a focus engine.
 #if os(macOS)
     /// A bound accelerator: a keycap showing the combo (glyphs read as the keys
     /// they are). The chip IS the remove control - on hover it turns red and

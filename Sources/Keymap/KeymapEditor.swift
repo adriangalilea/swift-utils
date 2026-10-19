@@ -245,7 +245,7 @@ struct KeymapEditor<A: ActionSet>: View {
                     HStack(spacing: 8) {
                         Text(row.what)
                         Spacer()
-                        ShortcutBadge(row.keys)
+                        InkKey(row.keys)
                     }
                     .padding(.vertical, 3)
                     .padding(.horizontal, 6)

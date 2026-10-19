@@ -149,6 +149,31 @@ struct DemoView: View {
                     )
                     .frame(maxWidth: width + 160, alignment: .leading)
                 }
+
+                // The one keycap (ShortcutBadge's place too): a key alone, a
+                // combo, beside a label, on a prominent button, held.
+                Section(title: "keys") {
+                    HStack(spacing: .inkGap) {
+                        InkKey("esc")
+                        InkKey("↩")
+                        InkKey("⌘K")
+                        InkKey("⌥⌘1")
+                        InkKey("⇧⌘P")
+                        InkKey("⇪", lit: true)
+                    }
+                    HStack(spacing: .inkBlock) {
+                        HStack(spacing: 6) {
+                            Text("Open palette").foregroundStyle(.secondary)
+                            InkKey("⌘K")
+                        }
+                        Button {
+                        } label: {
+                            InkKeyed("Submit", key: "↩", on: .prominent)
+                        }
+                        .buttonStyle(.inkProminent)
+                        InkCloseButton {}
+                    }
+                }
             }
             .padding(32)
             .frame(maxWidth: .infinity, alignment: .leading)

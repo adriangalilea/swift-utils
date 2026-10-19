@@ -77,14 +77,14 @@ public struct KeymapCard: View {
                         .lineLimit(1)
                     Spacer(minLength: 0)
                     if let combo = action.local.first {
-                        ShortcutBadge(combo)
+                        InkKey(combo)
                     }
                     if let combo = action.global.first {
                         HStack(spacing: 3) {
                             Image(systemName: "globe")
                                 .font(.system(size: 9))
                                 .foregroundStyle(.tertiary)
-                            ShortcutBadge(combo)
+                            InkKey(combo)
                         }
                     }
                 }
