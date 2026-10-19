@@ -87,9 +87,60 @@ struct DemoView: View {
                     .frame(width: width + 70, alignment: .leading)
                     HStack(spacing: 4) {
                         Text("order")
-                        Copy("A7K-29Q4").font(.body.monospaced())
+                        Copy("A7K-29Q4") { Text(verbatim: "A7K-29Q4") }.font(.body.monospaced())
                         Text("has shipped")
                     }
+                }
+
+                // One thing varies down the rows: who speaks on the hover. One tip,
+                // always: a Copy's tip silences the cut text's own.
+                Section(title: "one hover, one tooltip") {
+                    let address = wallets[0].1
+                    Grid(alignment: .leading, horizontalSpacing: .inkLane, verticalSpacing: 8) {
+                        GridRow {
+                            Text("no tip").foregroundStyle(.secondary)
+                            Copy(address) { MiddleTruncate(address, tail: 6) }
+                                .frame(width: width, alignment: .leading)
+                            Text("the whole address, only when cut").foregroundStyle(.tertiary)
+                        }
+                        GridRow {
+                            Text("tip: address").foregroundStyle(.secondary)
+                            Copy(address, tip: address) { MiddleTruncate(address, tail: 6) }
+                                .frame(width: width, alignment: .leading)
+                            Text("the whole address, always").foregroundStyle(.tertiary)
+                        }
+                        GridRow {
+                            Text("tip: words").foregroundStyle(.secondary)
+                            Copy(address, tip: "Copy the savings address") {
+                                MiddleTruncate(address, tail: 6)
+                            }
+                            .frame(width: width, alignment: .leading)
+                            Text("yours, and only yours").foregroundStyle(.tertiary)
+                        }
+                        GridRow {
+                            Text("tip: sentences").foregroundStyle(.secondary)
+                            Copy(
+                                address,
+                                tip:
+                                    "Copies the savings address, e.g. for a transfer. Exactly as stored, never retyped."
+                            ) {
+                                MiddleTruncate(address, tail: 6)
+                            }
+                            .frame(width: width, alignment: .leading)
+                            Text("one sentence per line, e.g. kept whole").foregroundStyle(
+                                .tertiary)
+                        }
+                        GridRow {
+                            Text("the mark alone").foregroundStyle(.secondary)
+                            HStack(spacing: .inkGap) {
+                                MiddleTruncate(address, tail: 6)
+                                Copy(address, tip: "Copy")
+                            }
+                            .frame(width: width + 30, alignment: .leading)
+                            Text("beside a value already shown").foregroundStyle(.tertiary)
+                        }
+                    }
+                    .font(.callout.monospaced())
                 }
 
                 Section(title: "a command on its own") {
