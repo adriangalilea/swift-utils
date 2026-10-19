@@ -89,6 +89,10 @@ let package = Package(
         // glass Assets.car, the flat icns and a 512 png; `mark preview`
         // shows Apple's own rendering of every appearance on a page.
         .executable(name: "mark", targets: ["mark"]),
+        // What changed in a SwiftPM dependency for the code that uses it: run
+        // in an app, per imported module, the breaks first. Any package, any
+        // app; installed by mise's spm backend like ship and mark.
+        .executable(name: "since", targets: ["since"]),
         // MediaSpec's gate + demo: `--check` pins the vocabulary, the label
         // rules and the lenient-decode law; without the flag, every chip
         // variant in a window on black.
@@ -137,6 +141,7 @@ let package = Package(
         .executableTarget(name: "brandgen"),
         .executableTarget(name: "ship"),
         .executableTarget(name: "mark"),
+        .executableTarget(name: "since", dependencies: ["Terminal"]),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
         .testTarget(name: "InkTests", dependencies: ["Ink"]),
         .testTarget(name: "GrantTests", dependencies: ["Grant"]),
