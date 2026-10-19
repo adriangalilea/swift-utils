@@ -142,6 +142,7 @@ let package = Package(
         .executableTarget(name: "ship"),
         .executableTarget(name: "mark"),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
+        .testTarget(name: "InkTests", dependencies: ["Ink"]),
         .testTarget(name: "GrantTests", dependencies: ["Grant"]),
         .target(name: "Terminal"),
         .testTarget(name: "TerminalTests", dependencies: ["Terminal"]),
