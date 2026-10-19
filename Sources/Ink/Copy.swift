@@ -8,8 +8,9 @@
 
     /// THE copy action: writes to the pasteboard and says, in place, that it worked.
     /// Every copy surface in Ink stands on it (`Copy`, `CopyableCommand`), so they
-    /// confirm alike and for as long; a surface of its own takes one as `@State` and
-    /// draws `CopyMark(feedback.state)`. The same contract as ui's `useCopy`.
+    /// confirm alike and for as long; a surface of its own takes one as `@State` (or
+    /// a model as a property, for a copy one of its actions makes) and draws
+    /// `CopyMark(feedback.state)`. The same contract as ui's `useCopy`.
     @MainActor @Observable
     public final class CopyFeedback {
         public enum State: Sendable { case idle, copied, failed }
@@ -19,9 +20,15 @@
         public static let confirmFor: Duration = .milliseconds(1400)
 
         public private(set) var state: State = .idle
+        private let confirm: Duration
         private var revert: Task<Void, Never>?
 
-        public init() {}
+        /// `confirmFor` longer than the glance only where the confirmation must
+        /// outlast something else the same act does: a copy that also opens a page
+        /// in the browser is confirmed after the person comes back.
+        public init(confirmFor: Duration = CopyFeedback.confirmFor) {
+            confirm = confirmFor
+        }
 
         /// Whether the pasteboard took it. Empty is no copy: writing "" would wipe
         /// what the clipboard held.
@@ -42,7 +49,7 @@
             withAnimation(.inkFlick) { state = wrote ? .copied : .failed }
             guard wrote else { return false }
             revert = Task {
-                try? await Task.sleep(for: Self.confirmFor)
+                try? await Task.sleep(for: self.confirm)
                 guard !Task.isCancelled else { return }
                 withAnimation(.inkSettle) { self.state = .idle }
             }
