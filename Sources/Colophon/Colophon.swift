@@ -1,6 +1,11 @@
-import AppKit
 import Ink
 import SwiftUI
+
+#if os(macOS)
+    import AppKit
+#else
+    import UIKit
+#endif
 
 /// The colophon - the book trade's word for the page that names who made a
 /// thing, how, and where it lives. Designed ONCE at the standard the first
@@ -107,9 +112,27 @@ public struct ColophonPane: View {
         .formStyle(.grouped)
     }
 
+    /// The running app's icon, as each platform keeps it: AppKit hands it over;
+    /// UIKit names it in the bundle's `CFBundleIcons`, loaded like any image.
+    private var appIcon: Image {
+        #if os(macOS)
+            Image(nsImage: NSApp.applicationIconImage)
+        #else
+            let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any]
+            let primary = icons?["CFBundlePrimaryIcon"] as? [String: Any]
+            let name =
+                (primary?["CFBundleIconFiles"] as? [String])?.last
+                ?? primary?["CFBundleIconName"] as? String
+            guard let name, let image = UIImage(named: name) else {
+                preconditionFailure("Colophon: the bundle names no app icon (CFBundleIcons)")
+            }
+            return Image(uiImage: image)
+        #endif
+    }
+
     private var identity: some View {
         HStack(spacing: .inkLane) {
-            Image(nsImage: NSApp.applicationIconImage)
+            appIcon
                 .resizable()
                 .frame(width: 56, height: 56)
             VStack(alignment: .leading, spacing: 2) {
@@ -118,7 +141,10 @@ public struct ColophonPane: View {
                 Text(verbatim: "\(Bundle.colophonVersion) (\(Bundle.colophonBuild))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                    // tvOS selects nothing: there is no pointer to drag across text.
+                    #if !os(tvOS)
+                        .textSelection(.enabled)
+                    #endif
                 Link(
                     String(localized: "made by \(author.title)", bundle: .module),
                     destination: author.url
