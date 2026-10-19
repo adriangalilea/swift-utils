@@ -124,7 +124,7 @@ let package = Package(
         .target(name: "Grant"),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
-        .executableTarget(name: "keymap-overlay", dependencies: ["Keymap"]),
+        .executableTarget(name: "keymap-overlay", dependencies: ["Keymap", "Ink"]),
         .target(
             name: "MediaSpec",
             dependencies: ["Ink"],
