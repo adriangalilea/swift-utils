@@ -16,12 +16,22 @@
 //   ship publish               from the checkout, once `authz release` made
 //                              the dmg of exactly its commits: the tag pushed
 //                              with its branch, then the channels
+//   ship released              whether the last `authz release` of the
+//                              manifest here (release.json) is of exactly the
+//                              checkout's commits, Markdown aside: exit 0 or 1
+//                              with the reason (anything that publishes
+//                              without `ship publish` asks this first)
 //
 //   --team <T>           the Apple team whose identity signs (identity, build)
 //   --name <slug>        the dmg, its volume and the cask are named by it
 //   --app <dir/X.app>    where --assemble leaves the bundle, in a repo subdirectory
 //   --assemble <shell>   builds the bundle (build)
 //   --sign <path>        inner code to sign first, relative to the bundle (build, repeatable)
+//   --signed             --assemble leaves the bundle signed already (an Xcode
+//                        export, which embeds the provisioning profiles
+//                        restricted entitlements need): verified, never re-signed
+//   --tag <name>         the tag publish pushes (default: VERSION), for a
+//                        repo that releases more than one app
 //   --github             a GitHub release with the notes and the dmg (gh)
 //   --after <shell>      runs once the dmg is public, before the cask, with
 //                        DMG and VERSION in its environment (publishing elsewhere)
@@ -206,14 +216,15 @@ let layout = """
 
 // MARK: - the arguments
 
-let verbs = ["identity", "check", "build", "publish"]
+let verbs = ["identity", "check", "build", "publish", "released"]
 guard let verb = CommandLine.arguments.dropFirst().first, verbs.contains(verb) else {
     die(
         """
         usage: ship identity --team <T>
                ship check   --name <slug> --app <dir/X.app> [--github] [--cask]
-               ship build   --team <T> --name <slug> --app <dir/X.app> --assemble <shell> [--sign <path>]…
-               ship publish --name <slug> --app <dir/X.app> [--github] [--after <shell>] [--cask]
+               ship build   --team <T> --name <slug> --app <dir/X.app> --assemble <shell> [--sign <path>]… [--signed]
+               ship publish --name <slug> --app <dir/X.app> [--tag <name>] [--github] [--after <shell>] [--cask]
+               ship released
         """
     )
 }
@@ -232,6 +243,15 @@ if verb == "identity" {
     guard let team = value("--team") else { die("--team <T> is required") }
     print(signingIdentity(team: team).sha1)
     exit(0)
+}
+
+if verb == "released" {
+    let released = releasedHere()
+    print(
+        released.ok
+            ? "released: the last authz release is of these commits"
+            : "not released: \(released.answer)")
+    exit(released.ok ? 0 : 1)
 }
 
 let env = ProcessInfo.processInfo.environment
@@ -273,12 +293,24 @@ if verb == "build" {
     shell(assemble)
     guard FileManager.default.fileExists(atPath: app) else { die("--assemble left no \(app)") }
 
-    // Inner code first: a second executable or a nested app is outside the
-    // bundle's seal. Hardened runtime and a secure timestamp, or notarization
-    // refuses.
-    step("sign (\(identity.name))")
-    for path in values("--sign").map({ "\(app)/\($0)" }) + [app] {
-        must(sign + ["--options", "runtime", path])
+    if has("--signed") {
+        // Signed by the assembly (an Xcode export embeds the provisioning
+        // profiles restricted entitlements need; re-signing here would drop
+        // them): only verified, and it must be this release's Developer ID.
+        step("verify the signature")
+        must(["codesign", "--verify", "--strict", "--deep", app])
+        let signer = run(["codesign", "-dvv", app], quiet: true).out
+        guard signer.contains("Authority=\(identity.name)") else {
+            die("\(app) is not signed by \(identity.name):\n\(signer)")
+        }
+    } else {
+        // Inner code first: a second executable or a nested app is outside
+        // the bundle's seal. Hardened runtime and a secure timestamp, or
+        // notarization refuses.
+        step("sign (\(identity.name))")
+        for path in values("--sign").map({ "\(app)/\($0)" }) + [app] {
+            must(sign + ["--options", "runtime", path])
+        }
     }
 
     step("notarize")
@@ -412,9 +444,10 @@ gate(
     hint: "the tag and the push land in whatever repo holds this directory")
 let dirty = run(["git", "status", "--porcelain"], quiet: true).out
 gate("clean working tree", dirty.isEmpty, answer: dirty)
+let tag = value("--tag") ?? version
 let tagged =
-    run(["git", "rev-parse", "-q", "--verify", "refs/tags/\(version)"], quiet: true).code == 0
-gate("no tag \(version) yet", !tagged, hint: "bump VERSION in mise.toml")
+    run(["git", "rev-parse", "-q", "--verify", "refs/tags/\(tag)"], quiet: true).code == 0
+gate("no tag \(tag) yet", !tagged, hint: "bump VERSION in mise.toml")
 let body = (try? String(contentsOfFile: notes, encoding: .utf8)) ?? ""
 gate("\(notes) exists (the words gate)", !body.isEmpty)
 // Notes render as designed releases (a glyph per group): a body without
@@ -463,13 +496,13 @@ let after = value("--after")
 
 // The branch with its tag: a tag pushed alone leaves the branch on the remote
 // behind the release it names.
-step("tag \(version) and push")
-must(["git", "tag", "-a", version, "-m", version])
-must(["git", "push", "origin", run(["git", "branch", "--show-current"], quiet: true).out, version])
+step("tag \(tag) and push")
+must(["git", "tag", "-a", tag, "-m", "\(name) \(version)"])
+must(["git", "push", "origin", run(["git", "branch", "--show-current"], quiet: true).out, tag])
 
 if has("--github") {
     step("GitHub release")
-    must(["gh", "release", "create", version, "--title", version, "--notes-file", notes, dmg])
+    must(["gh", "release", "create", tag, "--title", version, "--notes-file", notes, dmg])
 }
 
 // Before the cask: a cask can point at what this publishes, and brew fetches
