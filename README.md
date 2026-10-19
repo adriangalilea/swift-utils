@@ -406,7 +406,7 @@ packages:
 
 `from:` reads "anything below 1.0" while the package is on 0.x, so it takes every break; `upToNextMinor` is the promise the version numbers below make.
 
-**What changed for you: `since`.** Run inside an app, it reads the swift-utils its `Package.resolved` holds, finds the modules the app imports (and what they build on), and prints for each what changed between that version and the latest: the breaks first, with what to write instead, then the features and the fixes. `since --all <dir>` does it for every app under a directory, one line each. `since --json` for a program. Install it with mise like `ship`.
+**What changed for you: `since`.** Run inside an app, it reads the swift-utils its `Package.resolved` holds, finds the modules the app imports (and what they build on), and prints for each what changed between that version and the latest: the breaks first, with what to write instead, then the features and the fixes. Each break is judged against the app: the API its note names first in each clause (the old one, before its replacement) is looked for in the app's code, so it says "touches you: ShortcutBadge at Layers.swift:364", "doesn't touch you", or, when the note names no API, "may touch you". A migration note that names the old API is what makes this work. `since --all <dir>` does it for every app under a directory, one line each. `since --json` for a program. Install it with mise like `ship`.
 
 **Iterate without a release.** Committed manifests always pin a version; a local checkout stands in only on your machine:
 

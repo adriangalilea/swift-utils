@@ -275,6 +275,83 @@ struct Change: Codable {
     let commit: String
     /// What a break asks of the code that uses it: its `BREAKING CHANGE:` note.
     let migration: String?
+    /// A break's APIs, read from its note: nil when the note names none.
+    var apis: [String]? = nil
+    /// Where the app uses them, one place per API found: empty when it uses none
+    /// (the break does not touch it), nil when there were no APIs to look for.
+    var touches: [Touch]? = nil
+}
+
+struct Touch: Codable {
+    let api: String
+    /// `path:line`, relative to the app.
+    let at: String
+}
+
+/// Words that read as code and are not an API a note means: platforms, frameworks.
+let notAPIs: Set<String> = [
+    "iOS", "macOS", "tvOS", "watchOS", "visionOS", "iPadOS", "SwiftUI", "SwiftPM", "AppKit",
+    "UIKit",
+]
+
+/// The APIs a break is about: in each clause of its note, the first word that
+/// reads as code (a capital inside it, or a call). The first, because a note
+/// names the old API before its replacement ("ShortcutBadge(x) is InkKey(x)"),
+/// and only the old one can break the code that uses it.
+func apis(in note: String) -> [String] {
+    var found: [String] = []
+    for clause in note.split(whereSeparator: { ".;\n".contains($0) }) {
+        for m in clause.matches(of: #/([A-Za-z_][A-Za-z0-9_]*)(\()?/#) {
+            let word = String(m.1)
+            guard !notAPIs.contains(word) else { continue }
+            let camel = word.dropFirst().contains(where: \.isUppercase)
+            let call = m.2 != nil && (word.first!.isUppercase || word.count > 2)
+            if camel || call {
+                if !found.contains(word) { found.append(word) }
+                break
+            }
+        }
+    }
+    return found
+}
+
+/// The app's Swift files, read once: every break is looked for in them.
+struct Sources {
+    let read: [(path: String, lines: [Substring])]
+
+    @MainActor init(under app: URL) {
+        read = files(under: app, where: { $0.pathExtension == "swift" }).compactMap { url in
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+            let path = url.path.replacingOccurrences(of: app.path + "/", with: "")
+            return (path, text.split(separator: "\n", omittingEmptySubsequences: false))
+        }
+    }
+
+    /// The first place a whole word is used, or nil.
+    func first(_ word: String) -> String? {
+        let pattern = "\\b\(NSRegularExpression.escapedPattern(for: word))\\b"
+        for file in read {
+            for (i, line) in file.lines.enumerated()
+            where line.range(of: pattern, options: .regularExpression) != nil {
+                return "\(file.path):\(i + 1)"
+            }
+        }
+        return nil
+    }
+}
+
+/// A break judged against the app: which of its APIs the app uses, and where.
+func judged(_ change: Change, in sources: Sources) -> Change {
+    guard change.kind == .breaking else { return change }
+    // No note: the subject, less its `type(scope)!:`, which reads as a call.
+    let note =
+        change.migration ?? change.subject.replacing(#/^\w+(\([^)]*\))?!?:\s*/#, with: "")
+    let named = apis(in: note)
+    var out = change
+    guard !named.isEmpty else { return out }
+    out.apis = named
+    out.touches = named.compactMap { api in sources.first(api).map { Touch(api: api, at: $0) } }
+    return out
 }
 
 @MainActor func changes(in repo: URL, from: String, to: String, paths: [String]) -> [Change] {
@@ -345,6 +422,7 @@ struct AppReport: Codable {
     let from = pin.version ?? pin.revision
     let behind = pin.version.flatMap { v in Version(v).map { r in tags.filter { $0 > r }.count } }
     let package = targets(in: repo, at: latest.tag)
+    let sources = Sources(under: app)
     let imported = modulesImported(under: app).filter { package.path[$0] != nil }
     let involved = imported.reduce(into: Set<String>()) { $0.formUnion(package.closure[$1] ?? []) }
     let modules = involved.sorted {
@@ -355,7 +433,8 @@ struct AppReport: Codable {
             module: module, imported: imported.contains(module),
             under: imported.filter { $0 != module && package.closure[$0]?.contains(module) == true }
                 .sorted(),
-            changes: changes(in: repo, from: from, to: latest.tag, paths: [package.path[module]!]))
+            changes: changes(in: repo, from: from, to: latest.tag, paths: [package.path[module]!])
+                .map { judged($0, in: sources) })
     }
     return AppReport(
         app: label, resolved: pin.version ?? String(pin.revision.prefix(7)), latest: latest.tag,
@@ -390,6 +469,19 @@ struct AppReport: Codable {
             for c in these {
                 print("      \(c.subject)  \(ui.muted(c.commit))")
                 if let migration = c.migration { print(ui.warn(indent(migration, 8))) }
+                guard c.kind == .breaking else { continue }
+                switch c.touches {
+                case nil:
+                    print(ui.warn("        may touch you: its note names no API to look for"))
+                case let touches? where touches.isEmpty:
+                    print(
+                        ui.ok(
+                            "        doesn't touch you: \((c.apis ?? []).joined(separator: ", ")) not used"
+                        ))
+                case let touches?:
+                    let places = touches.map { "\($0.api) at \($0.at)" }.joined(separator: ", ")
+                    print(ui.bad("        touches you: \(places)"))
+                }
             }
         }
     }
@@ -435,12 +527,18 @@ if all {
         exit(0)
     }
     let rows = reports.sorted { $0.app < $1.app }.map { r -> [String] in
-        let breaks = r.modules.flatMap(\.changes).filter { $0.kind == .breaking }
-        let hit = r.modules.filter { $0.changes.contains { $0.kind == .breaking } }.map(\.module)
-        return [
-            r.app, r.resolved ?? "?", r.behind.map(String.init) ?? "-",
+        // A break counts when it touches the app, or may (its note names no API).
+        let counts = { (c: Change) in c.kind == .breaking && c.touches?.isEmpty != true }
+        let breaks = r.modules.flatMap(\.changes).filter(counts)
+        let clear =
+            r.modules.flatMap(\.changes).filter { $0.kind == .breaking }.count - breaks.count
+        let hit = r.modules.filter { $0.changes.contains(where: counts) }.map(\.module)
+        let breaking =
             breaks.isEmpty
-                ? ui.ok("none") : ui.bad("\(breaks.count) in \(hit.joined(separator: ", "))"),
+            ? ui.ok(clear == 0 ? "none" : "none for you (\(clear) elsewhere)")
+            : ui.bad("\(breaks.count) in \(hit.joined(separator: ", "))")
+        return [
+            r.app, r.resolved ?? "?", r.behind.map(String.init) ?? "-", breaking,
             r.modules.map(\.module).joined(separator: " "),
         ]
     }
