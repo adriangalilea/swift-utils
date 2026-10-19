@@ -1,29 +1,25 @@
 #if os(macOS) || os(iOS)
-    #if os(macOS)
-        import AppKit
-    #else
-        import UIKit
-    #endif
     import SwiftUI
 
     /// Copyable text, such as a shell command or pairing code: a monospaced chip whose
     /// trailing segment IS the button (hairline divider, its own hover
     /// raise), while the whole chip stays the click target. Copying
     /// confirms in place - Copy flips to a green ✓ Copied and reverts on
-    /// its own; repeated clicks just restart the confirm.
+    /// its own; repeated clicks just restart the confirm. The copy itself is
+    /// `CopyFeedback`, the one every Ink copy surface shares; for a value in a row
+    /// rather than a chip on its own, `Copy`.
     ///
     /// The geometry is static BY CONSTRUCTION, the lesson this component
     /// encodes: every variable element sits in a fixed-size slot. The
-    /// action label is sized by its wider state rendered invisibly, and
-    /// the icon slot is pinned in BOTH dimensions - the two glyphs differ
+    /// action label is sized by its widest state rendered invisibly, and
+    /// the icon slot is pinned in BOTH dimensions - the glyphs differ
     /// in width and height, and either dimension left loose lets the chip
     /// breathe on the swap.
     public struct CopyableCommand: View {
         let command: String
         let font: Font
-        @State private var copied = false
+        @State private var feedback = CopyFeedback()
         @State private var hovering = false
-        @State private var revert: Task<Void, Never>?
 
         public init(_ command: String, font: Font = .caption.monospaced()) {
             self.command = command
@@ -32,19 +28,7 @@
 
         public var body: some View {
             Button {
-                #if os(macOS)
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(command, forType: .string)
-                #else
-                    UIPasteboard.general.string = command
-                #endif
-                withAnimation(.easeOut(duration: 0.12)) { copied = true }
-                revert?.cancel()
-                revert = Task {
-                    try? await Task.sleep(for: .seconds(1.6))
-                    guard !Task.isCancelled else { return }
-                    withAnimation(.easeOut(duration: 0.25)) { copied = false }
-                }
+                feedback.copy(command)
             } label: {
                 HStack(spacing: 0) {
                     MiddleTruncate(command)
@@ -55,21 +39,20 @@
                         .fill(.quaternary)
                         .frame(width: 1)
                     ZStack(alignment: .leading) {
-                        HStack(spacing: 4) {
-                            Color.clear.frame(width: 14, height: 14)
-                            Text("Copied", bundle: .module).font(.caption2.weight(.medium))
+                        ForEach(Self.words, id: \.self) { word in
+                            HStack(spacing: 4) {
+                                Color.clear.frame(width: 14, height: 14)
+                                Text(word).font(.caption2.weight(.medium))
+                            }
+                            .hidden()
                         }
-                        .hidden()
                         HStack(spacing: 4) {
-                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                            CopyMark(feedback.state)
                                 .font(.caption2.weight(.semibold))
-                                .contentTransition(.symbolEffect(.replace))
                                 .frame(width: 14, height: 14)
-                            Text(copied ? "Copied" : "Copy", bundle: .module)
-                                .font(.caption2.weight(.medium))
+                            Text(word).font(.caption2.weight(.medium))
                         }
-                        .foregroundStyle(
-                            copied ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(tint)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
@@ -82,14 +65,34 @@
             .buttonStyle(.plain)
             .accessibilityLabel(command)
             .accessibilityHint(String(localized: "Copy to clipboard", bundle: .module))
-            .onDisappear { revert?.cancel() }
-            .onChange(of: command) { _, _ in
-                revert?.cancel()
-                copied = false
-            }
+            .onDisappear { feedback.reset() }
+            .onChange(of: command) { _, _ in feedback.reset() }
             .onHover { hovering = $0 }
-            .animation(.easeOut(duration: 0.12), value: hovering)
+            .animation(.inkFlick, value: hovering)
             .help(String(localized: "Copy to clipboard", bundle: .module))
+        }
+
+        /// Every word the action slot can say: the slot is as wide as the widest.
+        private static let words = [
+            String(localized: "Copy", bundle: .module),
+            String(localized: "Copied", bundle: .module),
+            String(localized: "Retry", bundle: .module),
+        ]
+
+        private var word: String {
+            switch feedback.state {
+            case .idle: Self.words[0]
+            case .copied: Self.words[1]
+            case .failed: Self.words[2]
+            }
+        }
+
+        private var tint: AnyShapeStyle {
+            switch feedback.state {
+            case .idle: AnyShapeStyle(.secondary)
+            case .copied: AnyShapeStyle(.green)
+            case .failed: AnyShapeStyle(.red)
+            }
         }
     }
 #endif

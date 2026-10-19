@@ -50,6 +50,16 @@
           }
         }
       }
+    },
+    "Retry": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintentar"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
