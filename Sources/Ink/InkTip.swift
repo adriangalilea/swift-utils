@@ -15,11 +15,11 @@ import SwiftUI
 // shows at once for a moment (`warm`), so reading along a toolbar flows. A click
 // is acting, not reading: it puts the tip away until the pointer leaves.
 //
-// Two looks, set once for a window or a section (`.inkTipStyle`), the way a
-// theme is: `.glass` (default), a coloured dot and the words on Liquid Glass
-// tinted with the subject's colour, below the element; `.bubble`, a dark mono
-// bubble for HUD and media chrome, above it. Each flips to the other side when
-// the screen has no room; `edge:` pins a side for one tip.
+// One look: a coloured dot and the words on Liquid Glass tinted with the
+// subject's colour, as wide as its longest line and never wider than a glance.
+// A tip shows below its element; `.inkTipEdge(.top)` turns a window or a section
+// the other way (chrome along a window's bottom edge), and it flips when the
+// screen has no room. `edge:` pins a side for one tip.
 //
 // One hover, one tip: the outermost tip with something to say owns it. A tip with
 // words claims the hover for everything inside it, so a component's own tip
@@ -31,33 +31,10 @@ import SwiftUI
 // own line, sentences found by the system's tokenizer: a tooltip is glanced, not
 // read.
 
-/// How tips look and which side they prefer, for everything inside
-/// `.inkTipStyle(_:)`.
-public struct InkTipStyle: Sendable, Equatable {
-    public enum Look: Sendable, Equatable {
-        /// A coloured dot and the words on Liquid Glass tinted with the subject's colour.
-        case glass
-        /// Light mono words on a dark bubble: HUD and media chrome.
-        case bubble
-    }
-
-    public let look: Look
-    /// The side a tip takes when there is room; the other when there is not.
-    public let prefers: VerticalEdge
-
-    public init(look: Look, prefers: VerticalEdge) {
-        self.look = look
-        self.prefers = prefers
-    }
-
-    public static let glass = InkTipStyle(look: .glass, prefers: .bottom)
-    public static let bubble = InkTipStyle(look: .bubble, prefers: .top)
-}
-
 extension View {
     /// This element's tip, the only one on its hover. nil: nothing to say, and the
     /// hover stays free for a tip inside. Under a tip that already speaks, it says
-    /// nothing. `edge` pins the side, which otherwise follows the style and the
+    /// nothing. `edge` pins the side, which otherwise follows `inkTipEdge` and the
     /// room on screen. The words are the element's accessibility hint too, so a tip
     /// replaces `.help` whole.
     public func inkTip(_ text: String?, tint: Color = .secondary, edge: VerticalEdge? = nil)
@@ -66,24 +43,25 @@ extension View {
         modifier(InkTipSource(text: text, tint: tint, edge: edge))
     }
 
-    /// How every tip inside looks and which side it prefers.
-    public func inkTipStyle(_ style: InkTipStyle) -> some View {
-        environment(\.inkTipStyle, style)
+    /// The side every tip inside takes when the screen has room; the other when not.
+    public func inkTipEdge(_ edge: VerticalEdge) -> some View {
+        environment(\.inkTipPrefers, edge)
     }
 }
 
 extension EnvironmentValues {
     /// A tip above has claimed the hover: tips below say nothing.
     @Entry var inkTipClaimed = false
-    @Entry var inkTipStyle = InkTipStyle.glass
+    @Entry var inkTipPrefers = VerticalEdge.bottom
 }
 
-/// One tip, as asked: what it says and how it is drawn.
+/// One tip, as asked: what it says, its colour, and where it goes.
 struct InkTipAsk: Equatable {
     let text: String
     let tint: Color
+    /// A side pinned by the tip itself, kept even without room.
     let edge: VerticalEdge?
-    let style: InkTipStyle
+    let prefers: VerticalEdge
 }
 
 private struct InkTipSource: ViewModifier {
@@ -91,11 +69,11 @@ private struct InkTipSource: ViewModifier {
     let tint: Color
     let edge: VerticalEdge?
     @Environment(\.inkTipClaimed) private var claimed
-    @Environment(\.inkTipStyle) private var style
+    @Environment(\.inkTipPrefers) private var prefers
 
     func body(content: Content) -> some View {
         let said = claimed ? nil : text
-        let ask = said.map { InkTipAsk(text: $0, tint: tint, edge: edge, style: style) }
+        let ask = said.map { InkTipAsk(text: $0, tint: tint, edge: edge, prefers: prefers) }
         // The words are also what assistive tech reads as the element's hint, as `.help` does.
         let claiming =
             content
@@ -109,52 +87,31 @@ private struct InkTipSource: ViewModifier {
     }
 }
 
-/// The chip, in its look, measured by what the words are.
+/// The chip, measured by what the words are.
 struct InkTipChip: View {
     let text: String
     let tint: Color
-    let look: InkTipStyle.Look
 
-    init(text: String, tint: Color, look: InkTipStyle.Look = .glass) {
-        self.text = text
-        self.tint = tint
-        self.look = look
-    }
-
-    /// The width prose wraps at: a glance, not a paragraph.
+    /// The widest prose runs before it wraps: a glance, not a paragraph.
     static let readingWidth: CGFloat = 220
-    /// The bubble's mono runs wider per word.
-    static let bubbleWidth: CGFloat = 260
 
     var body: some View {
-        switch look {
-        case .glass:
-            HStack(alignment: .top, spacing: 6) {
-                Circle().fill(tint).frame(width: 6, height: 6).padding(.top, 3)
-                words(width: Self.readingWidth, alignment: .leading)
-                    .font(.caption2).foregroundStyle(.primary)
-            }
-            .padding(.horizontal, 11).padding(.vertical, 7)
-            .glassEffect(.regular.tint(tint.opacity(0.10)), in: RoundedRectangle(cornerRadius: 10))
-            .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
-        case .bubble:
-            words(width: Self.bubbleWidth, alignment: .center)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.92))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(
-                    .black.opacity(0.78), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        HStack(alignment: .top, spacing: 6) {
+            Circle().fill(tint).frame(width: 6, height: 6).padding(.top, 3)
+            words.font(.caption2).foregroundStyle(.primary)
         }
+        .padding(.horizontal, 11).padding(.vertical, 7)
+        .glassEffect(.regular.tint(tint.opacity(0.10)), in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
     }
 
-    @ViewBuilder private func words(width: CGFloat, alignment: Alignment) -> some View {
+    @ViewBuilder private var words: some View {
         if Self.isToken(text) {
             Text(verbatim: text).lineLimit(1).fixedSize()
         } else {
-            Text(verbatim: Self.sentences(text).joined(separator: "\n"))
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: width, alignment: alignment)
+            InkTipMeasure(cap: Self.readingWidth) {
+                Text(verbatim: Self.sentences(text).joined(separator: "\n"))
+            }
         }
     }
 
@@ -169,6 +126,28 @@ struct InkTipChip: View {
         return tokenizer.tokens(for: text.startIndex..<text.endIndex)
             .map { text[$0].trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+}
+
+/// Prose as wide as its longest line, never wider than `cap`: a short tip hugs
+/// its words, a long one wraps at the cap. Whatever width the host offers is
+/// ignored, since a tip is measured by its words, not by the room around it.
+struct InkTipMeasure: Layout {
+    let cap: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        assert(subviews.count == 1, "InkTipMeasure: one text, not \(subviews.count)")
+        let natural = subviews[0].sizeThatFits(.unspecified)
+        return subviews[0].sizeThatFits(
+            ProposedViewSize(width: min(natural.width, cap), height: nil))
+    }
+
+    func placeSubviews(
+        in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
+    ) {
+        subviews[0].place(
+            at: bounds.origin,
+            proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
     }
 }
 
@@ -348,7 +327,7 @@ struct InkTipChip: View {
         private func present(_ ask: InkTipAsk, under anchor: InkTipAnchorView) {
             guard let window = anchor.window else { return }
             host.rootView = InkTipStage(
-                chip: InkTipChip(text: ask.text, tint: ask.tint, look: ask.style.look))
+                chip: InkTipChip(text: ask.text, tint: ask.tint))
             let screen = window.screen?.visibleFrame ?? .infinite
             // Measured as drawn: a token's own width, prose at its reading width.
             // Rounded up to whole points: a window is framed in whole points, so a
@@ -363,7 +342,7 @@ struct InkTipChip: View {
             let belowY = element.minY - gap - size.height
             let aboveY = element.maxY + gap
             let y: CGFloat
-            switch ask.edge ?? ask.style.prefers {
+            switch ask.edge ?? ask.prefers {
             case .bottom where ask.edge != nil, .bottom where belowY >= screen.minY + 4:
                 y = belowY
             case .bottom:
@@ -405,12 +384,12 @@ struct InkTipChip: View {
         @State private var hovered = false
 
         func body(content: Content) -> some View {
-            let above = (ask?.edge ?? ask?.style.prefers) == .top
+            let above = (ask?.edge ?? ask?.prefers) == .top
             content
                 .inkHover($hovered)
                 .overlay(alignment: above ? .top : .bottom) {
                     if hovered, let ask {
-                        InkTipChip(text: ask.text, tint: ask.tint, look: ask.style.look)
+                        InkTipChip(text: ask.text, tint: ask.tint)
                             .fixedSize()
                             .alignmentGuide(above ? .top : .bottom) {
                                 above ? $0[.bottom] + 8 : $0[.top] - 8

@@ -176,14 +176,14 @@ struct DemoView: View {
 
                 // Sweep the pointer along a row: the first tip waits a beat, the
                 // next ones follow at once; a click puts the tip away. The second
-                // row wears the bubble (HUD and media chrome), above its glyph;
-                // the last glyph pins its tip below.
+                // row is chrome along a window's bottom edge: its tips go above,
+                // except the last glyph's, pinned below.
                 Section(title: "a toolbar's tips") {
                     Toolbar()
                     Toolbar(pinBelow: true)
                         .padding(10)
                         .background(.black.opacity(0.55), in: Capsule())
-                        .inkTipStyle(.bubble)
+                        .inkTipEdge(.top)
                 }
 
                 // Secrets, composed: typed into SecretField; shown as Veiled (a

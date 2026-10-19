@@ -18,10 +18,10 @@
             backing: .buffered, defer: false)
     }
 
-    private func ask(_ text: String, style: InkTipStyle = .glass, edge: VerticalEdge? = nil)
+    private func ask(_ text: String, prefers: VerticalEdge = .bottom, edge: VerticalEdge? = nil)
         -> InkTipAsk
     {
-        InkTipAsk(text: text, tint: .secondary, edge: edge, style: style)
+        InkTipAsk(text: text, tint: .secondary, edge: edge, prefers: prefers)
     }
 
     /// Past the first tip's wait, with room for a busy machine.
@@ -46,17 +46,40 @@
             let anchor = InkTipAnchorView(frame: NSRect(x: 40, y: 90, width: 180, height: 16))
             try #require(w.contentView).addSubview(anchor)
 
-            for style in [InkTipStyle.glass, .bubble] {
-                InkTipPresenter.shared.show(ask(text, style: style), under: anchor)
+            InkTipPresenter.shared.show(ask(text), under: anchor)
+            try await Task.sleep(for: pastWait)
+            let panel = InkTipPresenter.shared.panel
+            #expect(panel.isVisible)
+            // The chip plus 12 points of shadow on each side: never collapsed.
+            #expect(panel.frame.width > 24 + 20 && panel.frame.height > 24 + 10)
+            #expect(panel.frame.width == panel.frame.width.rounded())
+            InkTipPresenter.shared.hide(anchor)
+            #expect(!panel.isVisible)
+        }
+
+        // Prose is as wide as its longest line: two words make a small chip, not
+        // one stretched to the reading width; a long sentence stops at that width.
+        @MainActor
+        @Test func proseHugsItsWords() async throws {
+            let w = window()
+            let anchor = InkTipAnchorView(frame: NSRect(x: 40, y: 90, width: 180, height: 16))
+            try #require(w.contentView).addSubview(anchor)
+            func width(_ text: String) async throws -> CGFloat {
+                InkTipPresenter.shared.show(ask(text), under: anchor)
                 try await Task.sleep(for: pastWait)
-                let panel = InkTipPresenter.shared.panel
-                #expect(panel.isVisible)
-                // The chip plus 12 points of shadow on each side: never collapsed.
-                #expect(panel.frame.width > 24 + 20 && panel.frame.height > 24 + 10)
-                #expect(panel.frame.width == panel.frame.width.rounded())
-                InkTipPresenter.shared.hide(anchor)
-                #expect(!panel.isVisible)
+                defer { InkTipPresenter.shared.hide(anchor) }
+                return InkTipPresenter.shared.panel.frame.width
             }
+            // Around the words: shadow 12 + padding 11 + dot 6 + spacing 6, then
+            // padding 11 + shadow 12.
+            let around: CGFloat = 12 + 11 + 6 + 6 + 11 + 12
+            let short = try await width("add clips")
+            let long = try await width(
+                "What the punch sees across the move. Click to play from there and watch it land")
+            #expect(short < around + 80, "two words took \(short - around) points")
+            #expect(long <= around + InkTipChip.readingWidth + 1)
+            #expect(
+                long > around + InkTipChip.readingWidth - 40, "a long sentence wraps at the cap")
         }
 
         // The first tip waits (a sweep across a bar never strobes); once one has
@@ -95,7 +118,8 @@
             #expect(!InkTipPresenter.shared.panel.isVisible)
         }
 
-        // Glass below the element, bubble above it; an edge pins the side.
+        // Below the element by default, above where the section prefers it; an edge
+        // pins the side.
         @MainActor
         @Test func sides() async throws {
             let w = window()
@@ -110,12 +134,12 @@
                 defer { InkTipPresenter.shared.hide(a) }
                 return panel.frame
             }
-            #expect(try await shown(ask("glass")).maxY <= element.minY + 12, "glass: below")
+            #expect(try await shown(ask("below")).maxY <= element.minY + 12, "default: below")
             #expect(
-                try await shown(ask("bubble", style: .bubble)).minY >= element.maxY - 12,
-                "bubble: above")
+                try await shown(ask("above", prefers: .top)).minY >= element.maxY - 12,
+                "preferring top: above")
             #expect(
-                try await shown(ask("pinned", style: .bubble, edge: .bottom)).maxY <= element.minY
+                try await shown(ask("pinned", prefers: .top, edge: .bottom)).maxY <= element.minY
                     + 12)
         }
 
