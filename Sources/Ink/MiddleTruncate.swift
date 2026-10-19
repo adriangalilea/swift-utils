@@ -12,7 +12,8 @@ import SwiftUI
 /// text cuts at its end. The tail is a promise: wider than the room, it overflows.
 ///
 /// When the whole text fits it is drawn as one `Text`, no seam; only a cut text
-/// carries the whole as its help tooltip. Same rule as ui's `middle-truncate`.
+/// shows the whole as its `inkTip`, and says nothing under a caller's tip (a
+/// `Copy(value, tip:)` around it). Same rule as ui's `middle-truncate`.
 public struct MiddleTruncate: View {
     public enum Tail: ExpressibleByIntegerLiteral, ExpressibleByStringLiteral, Sendable {
         case count(Int)
@@ -57,7 +58,7 @@ public struct MiddleTruncate: View {
                 Text(verbatim: head).lineLimit(1).truncationMode(.tail)
                 Text(verbatim: end).lineLimit(1).fixedSize()
             }
-            .help(text)
+            .inkTip(text)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(text)

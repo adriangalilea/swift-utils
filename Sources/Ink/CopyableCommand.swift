@@ -7,7 +7,8 @@
     /// confirms in place - Copy flips to a green ✓ Copied and reverts on
     /// its own; repeated clicks just restart the confirm. The copy itself is
     /// `CopyFeedback`, the one every Ink copy surface shares; for a value in a row
-    /// rather than a chip on its own, `Copy`.
+    /// rather than a chip on its own, `Copy`. `tip` is its tooltip, as `Copy`'s:
+    /// the only one on its hover; without one, a cut command shows itself whole.
     ///
     /// The geometry is static BY CONSTRUCTION, the lesson this component
     /// encodes: every variable element sits in a fixed-size slot. The
@@ -18,12 +19,14 @@
     public struct CopyableCommand: View {
         let command: String
         let font: Font
+        let tip: String?
         @State private var feedback = CopyFeedback()
         @State private var hovering = false
 
-        public init(_ command: String, font: Font = .caption.monospaced()) {
+        public init(_ command: String, font: Font = .caption.monospaced(), tip: String? = nil) {
             self.command = command
             self.font = font
+            self.tip = tip
         }
 
         public var body: some View {
@@ -69,7 +72,7 @@
             .onChange(of: command) { _, _ in feedback.reset() }
             .onHover { hovering = $0 }
             .animation(.inkFlick, value: hovering)
-            .help(String(localized: "Copy to clipboard", bundle: .module))
+            .inkTip(tip)
         }
 
         /// Every word the action slot can say: the slot is as wide as the widest.
