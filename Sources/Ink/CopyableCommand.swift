@@ -47,10 +47,8 @@
                 }
             } label: {
                 HStack(spacing: 0) {
-                    Text(command)
+                    MiddleTruncate(command)
                         .font(font)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
                     Rectangle()
