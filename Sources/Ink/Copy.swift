@@ -23,12 +23,14 @@
 
         public init() {}
 
-        /// Empty is no copy: writing "" would wipe what the clipboard held.
-        public func copy(_ text: String) {
+        /// Whether the pasteboard took it. Empty is no copy: writing "" would wipe
+        /// what the clipboard held.
+        @discardableResult
+        public func copy(_ text: String) -> Bool {
             revert?.cancel()
             guard !text.isEmpty else {
                 state = .idle
-                return
+                return false
             }
             #if os(macOS)
                 NSPasteboard.general.clearContents()
@@ -38,12 +40,13 @@
                 let wrote = true
             #endif
             withAnimation(.inkFlick) { state = wrote ? .copied : .failed }
-            guard wrote else { return }
+            guard wrote else { return false }
             revert = Task {
                 try? await Task.sleep(for: Self.confirmFor)
                 guard !Task.isCancelled else { return }
                 withAnimation(.inkSettle) { self.state = .idle }
             }
+            return true
         }
 
         /// Back to idle at once: the value changed under it, or its view left.
@@ -94,29 +97,38 @@
     /// `tip` is its tooltip (Ink's, `inkTip`), and the only one on its hover: a
     /// label's own goes quiet under it. `tip: address` shows the whole value even
     /// when it fits; without one, a cut `MiddleTruncate` shows the whole only when
-    /// cut. For a command or a code on its own, `CopyableCommand`.
+    /// cut. `onCopy` runs after each copy the pasteboard took, with the value
+    /// copied: a log line, a count (ui's `onClick`). For a command or a code on
+    /// its own, `CopyableCommand`.
     public struct Copy<Label: View>: View {
         let value: String
         let tip: String?
         let label: Label
         let markOnly: Bool
+        let onCopy: ((String) -> Void)?
         @State private var feedback = CopyFeedback()
         @State private var hovering = false
 
-        public init(_ value: String, tip: String? = nil, @ViewBuilder label: () -> Label) {
-            self.init(value, tip: tip, markOnly: false, label: label())
+        public init(
+            _ value: String, tip: String? = nil, onCopy: ((String) -> Void)? = nil,
+            @ViewBuilder label: () -> Label
+        ) {
+            self.init(value, tip: tip, onCopy: onCopy, markOnly: false, label: label())
         }
 
-        fileprivate init(_ value: String, tip: String?, markOnly: Bool, label: Label) {
+        fileprivate init(
+            _ value: String, tip: String?, onCopy: ((String) -> Void)?, markOnly: Bool, label: Label
+        ) {
             self.value = value
             self.tip = tip
+            self.onCopy = onCopy
             self.markOnly = markOnly
             self.label = label
         }
 
         public var body: some View {
             Button {
-                feedback.copy(value)
+                if feedback.copy(value) { onCopy?(value) }
             } label: {
                 if markOnly { well } else { text }
             }
@@ -181,8 +193,8 @@
 
     extension Copy where Label == EmptyView {
         /// The mark alone, in a round well: the copy beside a value shown already.
-        public init(_ value: String, tip: String? = nil) {
-            self.init(value, tip: tip, markOnly: true, label: EmptyView())
+        public init(_ value: String, tip: String? = nil, onCopy: ((String) -> Void)? = nil) {
+            self.init(value, tip: tip, onCopy: onCopy, markOnly: true, label: EmptyView())
         }
     }
 #endif
