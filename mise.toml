@@ -17,9 +17,37 @@ run = "xcrun swift-format --recursive Sources/ Tests/ --in-place"
 description = "swift-format lint, advisory (format-clean is the gate, not lint taste)"
 run = "xcrun swift-format lint --recursive Sources/ Tests/"
 
+[tasks.platforms]
+description = "build each library for every platform it claims beyond macOS (swift build covers macOS); the table is the one place a library's platforms are stated"
+run = '''
+set -euo pipefail
+# library  platforms beyond macOS
+#   Keymap      none: AppKit, Carbon, global hotkeys, a Mac's keyboard
+#   Biometrics  no tvOS: a TV has no LocalAuthentication, no finger, no face
+while read -r lib platforms; do
+  for platform in $platforms; do
+    echo "== $lib on $platform"
+    xcodebuild -scheme "$lib" -destination "generic/platform=$platform" \
+      -derivedDataPath .build/platforms build -quiet
+  done
+done <<'TABLE'
+Ink iOS tvOS
+Grant iOS tvOS
+Log iOS tvOS
+Terminal iOS tvOS
+Syntax iOS tvOS
+SyntaxLines iOS tvOS
+Entitlement iOS tvOS
+Colophon iOS tvOS
+MediaSpec iOS tvOS
+Scores iOS tvOS
+Biometrics iOS
+TABLE
+'''
+
 [tasks.check]
-description = "format + build (release) + test: the gate"
-run = ["mise run format", "swift build -c release", "mise run test", "echo 'swift-utils: check passed'"]
+description = "format + build (release) + test + every claimed platform: the gate"
+run = ["mise run format", "swift build -c release", "mise run test", "mise run platforms", "echo 'swift-utils: check passed'"]
 
 [tasks.overlay]
 description = "Run the keymap overlay example"

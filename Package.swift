@@ -1,19 +1,15 @@
 // swift-tools-version: 6.2
 // The Swift sibling of ts-utils/py-utils/go-utils: one repo, many products,
-// each module links only if imported. First product: Keymap - the registry
-// spine behind the studio keyboard decree (every app fully keyboard
-// navigable). Register actions once; menus, cheat sheet, remap pane, reveal
-// badges, system-wide hotkeys, App Intents surface, and the overlay keymap
-// JSON all derive from the registry and can never drift from it.
+// each module links only if imported. The README says what each one is.
 import PackageDescription
 
 let package = Package(
     name: "swift-utils",
     // One version floor on every platform - the 26-era SwiftUI API surface
-    // everywhere, so cross-platform products (Ink, MediaSpec) never carry
-    // availability checks. Keymap (Carbon/AppKit) stays mac-only de facto -
-    // SwiftPM builds only the products a consumer requests, so a tvOS app
-    // importing Ink never compiles it.
+    // everywhere, so cross-platform products never carry availability checks.
+    // Which product builds where is `mise run platforms`' table, checked on
+    // every push (Keymap is macOS only, Biometrics has no tvOS); SwiftPM
+    // builds only the products a consumer requests.
     platforms: [.macOS(.v26), .tvOS(.v26), .iOS(.v26)],
     products: [
         // The styling atoms: the Ink token ladder + the studio's
