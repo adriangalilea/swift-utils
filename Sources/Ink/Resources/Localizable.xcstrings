@@ -21,6 +21,16 @@
         }
       }
     },
+    "Copy failed. Try again": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo copiar. Inténtalo de nuevo"
+          }
+        }
+      }
+    },
     "Copy to clipboard": {
       "localizations": {
         "es": {
