@@ -58,7 +58,8 @@ extension View {
     /// This element's tip, the only one on its hover. nil: nothing to say, and the
     /// hover stays free for a tip inside. Under a tip that already speaks, it says
     /// nothing. `edge` pins the side, which otherwise follows the style and the
-    /// room on screen.
+    /// room on screen. The words are the element's accessibility hint too, so a tip
+    /// replaces `.help` whole.
     public func inkTip(_ text: String?, tint: Color = .secondary, edge: VerticalEdge? = nil)
         -> some View
     {
@@ -95,7 +96,11 @@ private struct InkTipSource: ViewModifier {
     func body(content: Content) -> some View {
         let said = claimed ? nil : text
         let ask = said.map { InkTipAsk(text: $0, tint: tint, edge: edge, style: style) }
-        let claiming = content.environment(\.inkTipClaimed, claimed || said != nil)
+        // The words are also what assistive tech reads as the element's hint, as `.help` does.
+        let claiming =
+            content
+            .accessibilityHint(Text(verbatim: said ?? ""), isEnabled: said != nil)
+            .environment(\.inkTipClaimed, claimed || said != nil)
         #if os(macOS)
             claiming.background(InkTipAnchor(ask: ask))
         #else
