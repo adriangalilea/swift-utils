@@ -1,19 +1,25 @@
 import NaturalLanguage
 import SwiftUI
 
-// The studio's ONE tooltip, designed in hollow and moved here so every app
-// wears it: a colored dot and the words on Liquid Glass tinted with the
-// subject's color, instant on hover (never the system tooltip's delay or its
-// flat black chip).
-//
-// `.inkTip("...")` is the only call, and it works anywhere:
-//  - macOS: ONE panel for the whole app, floated below the hovered element (above
-//    it when the screen has no room below), over every window and never clipped
-//    by one. One presenter owns it, so one tip shows at a time by construction,
-//    and a tip whose words change while it shows (Copy, then Copied) changes in
-//    place.
-//  - iOS / iPadOS: a pointer's hover draws the chip under the element; a touch
+// The studio's ONE tooltip. `.inkTip("...")` is the only call, and it works
+// anywhere:
+//  - macOS: ONE panel for the whole app, floated beside the hovered element, over
+//    every window and never clipped by one (a scroll view or a lane included).
+//    One presenter owns it, so one tip shows at a time by construction, and words
+//    that change while it shows change in place.
+//  - iOS / iPadOS: a pointer's hover draws the chip beside the element; a touch
 //    hovers nothing and shows none.
+//
+// It answers like the system's own: the first tip waits a beat (`wait`), so
+// sweeping the pointer across a bar never strobes; once one has shown, the next
+// shows at once for a moment (`warm`), so reading along a toolbar flows. A click
+// is acting, not reading: it puts the tip away until the pointer leaves.
+//
+// Two looks, set once for a window or a section (`.inkTipStyle`), the way a
+// theme is: `.glass` (default), a coloured dot and the words on Liquid Glass
+// tinted with the subject's colour, below the element; `.bubble`, a dark mono
+// bubble for HUD and media chrome, above it. Each flips to the other side when
+// the screen has no room; `edge:` pins a side for one tip.
 //
 // One hover, one tip: the outermost tip with something to say owns it. A tip with
 // words claims the hover for everything inside it, so a component's own tip
@@ -25,61 +31,125 @@ import SwiftUI
 // own line, sentences found by the system's tokenizer: a tooltip is glanced, not
 // read.
 
+/// How tips look and which side they prefer, for everything inside
+/// `.inkTipStyle(_:)`.
+public struct InkTipStyle: Sendable, Equatable {
+    public enum Look: Sendable, Equatable {
+        /// A coloured dot and the words on Liquid Glass tinted with the subject's colour.
+        case glass
+        /// Light mono words on a dark bubble: HUD and media chrome.
+        case bubble
+    }
+
+    public let look: Look
+    /// The side a tip takes when there is room; the other when there is not.
+    public let prefers: VerticalEdge
+
+    public init(look: Look, prefers: VerticalEdge) {
+        self.look = look
+        self.prefers = prefers
+    }
+
+    public static let glass = InkTipStyle(look: .glass, prefers: .bottom)
+    public static let bubble = InkTipStyle(look: .bubble, prefers: .top)
+}
+
 extension View {
     /// This element's tip, the only one on its hover. nil: nothing to say, and the
     /// hover stays free for a tip inside. Under a tip that already speaks, it says
-    /// nothing.
-    public func inkTip(_ text: String?, tint: Color = .secondary) -> some View {
-        modifier(InkTipSource(text: text, tint: tint))
+    /// nothing. `edge` pins the side, which otherwise follows the style and the
+    /// room on screen.
+    public func inkTip(_ text: String?, tint: Color = .secondary, edge: VerticalEdge? = nil)
+        -> some View
+    {
+        modifier(InkTipSource(text: text, tint: tint, edge: edge))
+    }
+
+    /// How every tip inside looks and which side it prefers.
+    public func inkTipStyle(_ style: InkTipStyle) -> some View {
+        environment(\.inkTipStyle, style)
     }
 }
 
 extension EnvironmentValues {
     /// A tip above has claimed the hover: tips below say nothing.
     @Entry var inkTipClaimed = false
+    @Entry var inkTipStyle = InkTipStyle.glass
+}
+
+/// One tip, as asked: what it says and how it is drawn.
+struct InkTipAsk: Equatable {
+    let text: String
+    let tint: Color
+    let edge: VerticalEdge?
+    let style: InkTipStyle
 }
 
 private struct InkTipSource: ViewModifier {
     let text: String?
     let tint: Color
+    let edge: VerticalEdge?
     @Environment(\.inkTipClaimed) private var claimed
+    @Environment(\.inkTipStyle) private var style
 
     func body(content: Content) -> some View {
         let said = claimed ? nil : text
+        let ask = said.map { InkTipAsk(text: $0, tint: tint, edge: edge, style: style) }
         let claiming = content.environment(\.inkTipClaimed, claimed || said != nil)
         #if os(macOS)
-            claiming.background(InkTipAnchor(text: said, tint: tint))
+            claiming.background(InkTipAnchor(ask: ask))
         #else
-            claiming.modifier(InkTipOverlay(text: said, tint: tint))
+            claiming.modifier(InkTipOverlay(ask: ask))
         #endif
     }
 }
 
-/// The chip: the dot and the words, measured by what they are.
+/// The chip, in its look, measured by what the words are.
 struct InkTipChip: View {
     let text: String
     let tint: Color
+    let look: InkTipStyle.Look
+
+    init(text: String, tint: Color, look: InkTipStyle.Look = .glass) {
+        self.text = text
+        self.tint = tint
+        self.look = look
+    }
 
     /// The width prose wraps at: a glance, not a paragraph.
     static let readingWidth: CGFloat = 220
+    /// The bubble's mono runs wider per word.
+    static let bubbleWidth: CGFloat = 260
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Circle().fill(tint).frame(width: 6, height: 6).padding(.top, 3)
-            words.font(.caption2).foregroundStyle(.primary)
+        switch look {
+        case .glass:
+            HStack(alignment: .top, spacing: 6) {
+                Circle().fill(tint).frame(width: 6, height: 6).padding(.top, 3)
+                words(width: Self.readingWidth, alignment: .leading)
+                    .font(.caption2).foregroundStyle(.primary)
+            }
+            .padding(.horizontal, 11).padding(.vertical, 7)
+            .glassEffect(.regular.tint(tint.opacity(0.10)), in: RoundedRectangle(cornerRadius: 10))
+            .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
+        case .bubble:
+            words(width: Self.bubbleWidth, alignment: .center)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.92))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(
+                    .black.opacity(0.78), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
-        .padding(.horizontal, 11).padding(.vertical, 7)
-        .glassEffect(.regular.tint(tint.opacity(0.10)), in: RoundedRectangle(cornerRadius: 10))
-        .shadow(color: .black.opacity(0.22), radius: 6, y: 2)
     }
 
-    @ViewBuilder private var words: some View {
+    @ViewBuilder private func words(width: CGFloat, alignment: Alignment) -> some View {
         if Self.isToken(text) {
             Text(verbatim: text).lineLimit(1).fixedSize()
         } else {
             Text(verbatim: Self.sentences(text).joined(separator: "\n"))
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: Self.readingWidth, alignment: .leading)
+                .frame(maxWidth: width, alignment: alignment)
         }
     }
 
@@ -105,18 +175,16 @@ struct InkTipChip: View {
     // hover exit, which strands the chip, while an NSView is told when it leaves
     // its window.
     private struct InkTipAnchor: NSViewRepresentable {
-        let text: String?
-        let tint: Color
+        let ask: InkTipAsk?
 
         func makeNSView(context: Context) -> InkTipAnchorView { InkTipAnchorView() }
         func updateNSView(_ view: InkTipAnchorView, context: Context) {
-            view.say(text, tint: tint)
+            view.say(ask)
         }
     }
 
     final class InkTipAnchorView: NSView {
-        private var text: String?
-        private var tint: Color = .secondary
+        private var ask: InkTipAsk?
         private var hovered = false
 
         // Clipped, though it draws nothing: since macOS 14 a view does not clip to
@@ -149,12 +217,12 @@ struct InkTipChip: View {
         }
 
         /// New words, or none: shown in place while hovered.
-        func say(_ text: String?, tint: Color) {
-            self.text = text
-            self.tint = tint
+        func say(_ ask: InkTipAsk?) {
+            guard ask != self.ask else { return }
+            self.ask = ask
             guard hovered else { return }
-            if let text {
-                InkTipPresenter.shared.show(text, tint: tint, under: self)
+            if let ask {
+                InkTipPresenter.shared.show(ask, under: self)
             } else {
                 InkTipPresenter.shared.hide(self)
             }
@@ -162,7 +230,7 @@ struct InkTipChip: View {
 
         override func mouseEntered(with event: NSEvent) {
             hovered = true
-            if let text { InkTipPresenter.shared.show(text, tint: tint, under: self) }
+            if let ask { InkTipPresenter.shared.show(ask, under: self) }
         }
 
         override func mouseExited(with event: NSEvent) {
@@ -186,12 +254,22 @@ struct InkTipChip: View {
     final class InkTipPresenter {
         static let shared = InkTipPresenter()
 
+        /// The first tip waits this long: a sweep across a bar never strobes.
+        nonisolated static let wait: Duration = .milliseconds(350)
+        /// After a tip has shown, the next shows at once for this long.
+        nonisolated static let warm: Duration = .milliseconds(800)
+
         /// Room around the chip for its shadow, which draws outside it.
         private let shadow: CGFloat = 12
         /// From the element to the chip.
         private let gap: CGFloat = 8
         private let host = NSHostingController(rootView: InkTipStage(chip: nil))
         private weak var current: InkTipAnchorView?
+        /// Clicked while its tip was up: it stays quiet until the pointer leaves.
+        private weak var dismissed: InkTipAnchorView?
+        private var pending: Task<Void, Never>?
+        private var lastUp: ContinuousClock.Instant?
+        private var clicks: Any?
 
         lazy var panel: NSPanel = {
             let p = NSPanel(
@@ -214,11 +292,58 @@ struct InkTipChip: View {
             return p
         }()
 
-        func show(_ text: String, tint: Color, under anchor: InkTipAnchorView) {
-            guard let window = anchor.window else { return }
+        private var isWarm: Bool {
+            panel.isVisible || lastUp.map { ContinuousClock.now - $0 < Self.warm } == true
+        }
+
+        func show(_ ask: InkTipAsk, under anchor: InkTipAnchorView) {
+            guard anchor !== dismissed else { return }
+            watchClicks()
+            pending?.cancel()
             current = anchor
-            let chip = InkTipChip(text: text, tint: tint)
-            host.rootView = InkTipStage(chip: chip)
+            if isWarm { return present(ask, under: anchor) }
+            pending = Task { [weak self, weak anchor] in
+                try? await Task.sleep(for: Self.wait)
+                guard !Task.isCancelled, let self, let anchor, self.current === anchor else {
+                    return
+                }
+                self.present(ask, under: anchor)
+            }
+        }
+
+        func hide(_ anchor: InkTipAnchorView) {
+            if dismissed === anchor { dismissed = nil }
+            guard current === anchor else { return }
+            putAway()
+        }
+
+        private func putAway() {
+            pending?.cancel()
+            current = nil
+            if panel.isVisible { lastUp = .now }
+            panel.orderOut(nil)
+        }
+
+        /// A click anywhere in the app is acting, not reading: the tip goes, and
+        /// its element stays quiet until the pointer leaves it.
+        private func watchClicks() {
+            guard clicks == nil else { return }
+            clicks = NSEvent.addLocalMonitorForEvents(
+                matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+            ) { [weak self] event in
+                MainActor.assumeIsolated {
+                    guard let self, let current = self.current else { return }
+                    self.dismissed = current
+                    self.putAway()
+                }
+                return event
+            }
+        }
+
+        private func present(_ ask: InkTipAsk, under anchor: InkTipAnchorView) {
+            guard let window = anchor.window else { return }
+            host.rootView = InkTipStage(
+                chip: InkTipChip(text: ask.text, tint: ask.tint, look: ask.style.look))
             let screen = window.screen?.visibleFrame ?? .infinite
             // Measured as drawn: a token's own width, prose at its reading width.
             // Rounded up to whole points: a window is framed in whole points, so a
@@ -228,11 +353,23 @@ struct InkTipChip: View {
             let size = NSSize(width: fitted.width.rounded(.up), height: fitted.height.rounded(.up))
             assert(size.width > 0 && size.height > 0, "InkTip: a chip measured \(size)")
 
+            // AppKit's y grows upward: below the element is a smaller y.
             let element = window.convertToScreen(anchor.convert(anchor.bounds, to: nil))
+            let belowY = element.minY - gap - size.height
+            let aboveY = element.maxY + gap
+            let y: CGFloat
+            switch ask.edge ?? ask.style.prefers {
+            case .bottom where ask.edge != nil, .bottom where belowY >= screen.minY + 4:
+                y = belowY
+            case .bottom:
+                y = aboveY
+            case .top where ask.edge != nil, .top where aboveY + size.height <= screen.maxY - 4:
+                y = aboveY
+            case .top:
+                y = belowY
+            }
             var x = element.midX - size.width / 2
-            var y = element.minY - gap - size.height
             x = min(max(x, screen.minX + 4), screen.maxX - size.width - 4)
-            if y < screen.minY + 4 { y = element.maxY + gap }
 
             let frame = NSRect(
                 x: (x - shadow).rounded(), y: (y - shadow).rounded(),
@@ -248,12 +385,6 @@ struct InkTipChip: View {
             // chip behind that window.
             panel.orderFrontRegardless()
         }
-
-        func hide(_ anchor: InkTipAnchorView) {
-            guard current === anchor else { return }
-            current = nil
-            panel.orderOut(nil)
-        }
     }
 
     /// What the one panel draws: the current chip, or nothing.
@@ -262,21 +393,23 @@ struct InkTipChip: View {
         var body: some View { chip }
     }
 #else
-    /// A pointer's hover on iPad: the chip under the element, drawn over what
-    /// follows it. tvOS never hovers (`inkHover`), so it never shows there.
+    /// A pointer's hover on iPad: the chip beside the element, drawn over its
+    /// neighbours. tvOS never hovers (`inkHover`), so it never shows there.
     private struct InkTipOverlay: ViewModifier {
-        let text: String?
-        let tint: Color
+        let ask: InkTipAsk?
         @State private var hovered = false
 
         func body(content: Content) -> some View {
+            let above = (ask?.edge ?? ask?.style.prefers) == .top
             content
                 .inkHover($hovered)
-                .overlay(alignment: .bottom) {
-                    if hovered, let text {
-                        InkTipChip(text: text, tint: tint)
+                .overlay(alignment: above ? .top : .bottom) {
+                    if hovered, let ask {
+                        InkTipChip(text: ask.text, tint: ask.tint, look: ask.style.look)
                             .fixedSize()
-                            .alignmentGuide(.bottom) { $0[.top] - 8 }
+                            .alignmentGuide(above ? .top : .bottom) {
+                                above ? $0[.bottom] + 8 : $0[.top] - 8
+                            }
                             .allowsHitTesting(false)
                     }
                 }
