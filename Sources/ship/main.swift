@@ -173,6 +173,37 @@ func signingIdentity(team: String) -> Identity {
     return newest
 }
 
+// MARK: - the install window
+
+/// Writes the dmg volume's .DS_Store (argv: the mount point, the app's file
+/// name): what Finder itself stores after arranging the window, with the keys
+/// dmgbuild writes. Window {400, 200} 660×400 without toolbar or status bar,
+/// icon view at 128 pt with 13 pt labels, nothing auto-arranged, the app at
+/// (165, 180) and the Applications link at (495, 180).
+let layout = """
+    import sys
+    from ds_store import DSStore
+    mount, app = sys.argv[1], sys.argv[2]
+    with DSStore.open(mount + "/.DS_Store", "w+") as d:
+        d["."]["vSrn"] = ("long", 1)
+        d["."]["bwsp"] = {
+            "WindowBounds": "{{400, 200}, {660, 400}}",
+            "ShowStatusBar": False, "ShowToolbar": False, "ShowPathbar": False,
+            "ShowSidebar": False, "ShowTabView": False, "ContainerShowSidebar": False,
+            "PreviewPaneVisibility": False, "SidebarWidth": 0,
+        }
+        d["."]["icvp"] = {
+            "viewOptionsVersion": 1, "backgroundType": 0,
+            "backgroundColorRed": 1.0, "backgroundColorGreen": 1.0, "backgroundColorBlue": 1.0,
+            "gridOffsetX": 0.0, "gridOffsetY": 0.0, "gridSpacing": 100.0, "arrangeBy": "none",
+            "showIconPreview": True, "showItemInfo": False, "labelOnBottom": True,
+            "textSize": 13.0, "iconSize": 128.0, "scrollPositionX": 0.0, "scrollPositionY": 0.0,
+        }
+        d["."]["icvl"] = (b"type", "icnv")
+        d[app]["Iloc"] = (165, 180)
+        d["Applications"]["Iloc"] = (495, 180)
+    """
+
 // MARK: - the arguments
 
 let verbs = ["identity", "check", "build", "publish"]
@@ -259,14 +290,14 @@ if verb == "build" {
     must(["xcrun", "stapler", "staple", app])
     try? FileManager.default.removeItem(atPath: zip)
 
-    // The install window is designed, not defaulted: a scratch image is
-    // mounted once so Finder (scripted) writes its .DS_Store, a fixed 660×400
-    // window, 128 pt icons, the app left and Applications right, and the
-    // app's own icon becomes the volume's. Then compressed to the shipping
-    // UDZO. Finder scripting needs a logged-in session and, once, the
-    // Automation permission; releases run on a logged-in Mac by design. All
-    // image work goes through `diskutil image` (hdiutil is deprecated in
-    // macOS 27).
+    // The install window is designed, not defaulted: a fixed 660×400 window,
+    // 128 pt icons, the app left and Applications right, and the app's own
+    // icon becomes the volume's. The layout IS the volume's .DS_Store, written
+    // directly (`layout`, the ds_store library dmgbuild uses) into a scratch
+    // image mounted out of Finder's sight: no Finder window opens, no
+    // Automation permission, no logged-in session needed. Then compressed to
+    // the shipping UDZO. All image work goes through `diskutil image`
+    // (hdiutil is deprecated in macOS 27).
     step("dmg")
     let appName = (app as NSString).lastPathComponent
     let work = "\(dist)/dmg"
@@ -283,7 +314,9 @@ if verb == "build" {
         "diskutil", "image", "create", "blank", "--format", "ASIF", "--fs", "APFS", "--volumeName",
         name, "--size", "\(appMB + 64)m", scratch,
     ])
-    let attached = run(["diskutil", "image", "attach", "--plist", scratch], quiet: true).out
+    let attached = run(
+        ["diskutil", "image", "attach", "--nobrowse", "--plist", scratch], quiet: true
+    ).out
     guard
         let mountKey = attached.range(of: "<key>mount-point</key>"),
         let open = attached.range(of: "<string>", range: mountKey.upperBound..<attached.endIndex),
@@ -293,29 +326,9 @@ if verb == "build" {
     must(["cp", "-R", app, mount])
     must(["ln", "-s", "/Applications", "\(mount)/Applications"])
     must([
-        "osascript", "-e",
-        """
-        tell application "Finder"
-          tell disk "\(name)"
-            open
-            set current view of container window to icon view
-            set toolbar visible of container window to false
-            set statusbar visible of container window to false
-            set the bounds of container window to {400, 200, 1060, 600}
-            set opts to the icon view options of container window
-            set icon size of opts to 128
-            set text size of opts to 13
-            set arrangement of opts to not arranged
-            set position of item "\(appName)" of container window to {165, 180}
-            set position of item "Applications" of container window to {495, 180}
-            update without registering applications
-            close
-          end tell
-        end tell
-        """,
+        "uv", "run", "--no-project", "--with", "ds-store==1.3.3", "python", "-c", layout, mount,
+        appName,
     ])
-    // After the Finder pass: its update deletes .VolumeIcon.icns and clears
-    // the custom-icon flag if they are already there.
     let iconFile = run(
         ["/usr/libexec/PlistBuddy", "-c", "Print :CFBundleIconFile", "\(app)/Contents/Info.plist"],
         quiet: true
