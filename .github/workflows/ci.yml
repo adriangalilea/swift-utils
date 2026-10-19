@@ -1,7 +1,10 @@
-# The gate on the way in. Releases fire on a tag, which is AFTER the fact, so
-# this is the only thing standing between a broken main and a broken tag.
-# check = format + release build + tests; the diff step makes format-clean a
-# hard requirement (swift-format changes nothing).
+# The gate, and the release after it. check = format + release build + tests
+# + every claimed platform; the diff step makes format-clean a hard
+# requirement (swift-format changes nothing). A green push to main is released
+# at once: next-version reads the version from the commits since the last tag
+# (in 0.x a break bumps the minor, anything else worth a release the patch,
+# docs and the like none), and release.yml creates the tag and its notes in one
+# call. Nothing is tagged by hand.
 name: ci
 
 on:
@@ -17,6 +20,24 @@ permissions: {}
 
 jobs:
   check:
-    uses: adriangalilea/ci/.github/workflows/mise.yml@c2ba9058dbad2cc8589da7419f2bd8b30ad9334a # v1.2.0
+    uses: adriangalilea/ci/.github/workflows/mise.yml@33215b28357e069f269d5bfd0bcb910288229d5f # v1.7.0
     permissions:
       contents: read
+
+  version:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: adriangalilea/ci/.github/workflows/next-version.yml@33215b28357e069f269d5bfd0bcb910288229d5f # v1.7.0
+    with:
+      v-prefix: false
+    permissions:
+      contents: read
+
+  release:
+    needs: version
+    if: needs.version.outputs.tag != ''
+    uses: adriangalilea/ci/.github/workflows/release.yml@33215b28357e069f269d5bfd0bcb910288229d5f # v1.7.0
+    with:
+      tag: ${{ needs.version.outputs.tag }}
+    permissions:
+      contents: write
