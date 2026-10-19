@@ -306,10 +306,12 @@ if verb == "build" {
     } else {
         // Inner code first: a second executable or a nested app is outside
         // the bundle's seal. Hardened runtime and a secure timestamp, or
-        // notarization refuses.
+        // notarization refuses. Entitlements already on a piece stay
+        // (Sparkle's Downloader.xpc carries its own; unsigned code has none
+        // to keep).
         step("sign (\(identity.name))")
         for path in values("--sign").map({ "\(app)/\($0)" }) + [app] {
-            must(sign + ["--options", "runtime", path])
+            must(sign + ["--options", "runtime", "--preserve-metadata=entitlements", path])
         }
     }
 
