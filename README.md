@@ -388,22 +388,45 @@ PARKED: today only Keymap-adopting apps publish a manifest, so for everything el
 
 ## Consuming
 
+Pin the minor you built against; every release that can be taken safely is then taken by `swift package update`, and no break ever is:
+
+```swift
+// Package.swift
+.package(url: "https://github.com/adriangalilea/swift-utils", .upToNextMinor(from: "0.26.0")),
+```
+
 ```yaml
 # project.yml (xcodegen)
 packages:
   swift-utils:
-    url: git@github.com:adriangalilea/swift-utils.git
-    from: "0.1.0"
+    url: https://github.com/adriangalilea/swift-utils
+    minorVersion: 0.26.0
 ```
 
-Local development: swap `url` for `path: ../../swift-utils`.
+`from:` reads "anything below 1.0" while the package is on 0.x, so it takes every break; `upToNextMinor` is the promise the version numbers below make.
 
-**Pin a tag, never a revision.** A consumer that needs work not yet released tags it (Release, below): main is already CI-gated, so a tag costs one push. A revision is a release nobody can name, and SwiftPM needs every package in one build to ask for swift-utils the same way, so one revision pin spreads to every package built beside it (in October 2026 one reached eight manifests across four repos before 0.24.0 replaced it).
+**What changed for you: `since`.** Run inside an app, it reads the swift-utils its `Package.resolved` holds, finds the modules the app imports (and what they build on), and prints for each what changed between that version and the latest: the breaks first, with what to write instead, then the features and the fixes. `since --all <dir>` does it for every app under a directory, one line each. `since --json` for a program. Install it with mise like `ship`.
+
+**Iterate without a release.** Committed manifests always pin a version; a local checkout stands in only on your machine:
+
+- an app built by SwiftPM: `swift package edit swift-utils --path ../swift-utils`, `swift package unedit swift-utils` to go back. Every package in the build sees the checkout, the ones that pin swift-utils themselves included.
+- an Xcode project: add the local checkout to the project (File › Add Package Dependencies › Add Local); Xcode prefers a local package to the remote one of the same name. Remove it before committing.
+
+**Pin a version, never a revision.** A revision is a release nobody can name, and SwiftPM needs every package in one build to ask for swift-utils the same way, so one revision pin spreads to every package built beside it. Work that is not released yet is released by pushing it (below).
 
 ## Release
 
-Tag and push: `git tag 0.1.2 && git push --tags`. Git is the registry. Push the tag ON ITS OWN: a tag pushed in the same command as a branch produces no tag event, so the release silently never fires. SwiftPM has no manifest version field, so the tag is not a record of the version, it IS the version, and any file claiming otherwise is a second source of truth that will eventually disagree. Pushing the tag publishes the changelog and the GitHub Release.
+Releasing is never a decision. Every push to main that passes the gate (format, release build, tests, every claimed platform) is released by CI, the version read from the commits since the last one:
 
-Mac apps invert this: an app bundle has a native version (`CFBundleShortVersionString`), so there the manifest is truth and CI derives the tag from it.
+| since the last release | while 0.x | from 1.0 |
+|---|---|---|
+| a break (`type!:` or `BREAKING CHANGE:` in the body, saying what to write instead) | minor: 0.26.0 → 0.27.0 | major |
+| `feat` | patch: 0.26.0 → 0.26.1 | minor |
+| `fix`, `perf`, `refactor`, `revert` | patch | patch |
+| only `docs`, `style`, `test`, `ci`, `chore`, `build` | no release | no release |
 
-The tag runs `.github/workflows/release.yml`, a stub over the shared workflows in [adriangalilea/ci](https://github.com/adriangalilea/ci): `swift.yml` builds and tests on `macos-26` (the package targets macOS 26), then `release.yml` writes the git-cliff notes and the GitHub Release. Any Swift library uses the same stub, listed in that repo's README; the pipeline is versioned there, apart from this library's semver, so a Keymap patch and a pipeline change never share a version number.
+A commit that is not conventional stops the release: the version cannot be read from it. So the commit message is the release: its type is the bump, its body the migration note `since` shows.
+
+Git is the registry: SwiftPM has no manifest version field, so the tag IS the version, and any file claiming one is a second source of truth. Mac apps invert this: a bundle has a native version (`CFBundleShortVersionString`), so `ship` takes the version from the app.
+
+The pipeline lives in [adriangalilea/ci](https://github.com/adriangalilea/ci) (`mise.yml`, `next-version.yml`, `release.yml`), called from `.github/workflows/ci.yml`; it is versioned there, so a Keymap patch and a pipeline change never share a version number.
