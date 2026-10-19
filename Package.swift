@@ -106,6 +106,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "Ink", resources: [.process("Resources")]),
+        .executableTarget(name: "ink-example", dependencies: ["Ink"]),
         .target(name: "SyntaxLines"),
         .target(
             name: "Syntax",
