@@ -263,7 +263,7 @@ struct InkTipChip: View {
     }
 #else
     /// A pointer's hover on iPad: the chip under the element, drawn over what
-    /// follows it.
+    /// follows it. tvOS never hovers (`inkHover`), so it never shows there.
     private struct InkTipOverlay: ViewModifier {
         let text: String?
         let tint: Color
@@ -271,7 +271,7 @@ struct InkTipChip: View {
 
         func body(content: Content) -> some View {
             content
-                .onHover { hovered = $0 }
+                .inkHover($hovered)
                 .overlay(alignment: .bottom) {
                     if hovered, let text {
                         InkTipChip(text: text, tint: tint)

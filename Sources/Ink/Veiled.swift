@@ -51,9 +51,7 @@ public struct Veiled: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        #if !os(tvOS)
-            .onHover { hovering = $0 }
-        #endif
+        .inkHover($hovering)
         .accessibilityLabel(Text("veiled value", bundle: .module))
         .accessibilityValue(Text(verbatim: shown ? text : "hidden"))
         .accessibilityHint(Text("reveals for five seconds", bundle: .module))

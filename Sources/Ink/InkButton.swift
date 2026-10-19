@@ -68,7 +68,7 @@ public struct InkButtonStyle: ButtonStyle {
                 }
                 .contentShape(Capsule())
                 .opacity(enabled ? 1 : 0.45)
-                .onHover { hovering = $0 }
+                .inkHover($hovering)
                 .animation(.inkFlick, value: hovering)
                 .animation(.inkFlick, value: configuration.isPressed)
         }

@@ -60,6 +60,17 @@ extension CGFloat {
 }
 
 extension View {
+    /// The pointer resting on this view, as `hovering`. tvOS has no pointer (its
+    /// focus engine is not a hover), so there nothing ever hovers: the one place
+    /// that says so, instead of a guard at every hover in every component.
+    public func inkHover(_ hovering: Binding<Bool>) -> some View {
+        #if os(tvOS)
+            self
+        #else
+            onHover { hovering.wrappedValue = $0 }
+        #endif
+    }
+
     /// A column-header label (the plane headers, any grid's column caps) -
     /// ONE style; every surface wears it, so two surfaces can never drift.
     /// `tint` covers accent-tinted headers (the manifest card) without the

@@ -130,7 +130,7 @@ public struct InkCloseButton: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .onHover { hovering = $0 }
+        .inkHover($hovering)
         .animation(.easeOut(duration: 0.12), value: hovering)
         .accessibilityLabel("Close")
     }
