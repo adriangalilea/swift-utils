@@ -193,7 +193,10 @@ public struct SyntaxText: View {
     public var body: some View {
         Text(Syntax.highlight(text, as: format))
             .font(font)
-            .textSelection(.enabled)
+            // tvOS selects nothing: there is no pointer to drag across text.
+            #if !os(tvOS)
+                .textSelection(.enabled)
+            #endif
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
