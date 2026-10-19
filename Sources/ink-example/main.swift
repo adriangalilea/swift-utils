@@ -26,6 +26,8 @@ struct Section<Content: View>: View {
 
 struct DemoView: View {
     @State private var width: CGFloat = 200
+    @State private var secret = ""
+    @State private var newSecret = ""
 
     var body: some View {
         ScrollView {
@@ -150,8 +152,28 @@ struct DemoView: View {
                     .frame(maxWidth: width + 160, alignment: .leading)
                 }
 
-                // The one keycap (ShortcutBadge's place too): a key alone, a
-                // combo, beside a label, on a prominent button, held.
+                // Secrets, composed: typed into SecretField; shown as Veiled (a
+                // click peeks it five seconds); copied beside it without being
+                // shown (Copy, the mark alone). Siblings, never nested: a click
+                // on the value peeks, a click on the mark copies.
+                Section(title: "secrets") {
+                    SecretField(prompt: "password", text: $secret)
+                        .frame(width: 280)
+                    SecretField(
+                        prompt: "new password, 12 or more", text: $newSecret,
+                        contentType: .newPassword, valid: newSecret.count >= 12
+                    )
+                    .frame(width: 280)
+                    HStack(spacing: .inkGap) {
+                        Text("serial").foregroundStyle(.secondary)
+                        Veiled("C02XK1ABJG5H")
+                        Copy("C02XK1ABJG5H", tip: "Copy without showing it")
+                    }
+                    .font(.callout)
+                }
+
+                // The one keycap: a key alone, a combo, beside a label, on a
+                // prominent button, held.
                 Section(title: "keys") {
                     HStack(spacing: .inkGap) {
                         InkKey("esc")
