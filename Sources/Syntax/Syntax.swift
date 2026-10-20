@@ -12,37 +12,33 @@ import SwiftUI
 /// rewrites a character: the output's characters are the input, exactly,
 /// so what is approved is what was shown.
 public enum Syntax {
-    /// The highlight.js theme the colors come from. Foreground colors only -
-    /// the host owns background and font - so pick one whose inks read on
-    /// your surfaces. Every current surface is dark glass.
-    public static var theme: String {
-        get { store.lock.withLock { store.theme } }
-        set {
-            store.lock.withLock {
-                store.theme = newValue
-                store.cache = [:]
-                store.order = []
-            }
-        }
+    /// The ground the inks are drawn on, which picks them: a dark theme's
+    /// pale inks vanish on a light ground, and the reverse. Foreground colors
+    /// only (the host owns background and font), so the caller says which
+    /// ground it paints: `SyntaxText` reads its environment's color scheme.
+    public enum Appearance: Sendable {
+        case light, dark
+        public init(_ scheme: ColorScheme) { self = scheme == .dark ? .dark : .light }
+        var theme: String { self == .dark ? "atom-one-dark" : "atom-one-light" }
     }
 
     /// Above this the grammar pass is skipped outright: JSC on hundreds of
     /// kilobytes stalls the render for something nobody reads colored.
     public static let ceiling = 32 * 1024
 
-    public static func highlight(_ text: String, as format: CodeFormat) -> AttributedString {
+    public static func highlight(_ text: String, as format: CodeFormat, on appearance: Appearance) -> AttributedString {
         switch format {
         case .diff: return SyntaxLines.diff(text)
         case .plain: return AttributedString(text)
         case .shell:
             guard text.utf8.count <= ceiling else { return AttributedString(text) }
-            let key = "\(theme)|\(format.rawValue)|\(text.hashValue)"
+            let key = "\(appearance.theme)|\(format.rawValue)|\(text.hashValue)"
             if let hit = cached(key) { return hit }
             // A multi-line "shell" body is usually a script riding a heredoc
             // or a -c string; detection reads the content, the bash grammar
             // would paint it all as one string. A single line IS shell.
             let colored =
-                code(text, language: text.contains("\n") ? nil : "bash")
+                code(text, language: text.contains("\n") ? nil : "bash", theme: appearance.theme)
                 ?? AttributedString(text)
             remember(key, colored)
             return colored
@@ -53,9 +49,9 @@ public enum Syntax {
     /// that cannot run the engine to paint (`CodeExcerpt(colors:)`). Nil for
     /// a diff (line-colored without an engine) and plain text, or when the
     /// grammar gives nothing.
-    public static func colors(_ text: String, as format: CodeFormat) -> CodeColors? {
+    public static func colors(_ text: String, as format: CodeFormat, on appearance: Appearance) -> CodeColors? {
         guard format == .shell, text.utf8.count <= ceiling else { return nil }
-        let colored = highlight(text, as: format)
+        let colored = highlight(text, as: format, on: appearance)
         var palette: [String] = []
         var runs: [[Int]] = []
         for run in colored.runs {
@@ -99,7 +95,6 @@ public enum Syntax {
     private final class Store: @unchecked Sendable {
         let lock = NSLock()
         let engine = Highlightr()
-        var theme = "atom-one-dark"
         var cache: [String: AttributedString] = [:]
         var order: [String] = []
     }
@@ -118,10 +113,10 @@ public enum Syntax {
         }
     }
 
-    private static func code(_ text: String, language: String?) -> AttributedString? {
+    private static func code(_ text: String, language: String?, theme: String) -> AttributedString? {
         store.lock.withLock {
             guard let engine = store.engine else { return nil }
-            engine.setTheme(to: store.theme)
+            engine.setTheme(to: theme)
             guard let colored = engine.highlight(text, as: language) else { return nil }
             // The theme's characters must be the input's: a grammar that
             // rewrote anything (entity decoding gone wrong) is discarded.
@@ -170,6 +165,7 @@ public struct SyntaxText: View {
     private let text: String
     private let format: CodeFormat
     private let font: Font
+    @Environment(\.colorScheme) private var scheme
 
     /// `font` is a parameter, not an ambient: a font set ON the inner Text
     /// would silently beat any modifier the host applies outside, so the
@@ -191,7 +187,7 @@ public struct SyntaxText: View {
     }
 
     public var body: some View {
-        Text(Syntax.highlight(text, as: format))
+        Text(Syntax.highlight(text, as: format, on: Syntax.Appearance(scheme)))
             .font(font)
             // tvOS selects nothing: there is no pointer to drag across text.
             #if !os(tvOS)
