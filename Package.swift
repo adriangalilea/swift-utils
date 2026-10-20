@@ -82,7 +82,8 @@ let package = Package(
         // A Mac app's release outside the App Store: gates with honest
         // answers, Developer ID signing, notarization judged by the staple,
         // the dmg, the branch and tag, and the channels the app asks for.
-        // `ship check` / `ship release`, installed by mise's spm backend.
+        // `ship identity|check|build|publish|released`, installed by
+        // mise's spm backend.
         .executable(name: "ship", targets: ["ship"]),
         // A Mac app's icon from its one source, the Icon Composer package
         // (`<Name>.icon`: icon.json + SVG layers): `mark build` compiles the
