@@ -83,3 +83,58 @@ extension ButtonStyle where Self == InkButtonStyle {
     /// Every other answer: a faint fill, the primary ink.
     public static var ink: InkButtonStyle { InkButtonStyle(.plain) }
 }
+
+/// A toolbar's icon, designed once: one size, quiet at rest (the secondary ink, no
+/// fill), a faint fill under the hand, and `on` (a mode that holds: motion playing,
+/// a pane shown, the chosen arrangement) a raised fill and the primary ink, never the
+/// accent, which belongs to a yes. Every icon of a bar wears it, so a bar of a dozen
+/// controls reads as one row, the host's own among them.
+public struct InkToolStyle: ButtonStyle {
+    let on: Bool
+
+    public init(on: Bool = false) { self.on = on }
+
+    /// The icon's well: a square a toolbar row centres.
+    public static let side: CGFloat = 28
+
+    public func makeBody(configuration: Configuration) -> some View {
+        Styled(on: on, configuration: configuration)
+    }
+
+    private struct Styled: View {
+        @Environment(\.isEnabled) private var enabled
+        @State private var hovering = false
+        let on: Bool
+        let configuration: Configuration
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 13, weight: .medium))
+                .symbolVariant(on ? .fill : .none)
+                .foregroundStyle(on || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .frame(minWidth: InkToolStyle.side, minHeight: InkToolStyle.side)
+                .background {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: .inkField, style: .continuous)
+                            .fill(on ? Color.inkRaised : .clear)
+                        RoundedRectangle(cornerRadius: .inkField, style: .continuous)
+                            .fill(.primary.opacity(hovering && !on ? 0.08 : 0))
+                        RoundedRectangle(cornerRadius: .inkField, style: .continuous)
+                            .fill(.primary.opacity(configuration.isPressed ? 0.12 : 0))
+                    }
+                }
+                .contentShape(Rectangle())
+                .opacity(enabled ? 1 : 0.35)
+                .inkHover($hovering)
+                .animation(.inkFlick, value: hovering)
+                .animation(.inkFlick, value: on)
+        }
+    }
+}
+
+extension ButtonStyle where Self == InkToolStyle {
+    /// A toolbar icon at rest.
+    public static var inkTool: InkToolStyle { InkToolStyle() }
+    /// A toolbar icon whose mode is on.
+    public static func inkTool(on: Bool) -> InkToolStyle { InkToolStyle(on: on) }
+}
