@@ -284,9 +284,40 @@ learned, a failure under a switch that claims on (`whenFailing`). An
 unproven claim (switch on) renders `good` - proof is journal detail,
 never UI divergence. An unreadable switch is `unknown`, not off and not
 good: only the capability seen live right now vouches for it, a past
-success is a witness of the past. `TCC` wraps the accessibility + per-app automation probes and
-requests, including the per-process AE answer cache and the
-denied-means-deep-link rule.
+success is a witness of the past.
+
+**`Permissions`, the one live answer for every TCC service** (macOS):
+Accessibility, posting events, Input Monitoring, System Audio Recording,
+the microphone. It asks tccd itself (`TCCAccessPreflight`, TCC.framework)
+and never a framework's remembered answer: `CGPreflightPostEventAccess`
+and `AXIsProcessTrusted` keep their first answer for the life of the
+process (measured: "denied" 30 s after tccd recorded "allowed", no tccd
+query after the first call), while tccd's own preflight is one query per
+call (6-8 ms) with a tri-state of its own, so no app keeps an "asked
+before" flag. The first read of a service is synchronous, so a surface's
+first frame is the truth (never a loading state, never a guess); every
+service read since is re-read off the main thread every 2 s, at once on
+app activation, on macOS's Accessibility-change notification, and after
+every ask. Changes publish through Observation (a view that read one
+repaints) and to `Permissions.shared.observe { service, answer in }`, the
+hook: no app writes a polling loop. `TCC` is the vocabulary over it
+(`accessibility()`, `postEvents()`, `inputMonitoring()`, `systemAudio()`,
+`microphone()`: true / false / nil, and their `request…`), every ask the
+same way: the app brought forward (macOS asks only an active app), the
+request made (with no record it prompts and lists the app), the pane
+opened when the person already said no. Per-app Apple Events stay on
+`AEDeterminePermissionToAutomateTarget`, with its per-process answer cache.
+
+Every reading is logged in the app's unified log, scope `grant`, the first
+time and at each change, with tccd's raw code, and so is every ask and
+every pane opened. `grant status <app>` (this package's CLI, installed like
+`ship`) prints the latest of each, plus every copy of the bundle id on disk
+with its signer; `grant reset <app>` quits it, clears every record macOS
+holds for the bundle id and reopens it. One bundle id has ONE record per
+service, bound to the signature of the build that received it: a Developer
+ID release and an Apple Development build of the same app do not share it,
+and the other one reads denied with its switch shown ON (utter,
+2026-10-20). That is what `grant status` flags and `grant reset` clears.
 
 `Notifications` is the same shape for the permission TCC doesn't own.
 `Notifications.reach()` answers `NotificationReach` - `notAsked` /

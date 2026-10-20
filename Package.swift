@@ -94,6 +94,9 @@ let package = Package(
         // in an app, per imported module, the breaks first. Any package, any
         // app; installed by mise's spm backend like ship and mark.
         .executable(name: "since", targets: ["since"]),
+        // An app's permissions from outside it, for development: what it last
+        // read (its own log) and a reset of its records (`grant help`).
+        .executable(name: "grant", targets: ["grant-cli"]),
         // MediaSpec's gate + demo: `--check` pins the vocabulary, the label
         // rules and the lenient-decode law; without the flag, every chip
         // variant in a window on black.
@@ -126,7 +129,7 @@ let package = Package(
         .target(name: "Entitlement", resources: [.process("Resources")]),
         // The yes it draws wears Ink's prominent button.
         .target(name: "Biometrics", dependencies: ["Ink"]),
-        .target(name: "Grant"),
+        .target(name: "Grant", dependencies: ["Log"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap", "Ink"]),
@@ -143,6 +146,9 @@ let package = Package(
         .executableTarget(name: "ship"),
         .executableTarget(name: "mark"),
         .executableTarget(name: "since", dependencies: ["Terminal"]),
+        // Its own directory name: `Sources/grant` IS `Sources/Grant` on a
+        // case-insensitive disk.
+        .executableTarget(name: "grant-cli", dependencies: ["Grant"]),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
         .testTarget(name: "InkTests", dependencies: ["Ink"]),
         .testTarget(name: "GrantTests", dependencies: ["Grant"]),
