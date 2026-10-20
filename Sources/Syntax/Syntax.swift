@@ -26,7 +26,9 @@ public enum Syntax {
     /// kilobytes stalls the render for something nobody reads colored.
     public static let ceiling = 32 * 1024
 
-    public static func highlight(_ text: String, as format: CodeFormat, on appearance: Appearance) -> AttributedString {
+    public static func highlight(_ text: String, as format: CodeFormat, on appearance: Appearance)
+        -> AttributedString
+    {
         switch format {
         case .diff: return SyntaxLines.diff(text)
         case .plain: return AttributedString(text)
@@ -49,7 +51,9 @@ public enum Syntax {
     /// that cannot run the engine to paint (`CodeExcerpt(colors:)`). Nil for
     /// a diff (line-colored without an engine) and plain text, or when the
     /// grammar gives nothing.
-    public static func colors(_ text: String, as format: CodeFormat, on appearance: Appearance) -> CodeColors? {
+    public static func colors(_ text: String, as format: CodeFormat, on appearance: Appearance)
+        -> CodeColors?
+    {
         guard format == .shell, text.utf8.count <= ceiling else { return nil }
         let colored = highlight(text, as: format, on: appearance)
         var palette: [String] = []
@@ -113,7 +117,8 @@ public enum Syntax {
         }
     }
 
-    private static func code(_ text: String, language: String?, theme: String) -> AttributedString? {
+    private static func code(_ text: String, language: String?, theme: String) -> AttributedString?
+    {
         store.lock.withLock {
             guard let engine = store.engine else { return nil }
             engine.setTheme(to: theme)

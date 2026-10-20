@@ -31,8 +31,12 @@ struct SyntaxTests {
         let light = try #require(Syntax.colors(command, as: .shell, on: .light))
         let dark = try #require(Syntax.colors(command, as: .shell, on: .dark))
         #expect(light.palette != dark.palette)
-        for hex in light.palette { #expect(Self.luminance(hex) < 0.5, "\(hex) is too pale for a light ground") }
-        for hex in dark.palette { #expect(Self.luminance(hex) > 0.2, "\(hex) is too dim for a dark ground") }
+        for hex in light.palette {
+            #expect(Self.luminance(hex) < 0.5, "\(hex) is too pale for a light ground")
+        }
+        for hex in dark.palette {
+            #expect(Self.luminance(hex) > 0.2, "\(hex) is too dim for a dark ground")
+        }
     }
 
     /// The grammar's inks travel as data and paint the same text the same
