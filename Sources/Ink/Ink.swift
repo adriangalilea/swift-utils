@@ -26,6 +26,30 @@ extension ShapeStyle where Self == Color {
     public static var inkGold: Color { .yellow }
 }
 
+/// The surface ladder - what a region of a window IS, by how far it stands off the
+/// window's ground (the work: a grid, a stage). Regions read as layers, never as cells
+/// cut apart by a line: a pane beside the work stands one step off it, what floats over
+/// either (a popover, a tray) one more. The primary ink, faint, like the fills.
+extension ShapeStyle where Self == Color {
+    /// A pane beside the work: a sidebar, an inspector.
+    public static var inkPane: Color { .primary.opacity(0.06) }
+    /// What floats over the work or a pane: a tray, a bar laid over a picture.
+    public static var inkFloat: Color { .primary.opacity(0.1) }
+}
+
+extension View {
+    /// A pane beside the work (a sidebar, an inspector), as the system lays one: inset
+    /// from the window's edge, rounded as a panel, on its own surface, so nothing but
+    /// the layer separates it from the ground. `top` keeps the content clear of what
+    /// sits there (a transparent titlebar's window buttons); the surface runs under it.
+    public func inkPane(top: CGFloat = 0) -> some View {
+        padding(.top, top)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .background(.inkPane, in: RoundedRectangle(cornerRadius: .inkPanel, style: .continuous))
+            .padding(.inkGap)
+    }
+}
+
 /// The radius ladder - four sizes, named by WHAT wears them, so two
 /// surfaces of the same kind can never round differently.
 extension CGFloat {
