@@ -111,7 +111,9 @@ public struct InkToolStyle: ButtonStyle {
             configuration.label
                 .font(.system(size: 13, weight: .medium))
                 .symbolVariant(on ? .fill : .none)
-                .foregroundStyle(on || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .foregroundStyle(
+                    on || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
+                )
                 .frame(minWidth: InkToolStyle.side, minHeight: InkToolStyle.side)
                 .background {
                     ZStack {
