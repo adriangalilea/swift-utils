@@ -60,10 +60,12 @@ public struct InkButtonStyle: ButtonStyle {
                             // brightness is unreadable for green and orange.
                             Capsule().fill(.black.opacity(0.3))
                         case .plain:
-                            Capsule().fill(.white.opacity(0.1))
+                            // The primary ink, faint: white at a tenth was
+                            // a fill only a dark ground could show.
+                            Capsule().fill(.primary.opacity(0.1))
                         }
-                        Capsule().fill(.white.opacity(hovering ? 0.08 : 0))
-                        Capsule().fill(.black.opacity(configuration.isPressed ? 0.15 : 0))
+                        Capsule().fill(.primary.opacity(hovering ? 0.06 : 0))
+                        Capsule().fill(.primary.opacity(configuration.isPressed ? 0.12 : 0))
                     }
                 }
                 .contentShape(Capsule())

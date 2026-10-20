@@ -1,24 +1,24 @@
 import SwiftUI
 
-/// THE styling ladder for the studio's dark-glass surfaces. Five roles, no
-/// raw values at call sites - a view names WHAT a surface is, never how
-/// transparent it is. Products build on these atoms (Keymap's panel and
-/// overlay today; AppSettings and the credits pane next) so surfaces can
-/// never drift apart.
+/// THE styling ladder for the studio's surfaces. Five roles, no raw values
+/// at call sites - a view names WHAT a surface is, never how transparent it
+/// is. Products build on these atoms (Keymap's panel and overlay, answer
+/// buttons, Authz's cards) so surfaces can never drift apart.
 ///
-/// tailwind-discipline, Swift-shaped: when a second theme appears, this
-/// becomes an Environment-injected struct and these turn into its defaults.
+/// Every role is the PRIMARY ink, faint: white on a dark ground, black on a
+/// light one, so a surface reads in both appearances (a white-only ladder
+/// drew nothing at all on a light ground).
 extension ShapeStyle where Self == Color {
     /// A resting interactive surface: a filter field, an idle ＋ slot.
-    public static var inkRest: Color { .white.opacity(0.12) }
+    public static var inkRest: Color { .primary.opacity(0.12) }
     /// A raised element: keycaps, chips, the focused field.
-    public static var inkRaised: Color { .white.opacity(0.18) }
+    public static var inkRaised: Color { .primary.opacity(0.18) }
     /// A hovered control - unmistakably live.
-    public static var inkHover: Color { .white.opacity(0.32) }
+    public static var inkHover: Color { .primary.opacity(0.32) }
     /// The cursor/flash row - paired with `inkEdge` as its border.
-    public static var inkSelection: Color { .white.opacity(0.22) }
+    public static var inkSelection: Color { .primary.opacity(0.22) }
     /// The stroke that separates a selected/active region from the glass.
-    public static var inkEdge: Color { .white.opacity(0.38) }
+    public static var inkEdge: Color { .primary.opacity(0.38) }
     /// THE highlight color - the one hue for "a moment the user marked"
     /// (karaoke gold words, scrubber ticks/spans, timeline markers).
     /// One color, alpha tiers only, per the flare rule: full for the mark
