@@ -31,10 +31,12 @@ extension ShapeStyle where Self == Color {
 /// cut apart by a line: a pane beside the work stands one step off it, what floats over
 /// either (a popover, a tray) one more. The primary ink, faint, like the fills.
 extension ShapeStyle where Self == Color {
-    /// A pane beside the work: a sidebar, an inspector.
-    public static var inkPane: Color { .primary.opacity(0.06) }
-    /// What floats over the work or a pane: a tray, a bar laid over a picture.
-    public static var inkFloat: Color { .primary.opacity(0.1) }
+    /// A pane beside the work: a sidebar, an inspector. On a black ground, the system's
+    /// own elevated level (#1C1C1E): a step the eye takes at a glance.
+    public static var inkPane: Color { .primary.opacity(0.11) }
+    /// What floats over the work or a pane: a tray, a bar laid over a picture (#2C2C2E
+    /// on black).
+    public static var inkFloat: Color { .primary.opacity(0.17) }
 }
 
 extension View {
