@@ -103,6 +103,7 @@ public struct InkToolStyle: ButtonStyle {
 
     private struct Styled: View {
         @Environment(\.isEnabled) private var enabled
+        @Environment(\.inkToolGrouped) private var grouped
         @State private var hovering = false
         let on: Bool
         let configuration: Configuration
@@ -114,17 +115,23 @@ public struct InkToolStyle: ButtonStyle {
                 .foregroundStyle(
                     on || hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
                 )
-                .frame(minWidth: InkToolStyle.side, minHeight: InkToolStyle.side)
+                // In a group the glass is the one shape: the icon alone says on (filled,
+                // whole ink) and under the hand (whole ink). Alone, the icon wears its
+                // own capsule.
+                .frame(
+                    minWidth: grouped ? InkToolStyle.side - 4 : InkToolStyle.side,
+                    minHeight: grouped ? InkToolStyle.side - 4 : InkToolStyle.side
+                )
+                .padding(.horizontal, 2)
                 .background {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: .inkField, style: .continuous)
-                            .fill(on ? Color.inkRaised : .clear)
-                        RoundedRectangle(cornerRadius: .inkField, style: .continuous)
-                            .fill(.primary.opacity(hovering && !on ? 0.08 : 0))
-                        RoundedRectangle(cornerRadius: .inkField, style: .continuous)
-                            .fill(.primary.opacity(configuration.isPressed ? 0.12 : 0))
+                    if !grouped {
+                        ZStack {
+                            Capsule().fill(on ? Color.inkRaised : .clear)
+                            Capsule().fill(.primary.opacity(hovering && !on ? 0.08 : 0))
+                        }
                     }
                 }
+                .scaleEffect(configuration.isPressed ? 0.92 : 1)
                 .contentShape(Rectangle())
                 .opacity(enabled ? 1 : 0.35)
                 .inkHover($hovering)
@@ -132,6 +139,27 @@ public struct InkToolStyle: ButtonStyle {
                 .animation(.inkFlick, value: on)
         }
     }
+}
+
+/// The tools that belong together (how a set plays; how it lies), as the system groups
+/// a toolbar's items: one Liquid Glass capsule around them, so a bar reads as its
+/// groups, never as a row of loose icons.
+public struct InkToolGroup<Content: View>: View {
+    let content: Content
+
+    public init(@ViewBuilder _ content: () -> Content) { self.content = content() }
+
+    public var body: some View {
+        HStack(spacing: 0) { content }
+            .environment(\.inkToolGrouped, true)
+            .padding(2)
+            .glassEffect(.regular.interactive(), in: Capsule())
+    }
+}
+
+extension EnvironmentValues {
+    /// Inside an `InkToolGroup`: its glass is the one shape, its icons draw none.
+    @Entry var inkToolGrouped = false
 }
 
 extension ButtonStyle where Self == InkToolStyle {
