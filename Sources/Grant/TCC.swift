@@ -50,8 +50,10 @@
         ) {
             let before = Permissions.shared.answer(service)
             guard before != .allowed else { return }
-            // An ask is a person's click: the main thread, or a bug.
-            MainActor.assumeIsolated { NSApp.activate() }
+            // An ask is a person's click (or a command line's first use):
+            // the main thread, or a bug. A command-line tool has no NSApp,
+            // and nothing to bring forward.
+            MainActor.assumeIsolated { NSApp?.activate() }
             let allowed = request()
             grantLog.info(
                 "asked macOS",
