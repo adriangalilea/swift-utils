@@ -249,6 +249,39 @@ func events(_ text: String) -> [[String: Any]] {
         #expect(log.writer.reach(.warn) == .stream)
     }
 
+    /// The record as a file: what the record takes is appended, one JSON
+    /// line each; past the limit it becomes `<name>.1.<ext>` and a new one
+    /// starts; a writer whose file another rotated reopens the path.
+    @Test func theRecordFileKeepsAndRotates() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "record-\(UUID().uuidString)")
+        let path = directory.appendingPathComponent("drill.jsonl").path
+        setLogLevel("warn")
+        setLogRecordFile(path)
+        let limit = recordFileLimit
+        defer {
+            setLogLevel("info")
+            setLogRecordFile(nil)
+            recordFileLimit = limit
+            try? FileManager.default.removeItem(at: directory)
+        }
+        _ = capture { log.info("first", ["n": 1]) }
+        let first = try String(contentsOfFile: path, encoding: .utf8)
+        #expect(first.contains("\"msg\":\"first\"") && first.hasSuffix("\n"))
+        // Another process rotated it: this writer reopens the path.
+        try FileManager.default.moveItem(atPath: path, toPath: path + ".moved")
+        _ = capture { log.info("second") }
+        #expect(try String(contentsOfFile: path, encoding: .utf8).contains("\"msg\":\"second\""))
+        // Past the limit: `.1` before the extension, a new file after.
+        recordFileLimit = 64
+        _ = capture { log.info("third, long enough to pass sixty-four bytes of record") }
+        let previous = directory.appendingPathComponent("drill.1.jsonl").path
+        #expect(try String(contentsOfFile: previous, encoding: .utf8).contains("\"msg\":\"third"))
+        recordFileLimit = limit
+        _ = capture { log.info("fourth") }
+        #expect(try String(contentsOfFile: path, encoding: .utf8).contains("\"msg\":\"fourth\""))
+    }
+
     @Test func levelsOffBuildNothing() {
         var built = false
         func expensive() -> Fields {

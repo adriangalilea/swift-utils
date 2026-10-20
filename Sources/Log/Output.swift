@@ -17,6 +17,7 @@ struct Settings: Sendable {
     var ship: String? = nil
     var shipToken: String? = nil
     var osLog = true
+    var recordFile: String? = nil
 }
 
 enum Format: String, Sendable { case human, json }
@@ -73,6 +74,23 @@ public func setLogOSLog(_ on: Bool) {
     settings.withLock { $0.osLog = on }
 }
 
+/// The record as a file (the contract's "The record as a file"): every event
+/// the record takes (LOG_RECORD_LEVEL) is also appended to `path` as its JSON
+/// line, one write per line; past 4 MiB the file becomes `<name>.1.<ext>`
+/// and a new one starts. Several processes may share a path. A record read
+/// back often (a trace gathered on demand) is read from here: a file scan,
+/// where the unified log is a scan of everything every program wrote.
+/// LOG_RECORD_FILE overrides it; nil: no record file.
+public func setLogRecordFile(_ path: String?) {
+    precondition(path.map { !$0.isEmpty } ?? true, "setLogRecordFile: a record file needs a path")
+    settings.withLock { $0.recordFile = path }
+}
+
+func recordFile() -> String? {
+    if let path = env("LOG_RECORD_FILE") { return path }
+    return settings.withLock { $0.recordFile }
+}
+
 func env(_ name: String) -> String? {
     guard let raw = getenv(name) else { return nil }
     let value = String(cString: raw)
@@ -126,7 +144,8 @@ func recordThreshold() -> LogLevel {
 
 /// Where an event goes: the stream (stderr, and the ship batch, which sends
 /// the stream's bytes) by its scope's threshold, the record (the unified
-/// log, when on) by the record's. Empty: nowhere, and nothing is built.
+/// log when on, the record file when named) by the record's. Empty:
+/// nowhere, and nothing is built.
 struct Reach: OptionSet, Sendable {
     let rawValue: UInt8
     static let stream = Reach(rawValue: 1)
@@ -137,7 +156,7 @@ struct Reach: OptionSet, Sendable {
     init(_ level: LogLevel, levelVariables: [String]) {
         var reach: Reach = []
         if level <= threshold(levelVariables) { reach.insert(.stream) }
-        if osLogOn(), level <= recordThreshold() { reach.insert(.record) }
+        if osLogOn() || recordFile() != nil, level <= recordThreshold() { reach.insert(.record) }
         self = reach
     }
 }
@@ -238,6 +257,66 @@ private struct Output {
     var human = Human()
     /// stderr; the tests read the stream through a pipe here.
     var fd = STDERR_FILENO
+    var record = RecordFile()
+}
+
+/// Past this an append rotates the record file (4 MiB; a test lowers it).
+nonisolated(unsafe) var recordFileLimit = 4 << 20
+
+/// The open record file: which path, its descriptor and the file it names
+/// (device and inode), so a rotation by another process is noticed.
+struct RecordFile {
+    var path: String?
+    var fd: Int32 = -1
+    var file: (dev: dev_t, ino: ino_t)?
+
+    /// Appends `line` (one JSON event and its newline) to `path`, opening,
+    /// reopening after another writer rotated it, and rotating it past the
+    /// limit. False when it could not be written.
+    mutating func append(_ line: String, to path: String) -> Bool {
+        if path != self.path || !current(path) { reopen(path) }
+        guard fd >= 0 else { return false }
+        var line = line
+        let written = line.withUTF8 { buffer in
+            write(fd, buffer.baseAddress, buffer.count) == buffer.count
+        }
+        var info = stat()
+        if written, fstat(fd, &info) == 0, Int(info.st_size) > recordFileLimit {
+            rotate(path)
+        }
+        return written
+    }
+
+    /// Whether the descriptor still names the file at `path`.
+    private func current(_ path: String) -> Bool {
+        guard fd >= 0, let file else { return false }
+        var there = stat()
+        return lstat(path, &there) == 0 && there.st_dev == file.dev && there.st_ino == file.ino
+    }
+
+    private mutating func reopen(_ path: String) {
+        if fd >= 0 { close(fd) }
+        self.path = path
+        let directory = (path as NSString).deletingLastPathComponent
+        if !directory.isEmpty { mkdir(directory, 0o700) }
+        fd = open(path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0o600)
+        var info = stat()
+        file = fd >= 0 && fstat(fd, &info) == 0 ? (info.st_dev, info.st_ino) : nil
+    }
+
+    /// `authzd.jsonl` → `authzd.1.jsonl`, replacing the older one, then a
+    /// new file: only the writer whose file is still the path renames it.
+    private mutating func rotate(_ path: String) {
+        if current(path) { rename(path, Self.previous(path)) }
+        reopen(path)
+    }
+
+    /// The previous generation's path: `.1` before the extension.
+    static func previous(_ path: String) -> String {
+        let ext = (path as NSString).pathExtension
+        let base = (path as NSString).deletingPathExtension
+        return ext.isEmpty ? base + ".1" : base + ".1." + ext
+    }
 }
 
 private let output = locked(Output())
@@ -284,31 +363,42 @@ private func osLogType(_ level: LogLevel) -> OSLogType {
 
 /// Writes the event where it reaches: the stream (stderr in the format
 /// chosen, and the ship batch when LOG_SHIP is set) and the record (the
-/// unified log). Every knob resolves on every event, so a bad variable
-/// screams under any rendering.
+/// unified log when on, the record file when named). Every knob resolves on
+/// every event, so a bad variable screams under any rendering. What went
+/// wrong writing is said after the lock is let go (saying it writes too).
 func emit(_ e: Event, _ reach: Reach) {
     guard !reach.isEmpty else { return }
     let fmt = format()
     let showClock = timeOn()
     let target = reach.contains(.stream) ? shipTarget() : nil
+    let file = reach.contains(.record) ? recordFile() : nil
     let json = fmt == .json || target != nil || reach.contains(.record) ? e.json : ""
-    let tooLarge: Int? = output.withLock { out in
+    let (tooLarge, unrecorded): (Int?, String?) = output.withLock { out in
         if reach.contains(.stream) {
             let text =
                 fmt == .json
                 ? json + "\n" : out.human.render(e, clock: showClock, color: color(out.fd))
             writeAll(out.fd, text)
         }
+        var unrecorded: String?
         if reach.contains(.record) {
-            osLogger(e.scope).log(level: osLogType(e.verb.level), "\(json, privacy: .public)")
+            if osLogOn() {
+                osLogger(e.scope).log(level: osLogType(e.verb.level), "\(json, privacy: .public)")
+            }
+            if let file, !out.record.append(json + "\n", to: file) { unrecorded = file }
         }
-        guard let target else { return nil }
-        return ship(target, json) ? nil : json.utf8.count
+        guard let target else { return (nil, unrecorded) }
+        return (ship(target, json) ? nil : json.utf8.count, unrecorded)
     }
     if let tooLarge {
         shipLog.warnOnce("event too large to ship", ["bytes": tooLarge, "limit": shipMaxBytes])
     }
+    if let unrecorded {
+        recordLog.warnOnce("record file not written", ["file": unrecorded, "errno": Int(errno)])
+    }
 }
+
+private let recordLog = LogWriter().scope("record")
 
 /// A failed write to stderr is dropped: there is nowhere left to report it.
 private func writeAll(_ fd: Int32, _ text: String) {
