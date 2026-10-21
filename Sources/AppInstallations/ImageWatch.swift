@@ -85,10 +85,25 @@
                     goneAfter: goneAfter, beforeLeaving: beforeLeaving)
                 installLog.info("watching the image", ["path": path, "as": watch.job ?? "the app"])
                 if watch.job == nil {
+                    let arguments = CommandLine.arguments
+                    if let flag = arguments.firstIndex(of: Job.forgetArgument),
+                        arguments.indices.contains(flag + 1)
+                    {
+                        // Run from the Trash by the root job that saw the app
+                        // deleted: the person's side goes, links into the
+                        // path the app was deleted from included, before
+                        // anything here could re-point them at the Trash.
+                        let deleted = URL(filePath: arguments[flag + 1])
+                        installLog.warn(
+                            "forgetting the deleted app for this person",
+                            ["was": deleted.path, "copy": bundle.path])
+                        AppInstallation.forget(
+                            bundleID: bundleID, bundle: deleted, keeps: keeps, links: links)
+                        exit(0)
+                    }
                     // A new copy of the app is where a job's record and a
                     // link into the bundle go stale.
                     AppInstallation.repoint(links, to: bundle, bundleID: bundleID)
-                    let arguments = CommandLine.arguments
                     if arguments.contains(Job.staleArgument) {
                         // Opened by a moved job's old process to register it
                         // here: done before any window, then gone.
@@ -165,6 +180,7 @@
                     }
                     if job != nil {
                         forget()
+                        if getuid() == 0 { AppInstallation.forgetForPerson(deleted: bundle) }
                     } else {
                         // The app saves its state as it quits (its terminate,
                         // AppKit's window frames): forgetting first, the quit
@@ -268,6 +284,47 @@
             }
             Thread.sleep(forTimeInterval: 20)
             installLog.warn("still running after the hand-over", ["job": target])
+        }
+
+        /// A root job removes only what root created; the person's side of a
+        /// deleted app (its state, preferences, links) is the app's to
+        /// forget, and any process of it in the person's session does so as
+        /// it leaves. When none is alive (the app quit before the delete,
+        /// the daemon alone left), the deleted copy, still in the Trash, is
+        /// run as the person at the console with `Job.forgetArgument`: its
+        /// own declarations know what to forget. With the Trash emptied or
+        /// nobody at the console, that side stays.
+        static func forgetForPerson(deleted bundle: URL) {
+            guard let image = image(of: getpid()), let copy = app(around: image),
+                let executable = Bundle(url: copy)?.executableURL?.path,
+                FileManager.default.isExecutableFile(atPath: executable)
+            else {
+                installLog.warn(
+                    "the deleted copy is gone: the person's side stays", ["was": bundle.path])
+                return
+            }
+            if let alive = processes(inside: copy).first {
+                installLog.info("a process of the app forgets the person's side", ["pid": alive])
+                return
+            }
+            var console = stat()
+            guard stat("/dev/console", &console) == 0, console.st_uid != 0,
+                let person = getpwuid(console.st_uid)
+            else {
+                installLog.warn(
+                    "nobody at the console: the person's side stays", ["was": bundle.path])
+                return
+            }
+            let name = String(cString: person.pointee.pw_name)
+            let status = run(
+                "/bin/launchctl",
+                [
+                    "asuser", String(console.st_uid), "/usr/bin/sudo", "-H", "-u", name,
+                    executable, Job.forgetArgument, bundle.path,
+                ]
+            ).status
+            installLog.info(
+                "the deleted copy ran for the person", ["person": name, "status": status])
         }
 
         /// The process leaves for good. A job boots its label out of launchd

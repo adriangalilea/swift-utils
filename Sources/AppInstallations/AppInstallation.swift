@@ -100,14 +100,36 @@
         /// `Contents/Helpers`) belongs to the app that carries it, whose
         /// place, plists and identity are the ones that count.
         public static var bundle: URL? {
-            guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath() else {
-                return nil
-            }
-            let components = executable.pathComponents
+            Bundle.main.executableURL.flatMap { app(around: $0.resolvingSymlinksInPath().path) }
+        }
+
+        /// The outermost `.app` around `path`, or nil outside any.
+        static func app(around path: String) -> URL? {
+            let components = URL(filePath: path).pathComponents
             guard let outer = components.firstIndex(where: { $0.hasSuffix(".app") }) else {
                 return nil
             }
             return URL(filePath: NSString.path(withComponents: Array(components[...outer])))
+        }
+
+        /// The launch arguments with this module's own removed (each flag
+        /// and the value after it): what the app's verb parsing reads, so a
+        /// copy opened to register, turn on or forget a job is the app, never
+        /// an unknown verb.
+        public static func appArguments(_ arguments: [String]) -> [String] {
+            let own: Set = [Job.turnOnArgument, Job.staleArgument, Job.forgetArgument]
+            var kept: [String] = []
+            var skip = false
+            for argument in arguments {
+                if skip {
+                    skip = false
+                } else if own.contains(argument) {
+                    skip = true
+                } else {
+                    kept.append(argument)
+                }
+            }
+            return kept
         }
 
         /// The app's name as a person sees it.

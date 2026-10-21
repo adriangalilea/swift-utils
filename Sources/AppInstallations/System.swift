@@ -30,12 +30,23 @@
         static func isRunning(_ app: URL) -> Bool {
             guard let executable = Bundle(url: app)?.executableURL?.resolvingSymlinksInPath().path
             else { return false }
+            return !otherProcesses(where: { $0 == executable }).isEmpty
+        }
+
+        /// Every other process whose image is inside `bundle` (the app, its
+        /// agents, its helpers), wherever the bundle is now.
+        static func processes(inside bundle: URL) -> [pid_t] {
+            let prefix = bundle.standardizedFileURL.path + "/"
+            return otherProcesses(where: { $0.hasPrefix(prefix) })
+        }
+
+        private static func otherProcesses(where matches: (String) -> Bool) -> [pid_t] {
             let count = proc_listallpids(nil, 0)
-            guard count > 0 else { return false }
+            guard count > 0 else { return [] }
             var pids = [pid_t](repeating: 0, count: Int(count) + 32)
             let filled = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
-            return pids.prefix(Int(max(filled, 0))).contains {
-                $0 != getpid() && image(of: $0) == executable
+            return pids.prefix(Int(max(filled, 0))).filter { pid in
+                pid > 0 && pid != getpid() && image(of: pid).map(matches) == true
             }
         }
 

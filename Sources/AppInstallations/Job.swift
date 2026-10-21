@@ -359,6 +359,13 @@
             /// copy registers the job afresh and exits, no window shown.
             static let staleArgument = "--app-installation-stale"
 
+            /// The launch argument naming the bundle path a deleted app had:
+            /// a root job, the only process of the app left, runs the deleted
+            /// copy (still in the Trash) with it as the person, and that copy
+            /// forgets the person's side (state, preferences, links) and
+            /// exits, no window shown.
+            static let forgetArgument = "--app-installation-forget"
+
             /// Every agent and daemon `bundle` declares (its LaunchAgents and
             /// LaunchDaemons plists), the app's own declaration standing in
             /// for the plist it names (its probe, the stronger witness).
