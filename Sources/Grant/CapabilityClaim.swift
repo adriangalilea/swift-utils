@@ -32,8 +32,10 @@ import os
 /// Isolation is the consumer's convention (main-thread by convention
 /// matches an unannotated app model; annotating @MainActor here would
 /// only manufacture isolation errors, not safety).
+/// Named for what it is, never a bare "Claim": that word is apps' own
+/// (awake's sessions are Claims).
 @Observable
-public final class Claim<Reason: Equatable> {
+public final class CapabilityClaim<Reason: Equatable> {
     public enum Intent: Equatable, CustomStringConvertible {
         /// The switch reads on.
         case on
@@ -172,4 +174,4 @@ public final class Claim<Reason: Equatable> {
 
 /// An intent is a value: it crosses actors as freely as its reason does
 /// (an app reads it on a background probe and applies it on the main actor).
-extension Claim.Intent: Sendable where Reason: Sendable {}
+extension CapabilityClaim.Intent: Sendable where Reason: Sendable {}

@@ -5,14 +5,6 @@
 
     private let grantLog = log.scope("grant")
 
-    /// What macOS answers for one of this app's permissions, asked of tccd
-    /// itself.
-    public enum Answer: String, Sendable, Equatable {
-        case allowed, denied
-        /// No record: the person was never asked (or the record was reset).
-        case notAsked = "not asked"
-    }
-
     /// The live permissions of this app, ONE hub every surface and every
     /// check reads. Never a remembered answer:
     ///
@@ -35,6 +27,16 @@
     /// every `observe` handler, and is logged with tccd's raw answer.
     public final class Permissions: @unchecked Sendable {
         public static let shared = Permissions()
+
+        /// What macOS answers for one of this app's permissions, asked of
+        /// tccd itself. Nested: "Answer" is every app's word for its own
+        /// things (Authz's voice card, perceive's questions), never this
+        /// library's to take.
+        public enum Answer: String, Sendable, Equatable {
+            case allowed, denied
+            /// No record: the person was never asked (or it was reset).
+            case notAsked = "not asked"
+        }
 
         /// The TCC services this hub reads, named for what they let an app do.
         public enum Service: String, Sendable, CaseIterable {

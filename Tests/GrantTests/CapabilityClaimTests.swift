@@ -5,8 +5,8 @@ import os
 
 enum Why: Equatable { case off, absent, failing }
 
-private func claim() -> Claim<Why> {
-    Claim(whenFailing: .failing, log: Logger(subsystem: "test", category: "claim"))
+private func claim() -> CapabilityClaim<Why> {
+    CapabilityClaim(whenFailing: .failing, log: Logger(subsystem: "test", category: "claim"))
 }
 
 // The epistemics, pinned: a readable switch is a claim whose off-reason
