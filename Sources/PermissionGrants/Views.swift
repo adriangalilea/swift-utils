@@ -243,8 +243,19 @@
             let label: String?
             let fill: Bool
             @Environment(\.permissionGrantCase) private var letterCase
+            /// `.regular` for a menu or a toolbar; `.small` and `.mini` for a
+            /// dense line (a HUD beside its icons).
+            @Environment(\.controlSize) private var size
             @State private var hovering = false
             @FocusState private var focused: Bool
+
+            private var metrics: (font: CGFloat, dot: CGFloat, x: CGFloat, y: CGFloat) {
+                switch size {
+                case .mini: (9.5, 4, 6, 2)
+                case .small: (10.5, 5, 7, 3)
+                default: (11.5, 6, 9, 5)
+                }
+            }
 
             public init(_ grant: PermissionGrant, label: String? = nil, fill: Bool = false) {
                 self.grant = grant
@@ -261,16 +272,17 @@
                     Button {
                         grant.act()
                     } label: {
-                        HStack(spacing: 7) {
-                            Circle().fill(Self.hue(standing.grade)).frame(width: 6, height: 6)
+                        HStack(spacing: metrics.x - 2) {
+                            Circle().fill(Self.hue(standing.grade))
+                                .frame(width: metrics.dot, height: metrics.dot)
                             ZStack(alignment: .leading) {
                                 Text(what).opacity(fixing ? 0 : 1)
                                 Text(fix).opacity(fixing ? 1 : 0)
                             }
                             .lineLimit(1)
                         }
-                        .font(.system(size: 11.5))
-                        .padding(.horizontal, 9).padding(.vertical, 5)
+                        .font(.system(size: metrics.font))
+                        .padding(.horizontal, metrics.x).padding(.vertical, metrics.y)
                         .frame(maxWidth: fill ? .infinity : nil, alignment: .leading)
                         .background(
                             RoundedRectangle(cornerRadius: 7)
