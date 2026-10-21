@@ -36,7 +36,7 @@ while read -r lib platforms; do
   done
 done <<'TABLE'
 Ink iOS tvOS
-Grant iOS tvOS
+PermissionGrants iOS tvOS
 Log iOS tvOS
 Terminal iOS tvOS
 Syntax iOS tvOS
@@ -54,7 +54,7 @@ description = "format + build (release) + test: the macOS gate, fast enough to r
 run = ["mise run format", "swift build -c release", "mise run test", "echo 'swift-utils: check passed'"]
 
 [tasks.grant-example]
-description = "Grant's shapes as a real, signed app with its own permissions and a helper to install (grant reset grant-example replays it)"
+description = "PermissionGrants' shapes as a real, signed app with its own permissions and a helper to install (grant reset grant-example replays it)"
 run = "bash scripts/grant-example-app.sh"
 
 [tasks.overlay]

@@ -1,7 +1,7 @@
 #!/bin/bash
 # grant-example as a real app: its own bundle id (so tccd keeps its own
-# records, never the terminal's), a harmless launch agent inside (so
-# BackgroundServiceGrant has something to install), signed with the team's
+# records, never the terminal's), a harmless launch agent inside (so its
+# background-service grant has something to install), signed with the team's
 # Apple Development identity (an unsigned bundle can register no agent).
 # Opens it from build/, where the helper's row offers "move to Applications".
 # `grant reset grant-example` takes it back to square one.
@@ -28,6 +28,9 @@ cat > "$app/Contents/Info.plist" <<EOF
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>NSMicrophoneUsageDescription</key><string>The example asks for the microphone to show the grant flow; it records nothing.</string>
+  <key>NSCameraUsageDescription</key><string>The example asks for the camera to show the grant flow; it records nothing.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>The example asks for speech recognition to show the grant flow; it recognizes nothing.</string>
+  <key>NSMotionUsageDescription</key><string>The example asks for headphone motion to show the grant flow; it reads nothing.</string>
 </dict></plist>
 EOF
 
@@ -44,14 +47,15 @@ cat > "$app/Contents/Library/LaunchAgents/$agent" <<EOF
 </dict></plist>
 EOF
 
-# Under the hardened runtime macOS denies the microphone WITHOUT asking unless
-# the signature carries this entitlement.
+# Under the hardened runtime macOS denies the microphone and the camera
+# WITHOUT asking unless the signature carries these entitlements.
 entitlements="$(mktemp -t grant-example).plist"
 cat > "$entitlements" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>com.apple.security.device.audio-input</key><true/>
+  <key>com.apple.security.device.camera</key><true/>
 </dict></plist>
 EOF
 

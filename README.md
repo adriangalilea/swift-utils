@@ -2,7 +2,7 @@
 
 Swift utilities for mac apps. The sibling of [ts-utils](https://github.com/adriangalilea/ts-utils), py-utils, and go-utils: one repo, multiple products, each module links only if imported.
 
-**A module never takes a common word at top level.** Whatever it makes public lands in every importer's namespace, where apps have their own `Answer`, `Claim`, `Session`, `State`: a type with a generic name is nested in the type that gives it meaning (`Permissions.Answer`) or named for what it is (`CapabilityClaim`, `GrantRow`). The module's own vocabulary is the exception, chosen knowingly (Grant's `Grant` and `Standing`). A top-level `Answer` in 0.30.6 broke Authz's build, whose voice card has its own.
+**A module never takes a common word at top level.** Whatever it makes public lands in every importer's namespace, where apps have their own `Answer`, `Claim`, `Grant`, `Permission`, `Session`, `State`: a module exports one compound name and nests everything else in it (`PermissionGrant.Standing`, `PermissionGrant.Claim`). The module is never named like its type: `Module.Type` is the escape hatch when two imports clash, and a type named like its module hides the module (`PermissionGrants.PermissionGrant` works, `Grant.Grant` did not). A top-level `Answer` in 0.30.6 broke Authz's build, whose voice card has its own.
 
 ## Ink
 
@@ -241,16 +241,18 @@ gesture; on an iPhone it holds Face ID's glyph and the press asks for it. `Biome
 context: armed, onReady: { start($0) }) { click() }`; the lock, the field and
 the sensor build on macOS alone, the button everywhere.
 
-## Grant
+## PermissionGrants
 
-Every permission an app needs, read live and drawn the same way everywhere:
-one `Standing` per grant, ready grants (`TCCGrant`, `BackgroundServiceGrant`,
-`NotificationGrant`), shapes to compose (`GrantRow`, `GrantSection`,
-`GrantSheet`, `GrantSteps`, `GrantChip`, `LaunchAtLoginToggle`), the
-`Permissions` hub (tccd read live, a fresh process after a change, a
-public-API fallback) and the `grant` CLI. One line in every app's `main`:
-`Permissions.answerProbeIfAsked()`. The whole of it, measurements included:
-[Sources/Grant/README.md](Sources/Grant/README.md).
+Every permission an app needs as one `PermissionGrant`, declared once by name
+(`static let microphone = PermissionGrant.privacy(.microphone, title:, why:)`)
+and used by that name on every screen (`PermissionGrant.Section`, `.Sheet`,
+`.Steps`, `.Chip`, `.LaunchAtLogin`) and in every line of code (`isAllowed`,
+`await ask()`, `observe`): Privacy & Security switches read live (tccd, a
+fresh process after a change, Apple's public calls as the fallback),
+background services, notifications, the app's own. One line in every app's
+`main`: `PermissionGrant.answerProbeIfAsked()`. The `grant` CLI reads and
+resets an app's permissions from outside. The whole of it, measurements
+included: [Sources/PermissionGrants/README.md](Sources/PermissionGrants/README.md).
 
 ## Colophon
 

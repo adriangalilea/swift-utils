@@ -1,27 +1,35 @@
-import Grant
+import PermissionGrants
 import SwiftUI
 
-// The Grant shapes over real permissions: `mise run grant-example` builds and
-// opens a signed app with its own bundle id, so every answer is macOS's for
-// this app and every ask is the real one. One set of grants drawn as a Settings
-// section, one sheet, steps (a page per grant) and inline chips; pick a shape at
-// the top. `--render <dir>` writes each shape as a PNG.
+// PermissionGrants' shapes over real permissions: `mise run grant-example`
+// builds and opens a signed app with its own bundle id, so every answer is
+// macOS's for this app and every ask is the real one. One set of grants drawn
+// as a Settings section, one sheet, steps (a page per grant) and inline chips;
+// pick a shape at the top. `--render <dir>` writes each shape as a PNG.
 
-/// The bundled launch agent (`mise run grant-example` builds the app that
-/// carries it): the same binary idling with `--helper`. Declared before
-/// `grants`: main.swift initializes top-level constants in order, and one
-/// read before its line is an uninitialized value (an empty plist name that
-/// crashed SMAppService.status).
-let helper = BackgroundServiceGrant(
-    .agent(plist: "garden.untitled.grant-example.helper.plist"), title: "Background helper",
-    why: "Keeps running when the window is closed.")
-let grants: [any Grant] = [
-    TCCGrant(.microphone, title: "Microphone", why: "Hears what you say.", required: false),
-    TCCGrant(
+// The app's permissions, each declared once: these names are every screen's
+// rows and every line of code's gates.
+extension PermissionGrant {
+    static let microphone = PermissionGrant.privacy(
+        .microphone, title: "Microphone", why: "Hears what you say.", required: false)
+    static let keyLight = PermissionGrant.privacy(
         .inputMonitoring, title: "Input Monitoring", why: "Lights Caps Lock while the mic is open.",
-        required: false),
-    TCCGrant(.postEvents, title: "Accessibility", why: "Types into other apps.", required: false),
-    helper,
+        required: false)
+    static let typing = PermissionGrant.privacy(
+        .postEvents, title: "Accessibility", why: "Types into other apps.", required: false)
+    static let speech = PermissionGrant.privacy(
+        .speechRecognition, title: "Speech Recognition", why: "Turns what you say into text.",
+        required: false)
+    static let headMotion = PermissionGrant.privacy(
+        .motion, title: "Head gestures", why: "A nod says yes, a shake says no.", required: false)
+    /// The bundled launch agent: the same binary idling with `--helper`.
+    static let helper = PermissionGrant.backgroundService(
+        .agent(plist: "garden.untitled.grant-example.helper.plist"), title: "Background helper",
+        why: "Keeps running when the window is closed.")
+}
+
+let grants: [PermissionGrant] = [
+    .microphone, .keyLight, .typing, .speech, .headMotion, .helper,
 ]
 
 enum Shape: String, CaseIterable { case section, sheet, steps, chip }
@@ -54,9 +62,7 @@ enum Shape: String, CaseIterable { case section, sheet, steps, chip }
             event?.keyboardSetUnicodeString(stringLength: word.count, unicodeString: word)
             event?.postToPid(app.processIdentifier)
         }
-        print(
-            "typed test word into TextEdit; hub reads \(Permissions.shared.answer(.postEvents).rawValue)"
-        )
+        print("typed test word into TextEdit; the grant reads \(PermissionGrant.typing.standing)")
     }
 }
 
@@ -70,8 +76,8 @@ enum Shape: String, CaseIterable { case section, sheet, steps, chip }
             tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly,
             eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
             callback: { _, _, event, _ in Unmanaged.passUnretained(event) }, userInfo: nil)
-        let hub = Permissions.shared.answer(.inputMonitoring).rawValue
-        result = tap == nil ? "listen: REFUSED (hub: \(hub))" : "listen: WORKS (hub: \(hub))"
+        let reads = PermissionGrant.keyLight.isAllowed ? "allowed" : "not allowed"
+        result = tap == nil ? "listen: REFUSED (reads \(reads))" : "listen: WORKS (reads \(reads))"
         if let tap { CFMachPortInvalidate(tap) }
         print(result)
     }
@@ -95,11 +101,12 @@ struct Gallery: View {
                 Text(ListenTest.shared.result).font(.caption.monospaced())
                 Button("listen test") { ListenTest.shared.run() }.controlSize(.small)
                 Button("type a test word") { typeTestWord() }.controlSize(.small)
-                Button("turn the helper off") { helper.unregister() }.controlSize(.small)
+                Button("turn the helper off") { PermissionGrant.helper.unregister() }
+                    .controlSize(.small)
             }
             .padding(10)
         }
-        .frame(width: 520, height: 440)
+        .frame(width: 560, height: 600)
     }
 }
 
@@ -108,23 +115,26 @@ struct Gallery: View {
     case .section:
         // ImageRenderer draws no Form: the render shows the section bare.
         if rendering {
-            GrantSection("Permissions", grants, footer: "Rows read live; nothing here holds state.")
-                .padding(20)
+            PermissionGrant.Section(
+                "Permissions", grants, footer: "Rows read live; nothing here holds state."
+            )
+            .padding(20)
         } else {
             Form {
                 Section("Permissions") {
-                    GrantSection(grants, footer: "Rows read live; nothing here holds state.")
+                    PermissionGrant.Section(
+                        grants, footer: "Rows read live; nothing here holds state.")
                 }
             }
             .formStyle(.grouped)
         }
     case .sheet:
-        GrantSheet(
-            title: "quick setup", subtitle: "one grant to start, three optional.", grants,
+        PermissionGrant.Sheet(
+            title: "quick setup", subtitle: "one grant to start, the rest optional.", grants,
             optionalNote: "Without them the example still runs; it just does less."
         ) {}
     case .steps:
-        GrantSteps(grants) {
+        PermissionGrant.Steps(grants) {
             VStack(spacing: 12) {
                 Image(systemName: "hand.wave").font(.system(size: 48)).foregroundStyle(.secondary)
                 Text("Welcome").font(.title.bold())
@@ -138,7 +148,9 @@ struct Gallery: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Inline: only what needs the person, nothing once it is good.")
                 .font(.caption).foregroundStyle(.secondary)
-            ForEach(Array(grants.enumerated()), id: \.offset) { _, grant in GrantChip(grant) }
+            ForEach(Array(grants.enumerated()), id: \.offset) { _, grant in
+                PermissionGrant.Chip(grant)
+            }
         }
         .padding(20)
     }
@@ -147,19 +159,25 @@ struct Gallery: View {
 struct GrantExample: App {
     var body: some Scene {
         WindowGroup("grant shapes") {
-            Gallery().onAppear { NSApp.activate() }
+            Gallery().onAppear {
+                NSApp.activate()
+                // The hook, the way an app reacts to a change without a loop.
+                for grant in grants {
+                    grant.observe { print("\(grant.title) changed to \($0)") }
+                }
+            }
         }
         .windowResizability(.contentSize)
     }
 }
 
 // First thing: a probe launch answers the hub and exits.
-Permissions.answerProbeIfAsked()
+PermissionGrant.answerProbeIfAsked()
 
 let args = CommandLine.arguments
 if args.contains("--reset-helper") {
     // Back to square one for the helper's flow (run from the installed copy).
-    helper.unregister()
+    PermissionGrant.helper.unregister()
     print("helper unregistered")
 } else if args.contains("--helper") {
     // The launch agent: alive, doing nothing, until launchd stops it.

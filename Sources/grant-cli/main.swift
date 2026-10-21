@@ -1,7 +1,7 @@
 // grant: an app's permissions from outside it, for development.
 //
 //   grant status <app>   what the app last read for each permission (its own
-//                        log, scope `grant`, written by Grant's Permissions
+//                        log, scope `grant`, written by PermissionGrants'
 //                        hub), and who signed the build installed
 //   grant reset <app>    quit it, clear every permission record macOS holds for
 //                        its bundle id (`tccutil reset All`), and reopen it: the
@@ -11,7 +11,7 @@
 // tccd about itself, so status reads what the app recorded, never tccd.
 
 import Foundation
-import Grant
+import PermissionGrants
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write(Data("grant: \(message)\n".utf8))
@@ -117,7 +117,7 @@ func status(_ app: App) {
     let rows = readings(of: app)
     guard !rows.isEmpty else {
         print(
-            "no readings in its log for 3 days (not on Grant's Permissions hub, or not run since)")
+            "no readings in its log for 3 days (not on PermissionGrants, or not run since)")
         return
     }
     for row in rows {
@@ -141,7 +141,7 @@ func reset(_ app: App, reopen: Bool) {
     guard result.status == 0 else { fail("tccutil reset All \(app.id): \(result.out)") }
     print("cleared every permission record for \(app.id)")
     print(
-        "  (the hub's services: \(Permissions.Service.allCases.map(\.rawValue).joined(separator: ", ")), and all others)"
+        "  (the Privacy switches grants read: \(PermissionGrant.Privacy.allCases.map(\.rawValue).joined(separator: ", ")), and all others)"
     )
     if reopen, wasRunning {
         run("/usr/bin/open", ["-b", app.id])

@@ -49,13 +49,12 @@ let package = Package(
         // primitive. The evaluated LAContext rides the verdict, so
         // biometry-gated keychain reads need no second prompt.
         .library(name: "Biometrics", targets: ["Biometrics"]),
-        // Permission standing, split-brain-proof: every grant resolves to
-        // ONE Standing (good / askable / broken) that carries its own
-        // presentation, so no two surfaces can disagree on "is this a
-        // problem?". Ships the Claim proof machine (for capabilities
-        // whose system readout lies), the TCC and notification probes,
-        // and the live row.
-        .library(name: "Grant", targets: ["Grant"]),
+        // Every permission an app needs as one `PermissionGrant`, declared
+        // once and used by name on every screen and in every gate: Privacy &
+        // Security switches read live (tccd, Apple's public calls as the
+        // fallback), background services, notifications, the app's own.
+        // One top-level name; everything else nested in it.
+        .library(name: "PermissionGrants", targets: ["PermissionGrants"]),
         // The system-wide shortcut overlay: a tiny background agent showing
         // the frontmost app's published keymap on one global chord (⌃⌘/).
         // Dogfood-first: `swift run keymap-overlay`.
@@ -129,10 +128,11 @@ let package = Package(
         .target(name: "Entitlement", resources: [.process("Resources")]),
         // The yes it draws wears Ink's prominent button.
         .target(name: "Biometrics", dependencies: ["Ink"]),
-        .target(name: "Grant", dependencies: ["Log"], exclude: ["README.md", "CLAUDE.md"]),
+        .target(
+            name: "PermissionGrants", dependencies: ["Log"], exclude: ["README.md", "CLAUDE.md"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
-        // Every Grant shape live, one set of grants: `swift run grant-example`.
-        .executableTarget(name: "grant-example", dependencies: ["Grant"]),
+        // Every shape live over real permissions: `mise run grant-example`.
+        .executableTarget(name: "grant-example", dependencies: ["PermissionGrants"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap", "Ink"]),
         .target(
@@ -148,12 +148,10 @@ let package = Package(
         .executableTarget(name: "ship"),
         .executableTarget(name: "mark"),
         .executableTarget(name: "since", dependencies: ["Terminal"]),
-        // Its own directory name: `Sources/grant` IS `Sources/Grant` on a
-        // case-insensitive disk.
-        .executableTarget(name: "grant-cli", dependencies: ["Grant"]),
+        .executableTarget(name: "grant-cli", dependencies: ["PermissionGrants"]),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
         .testTarget(name: "InkTests", dependencies: ["Ink"]),
-        .testTarget(name: "GrantTests", dependencies: ["Grant"]),
+        .testTarget(name: "PermissionGrantsTests", dependencies: ["PermissionGrants"]),
         .target(name: "Terminal"),
         .testTarget(name: "TerminalTests", dependencies: ["Terminal"]),
         .target(name: "Log"),
