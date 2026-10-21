@@ -159,8 +159,20 @@
                     installLog.warn(
                         "the app was deleted: cleaning up and leaving", ["path": bundle.path])
                     beforeLeaving()
-                    AppInstallation.forget(
-                        bundleID: bundleID, bundle: bundle, keeps: keeps, links: links)
+                    let forget: @Sendable () -> Void = { [bundleID, bundle, keeps, links] in
+                        AppInstallation.forget(
+                            bundleID: bundleID, bundle: bundle, keeps: keeps, links: links)
+                    }
+                    if job != nil {
+                        forget()
+                    } else {
+                        // The app saves its state as it quits (its terminate,
+                        // AppKit's window frames): forgetting first, the quit
+                        // would write part of it back. So it quits, and the
+                        // state goes to the Trash at the process's exit,
+                        // after every save.
+                        AppInstallation.atExit(forget)
+                    }
                     AppInstallation.leave(job: job, reopening: nil)
                     return
                 }

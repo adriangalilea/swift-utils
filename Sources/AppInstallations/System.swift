@@ -1,6 +1,7 @@
 #if os(macOS)
     import CoreServices
     import Foundation
+    import Synchronization
 
     // The few things an app does to itself and to other copies of itself,
     // through the system's own tools rather than AppKit, so every process of
@@ -47,6 +48,15 @@
             run("/usr/bin/mdfind", ["kMDItemCFBundleIdentifier == '\(bundleID)'"]).output
                 .split(separator: "\n").map { URL(filePath: String($0)) }
         }
+
+        /// Runs `work` as the process exits, after the app's own terminate
+        /// (`exit` runs it, the quit included). Once per process.
+        static func atExit(_ work: @escaping @Sendable () -> Void) {
+            exitWork.withLock { $0 = work }
+            atexit { AppInstallation.exitWork.withLock { $0 }?() }
+        }
+
+        private static let exitWork = Mutex<(@Sendable () -> Void)?>(nil)
 
         /// The app quits itself as the Dock's Quit does: a Quit Apple Event
         /// to its own process, which AppKit answers with a normal terminate

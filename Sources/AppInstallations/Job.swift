@@ -121,7 +121,13 @@
                 case bare(missing: String)
             }
 
-            public var state: State {
+            public var state: State { state(probing: true) }
+
+            /// The state, `probing: false` judging running by launchd's
+            /// answer alone, never the job's own probe: for a caller already
+            /// inside that probe's path (a client classifying its own failed
+            /// call), where asking the probe again would recurse.
+            public func state(probing: Bool) -> State {
                 if let plistPath {
                     guard let bundle = AppInstallation.bundle else {
                         return .bare(missing: "an app bundle")
@@ -146,7 +152,8 @@
                     // Judged before the probe: the other copy's process may
                     // answer it, and still not be this copy's job.
                     if registeredElsewhere { return .silent }
-                    return (answers ?? launchdRuns)() ? .running : .silent
+                    let witness = probing ? (answers ?? launchdRuns) : launchdRuns
+                    return witness() ? .running : .silent
                 case .requiresApproval:
                     if case .daemon = kind {
                         return .awaitingApproval(needsAdmin: !Self.userIsAdmin)
@@ -161,6 +168,13 @@
 
             /// System Settings' own words for where approval happens.
             public static let approvalPath = "System Settings › General › Login Items & Extensions"
+
+            /// Opens Login Items, where a held job is approved: the one door
+            /// for every surface's "approve" action (`approvalSteer` says
+            /// which row).
+            public static func openApprovalSettings() {
+                SMAppService.openSystemSettingsLoginItems()
+            }
 
             /// Where the switch is and what it is called, for a person
             /// looking for it: macOS lists the app's jobs as one row under
@@ -524,7 +538,7 @@
                 while service.status == .requiresApproval {
                     if !told {
                         installLog.info("awaiting approval: opened Login Items", ["job": name])
-                        SMAppService.openSystemSettingsLoginItems()
+                        Self.openApprovalSettings()
                         told = true
                     }
                     guard ContinuousClock.now < deadline else {

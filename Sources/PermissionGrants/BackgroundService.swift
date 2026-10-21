@@ -2,7 +2,6 @@
     import AppInstallations
     import AppKit
     import Log
-    import ServiceManagement
     import Synchronization
 
     private let grantLog = log.scope("grant")
@@ -69,7 +68,7 @@
                 } catch { fail(job, "\(error)") }
             case .awaitingApproval:
                 grantLog.info("opened Login Items", ["grant": job.name])
-                SMAppService.openSystemSettingsLoginItems()
+                AppInstallation.Job.openApprovalSettings()
             case .off, .silent:
                 do {
                     try await job.install()
