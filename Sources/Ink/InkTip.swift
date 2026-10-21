@@ -165,6 +165,16 @@ struct InkTipMeasure: Layout {
         func updateNSView(_ view: InkTipAnchorView, context: Context) {
             view.say(ask)
         }
+
+        /// The element's size, whatever it is: the anchor only lies behind it. Said
+        /// here, SwiftUI never asks AppKit to measure it, which builds an Auto Layout
+        /// engine over the view on every layout pass of every element that has a tip
+        /// (a tenth of a scrolling grid's main thread, measured).
+        func sizeThatFits(
+            _ proposal: ProposedViewSize, nsView: InkTipAnchorView, context: Context
+        ) -> CGSize? {
+            proposal.replacingUnspecifiedDimensions(by: .zero)
+        }
     }
 
     final class InkTipAnchorView: NSView {
