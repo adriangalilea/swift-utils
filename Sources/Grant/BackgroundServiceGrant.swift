@@ -74,9 +74,9 @@
                         "open Login Items", note: "An admin must allow it in Login Items.")
                 }
                 return .broken("open Login Items", note: "Waiting for your OK in Login Items.")
-            case .notRegistered:
-                return .askable("turn on")
-            case .notFound:
+            case .notRegistered, .notFound:
+                // A registration is bound to the bundle's path: wherever
+                // macOS says it stands, the place is judged first.
                 switch Placement.of(kind) {
                 case .installable:
                     return .askable("turn on")
@@ -104,13 +104,13 @@
             case .requiresApproval:
                 grantLog.info("opened Login Items", ["grant": title])
                 SMAppService.openSystemSettingsLoginItems()
-            case .notFound:
+            case .notRegistered, .notFound:
                 switch Placement.of(kind) {
                 case .misplaced: MainActor.assumeIsolated { Placement.moveToApplications() }
                 case .installable: register()
                 case .bare: return
                 }
-            default:
+            @unknown default:
                 register()
             }
         }

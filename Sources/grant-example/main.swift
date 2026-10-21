@@ -141,7 +141,11 @@ struct GrantExample: App {
 Permissions.answerProbeIfAsked()
 
 let args = CommandLine.arguments
-if args.contains("--helper") {
+if args.contains("--reset-helper") {
+    // Back to square one for the helper's flow (run from the installed copy).
+    helper.unregister()
+    print("helper unregistered")
+} else if args.contains("--helper") {
     // The launch agent: alive, doing nothing, until launchd stops it.
     dispatchMain()
 } else if let at = args.firstIndex(of: "--render"), at + 1 < args.count {
