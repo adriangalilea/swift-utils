@@ -132,6 +132,7 @@ let package = Package(
         .target(
             name: "PermissionGrants", dependencies: ["Log", "Ink"],
             exclude: ["README.md", "CLAUDE.md"]),
+        .target(name: "AppInstallations", dependencies: ["Log"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         // Every shape live over real permissions: `mise run grant-example`.
         .executableTarget(name: "grant-example", dependencies: ["PermissionGrants"]),
