@@ -13,16 +13,14 @@ import SwiftUI
 /// read before its line is an uninitialized value (an empty plist name that
 /// crashed SMAppService.status).
 let helper = BackgroundServiceGrant(
-    .agent(plist: "garden.untitled.grant-example.helper.plist"), title: "the helper",
-    why: "Keeps working while the window is closed.")
+    .agent(plist: "garden.untitled.grant-example.helper.plist"), title: "Background helper",
+    why: "Keeps running when the window is closed.")
 let grants: [any Grant] = [
     TCCGrant(.microphone, title: "Microphone", why: "Hears what you say.", required: false),
     TCCGrant(
         .inputMonitoring, title: "Input Monitoring", why: "Lights Caps Lock while the mic is open.",
-        required: false, withoutIt: "The key works; its light stays off."),
-    TCCGrant(
-        .postEvents, title: "Accessibility", why: "Types into other apps.", required: false,
-        withoutIt: "It can show text, never type it."),
+        required: false),
+    TCCGrant(.postEvents, title: "Accessibility", why: "Types into other apps.", required: false),
     helper,
 ]
 

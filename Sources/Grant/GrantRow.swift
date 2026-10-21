@@ -128,19 +128,15 @@
                     .foregroundStyle(.secondary)
                     .frame(width: 24)
                     .padding(.top, 1)
+                // Two lines, never three: what it is, and one short line
+                // under it. The standing's note, when there is one, IS that
+                // line (it says what to do now); the why otherwise.
                 VStack(alignment: .leading, spacing: 2) {
                     Text(grant.title).font(.callout.weight(.medium))
-                    Text(grant.why)
+                    Text(standing.note ?? grant.why)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let note = standing.note {
-                        Text(note)
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 2)
-                    }
                 }
                 Spacer(minLength: 12)
                 switch standing.grade {

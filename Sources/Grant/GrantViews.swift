@@ -204,14 +204,10 @@
                     .foregroundStyle(
                         standing.grade == .good ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
                 Text(grant.title).font(.title2.bold())
-                Text(grant.why)
+                // Two texts, as a row: the note when there is one, else why.
+                Text(standing.note ?? grant.why)
                     .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(
                         maxWidth: 360)
-                if let note = standing.note {
-                    Text(note)
-                        .font(.caption).multilineTextAlignment(.center).foregroundStyle(.tertiary)
-                        .frame(maxWidth: 360)
-                }
             }
         }
     }

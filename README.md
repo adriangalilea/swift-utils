@@ -288,7 +288,11 @@ never UI divergence. An unreadable switch is `unknown`, not off and not
 good: only the capability seen live right now vouches for it, a past
 success is a witness of the past.
 
-**Ready grants.** `TCCGrant(.microphone, title:, why:, required:, withoutIt:)`
+**Two lines per grant, never three**: what it is (`title`) and ONE short
+line under it, the standing's note when it has one (it says what to do
+now), the `why` otherwise. Notes are a short sentence; nothing stacks.
+
+**Ready grants.** `TCCGrant(.microphone, title:, why:, required:)`
 is any TCC permission the hub reads as a grant in one line: the app writes
 what it is for, the standing and the ask are `TCC`'s.
 `BackgroundServiceGrant(.agent(plist:) | .daemon(plist:) | .loginItem, title:, why:)`

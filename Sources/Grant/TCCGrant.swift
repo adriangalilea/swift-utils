@@ -10,19 +10,16 @@
         public let title: String
         public let why: String
         public let required: Bool
-        /// Shown under a denial: what the app does without it.
-        public let withoutIt: String?
 
         public init(
             _ service: Permissions.Service, title: String, why: String, symbol: String? = nil,
-            required: Bool = true, withoutIt: String? = nil
+            required: Bool = true
         ) {
             self.service = service
             self.title = title
             self.why = why
             self.symbol = symbol ?? service.symbol
             self.required = required
-            self.withoutIt = withoutIt
         }
 
         public var standing: Standing {
@@ -32,8 +29,7 @@
             case .denied:
                 .broken(
                     "Open Settings\u{2026}",
-                    note: ["Denied in Privacy & Security › \(service.paneTitle).", withoutIt]
-                        .compactMap { $0 }.joined(separator: " "))
+                    note: "Off in Privacy & Security › \(service.paneTitle).")
             }
         }
 

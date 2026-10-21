@@ -71,27 +71,23 @@
             case .requiresApproval:
                 if case .daemon = kind, !Self.userIsAdmin {
                     return .broken(
-                        "open Login Items",
-                        note:
-                            "approving \(title) is an admin's act: ask one to allow it in \(Self.approvalPath)"
-                    )
+                        "open Login Items", note: "An admin must allow it in Login Items.")
                 }
-                return .broken("open Login Items", note: "allow \(title) in \(Self.approvalPath)")
+                return .broken("open Login Items", note: "Waiting for your OK in Login Items.")
             case .notRegistered:
                 return .askable("turn on")
             case .notFound:
                 switch Placement.of(kind) {
                 case .installable:
                     return .askable("turn on")
-                case .misplaced(let path):
+                case .misplaced:
                     return .broken(
                         Placement.applicationsCopyExists
                             ? "open in Applications" : "move to Applications",
-                        note:
-                            "\(Self.appName) is running from \(Placement.describe(path)), and runs \(title) only from Applications"
-                    )
+                        note: "Only works from the Applications folder.")
                 case .bare(let missing):
-                    return .unknown(note: "this build has no \(missing): install a built app")
+                    grantLog.warn("bare build", ["grant": title, "missing": missing])
+                    return .unknown(note: "Not part of this build.")
                 }
             @unknown default:
                 return .unknown(note: "\(title): registration status \(service.status.rawValue)")
@@ -255,7 +251,8 @@
                 if path.contains("/AppTranslocation/") {
                     return "a copy macOS made of the download"
                 }
-                return path
+                let folder = URL(fileURLWithPath: path).deletingLastPathComponent().path
+                return folder.replacingOccurrences(of: NSHomeDirectory(), with: "~")
             }
 
             /// Puts the app where it belongs: an install already there is
