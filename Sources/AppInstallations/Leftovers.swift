@@ -1,5 +1,5 @@
 #if os(macOS)
-    import AppKit
+    import Foundation
 
     extension AppInstallation {
         /// A command line the app puts on PATH as a link into its bundle
@@ -35,7 +35,7 @@
         static func movedCopy(
             of bundleID: String, named name: String, besides: URL, executable inode: ino_t
         ) -> URL? {
-            let known = NSWorkspace.shared.urlsForApplications(withBundleIdentifier: bundleID)
+            let known = indexedCopies(of: bundleID)
             let installs = Scope.allCases.map { $0.folder.appending(path: name) }
             let gone = besides.standardizedFileURL.path
             let installPaths = Set(installs.map(\.standardizedFileURL.path))
@@ -108,24 +108,23 @@
             let preferences = fm.homeDirectoryForCurrentUser
                 .appending(path: "Library/Preferences/\(bundleID).plist")
             if fm.fileExists(atPath: preferences.path) {
-                // A copy in the Trash only when the domain holds anything: a
-                // second process cleaning up meets cfprefsd's empty file.
+                // The file IS the preferences: moved to the Trash whole, the
+                // domain never cleared through cfprefsd. Clearing marks it
+                // changed, and cfprefsd then rewrites an empty file whenever
+                // it next flushes, after any removal (measured); a file that
+                // simply leaves, cfprefsd notices and never rewrites. An empty
+                // domain (an earlier clear's leftover) is removed, not
+                // trashed: nothing in it to keep.
                 let keys =
                     CFPreferencesCopyKeyList(
                         bundleID as CFString, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
                     as? [String] ?? []
-                if !keys.isEmpty {
-                    let copy = fm.temporaryDirectory.appending(path: "\(bundleID).plist")
-                    try? fm.removeItem(at: copy)
-                    if (try? fm.copyItem(at: preferences, to: copy)) != nil { trash(copy) }
+                if keys.isEmpty {
+                    try? fm.removeItem(at: preferences)
+                } else {
+                    trash(preferences)
                 }
-                UserDefaults.standard.removePersistentDomain(forName: bundleID)
-                CFPreferencesAppSynchronize(bundleID as CFString)
-                // cfprefsd leaves the cleared domain as an empty file; with
-                // its contents in the Trash and nothing of the app left to
-                // write it, the file goes too.
-                try? fm.removeItem(at: preferences)
-                installLog.info("preferences cleared (a copy in the Trash)", ["domain": bundleID])
+                installLog.info("preferences gone", ["domain": bundleID, "keys": keys.count])
             }
             let inside = bundle.standardizedFileURL.path + "/"
             for link in links {

@@ -1,5 +1,5 @@
 #if os(macOS)
-    import AppKit
+    import Foundation
     import Security
 
     extension AppInstallation {
@@ -187,9 +187,7 @@
                     }
                     exit(0)
                 }
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated { AppInstallation.reopen("an upgrade landed") }
-                }
+                AppInstallation.reopen("an upgrade landed")
             }
 
             /// The image at `path` is complete and signed as this process is:
@@ -251,7 +249,7 @@
             guard getuid() != 0 else { return }
             installLog.info(
                 "asking the app's current copy to take this job", ["job": target, "to": app.path])
-            guard openHeadless(app, [Job.staleArgument, handoff]) == 0 else {
+            guard open(app, arguments: [Job.staleArgument, handoff], background: true) == 0 else {
                 installLog.warn(
                     "could not open the app's current copy", ["job": target, "app": app.path])
                 return
@@ -279,23 +277,10 @@
                 }
                 exit(0)
             }
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    guard let moved else {
-                        NSApp?.terminate(nil)
-                        return
-                    }
-                    let open = NSWorkspace.OpenConfiguration()
-                    open.createsNewApplicationInstance = true
-                    NSWorkspace.shared.openApplication(at: moved, configuration: open) { _, error in
-                        if let error {
-                            installLog.error(
-                                "could not reopen the moved app", ["at": moved.path, "err": error])
-                        }
-                        Task { @MainActor in NSApp?.terminate(nil) }
-                    }
-                }
+            if let moved, open(moved) != 0 {
+                installLog.error("could not reopen the moved app", ["at": moved.path])
             }
+            quit()
         }
     }
 #endif

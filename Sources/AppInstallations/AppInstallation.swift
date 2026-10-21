@@ -1,6 +1,7 @@
 #if os(macOS)
-    import AppKit
+    import Foundation
     import Log
+    import Security
 
     let installLog = log.scope("install")
 
@@ -194,7 +195,7 @@
         /// (unregistered here, which stops them, then turned on there), and
         /// this copy goes to the Trash once the new one is open. A download or
         /// a build folder is never touched.
-        @MainActor public static func moveHome(to scope: Scope, turningOn asked: [Job] = [])
+        public static func moveHome(to scope: Scope, turningOn asked: [Job] = [])
             async throws
         {
             guard let bundle else { throw MoveError.noBundle }
@@ -228,14 +229,12 @@
             // THE app already running there is brought forward, never joined
             // by a second instance; launch arguments only reach a launch, so
             // the jobs asked for stay that copy's to turn on, said in the log.
-            if let running = NSWorkspace.shared.runningApplications.first(where: {
-                $0.bundleURL?.standardizedFileURL == target.standardizedFileURL
-            }) {
-                running.activate()
+            if isRunning(target) {
+                activate(target)
                 installLog.info(
                     "the app in Applications is already running: brought forward; leaving",
                     ["from": bundle.path, "jobs not carried": jobs.map(\.name)])
-                NSApp?.terminate(nil)
+                quit()
                 return
             }
             if leaving {
@@ -250,14 +249,8 @@
                     }
                 }
             }
-            let open = NSWorkspace.OpenConfiguration()
-            open.createsNewApplicationInstance = true
-            open.arguments = jobs.flatMap { [Job.turnOnArgument, $0.handoff] }
-            do {
-                _ = try await NSWorkspace.shared.openApplication(at: target, configuration: open)
-            } catch {
-                throw MoveError.open(error.localizedDescription)
-            }
+            let opened = open(target, arguments: jobs.flatMap { [Job.turnOnArgument, $0.handoff] })
+            guard opened == 0 else { throw MoveError.open("open exited \(opened)") }
             installLog.info(
                 "opened the app in Applications; leaving",
                 ["from": bundle.path, "jobs handed over": jobs.map(\.name)])
@@ -273,25 +266,19 @@
                         "could not trash the copy left behind", ["path": bundle.path, "err": error])
                 }
             }
-            NSApp?.terminate(nil)
+            quit()
         }
 
         /// Opens a new instance of this bundle, then quits this one: an
         /// upgrade landed on disk, or a change that applies on reopen.
-        @MainActor public static func reopen(_ why: String) {
-            let open = NSWorkspace.OpenConfiguration()
-            open.createsNewApplicationInstance = true
+        public static func reopen(_ why: String) {
             installLog.info("reopening", ["why": why])
-            NSWorkspace.shared.openApplication(
-                at: bundle ?? Bundle.main.bundleURL, configuration: open
-            ) {
-                _, error in
-                if let error {
-                    installLog.error("reopen failed", ["why": why, "err": error])
-                    return
-                }
-                Task { @MainActor in NSApp?.terminate(nil) }
+            let opened = open(bundle ?? Bundle.main.bundleURL)
+            guard opened == 0 else {
+                installLog.error("reopen failed", ["why": why, "open": opened])
+                return
             }
+            quit()
         }
     }
 #endif

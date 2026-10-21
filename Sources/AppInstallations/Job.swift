@@ -1,5 +1,5 @@
 #if os(macOS)
-    import AppKit
+    import Foundation
     import ServiceManagement
 
     extension AppInstallation {
@@ -631,13 +631,6 @@
             run("/bin/launchctl", arguments).output
         }
 
-        /// Opens `app` as a new instance in the background, no window
-        /// brought forward (`open -n -g -j`), with `arguments` after `--args`;
-        /// open's exit status once the app is launched.
-        static func openHeadless(_ app: URL, _ arguments: [String]) -> Int32 {
-            run("/usr/bin/open", ["-n", "-g", "-j", app.path, "--args"] + arguments).status
-        }
-
         /// `/bin/launchctl` with these arguments; its exit status.
         @discardableResult
         static func launchctl(_ arguments: [String]) -> Int32 {
@@ -650,7 +643,8 @@
         /// standing), where a turn of the run loop re-enters a layout half
         /// done (a page dot row once drew a phantom slot). This blocks for
         /// launchctl's few milliseconds and runs nothing else meanwhile.
-        private static func run(_ path: String, _ arguments: [String]) -> (
+        @discardableResult
+        static func run(_ path: String, _ arguments: [String]) -> (
             status: Int32, output: String
         ) {
             var actions: posix_spawn_file_actions_t?

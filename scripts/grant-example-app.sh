@@ -75,7 +75,10 @@ cat > "$entitlements" <<EOF
 </dict></plist>
 EOF
 
-identity="$(ship identity --team G387QW47LV)"
+# This repo's own ship, never one from PATH: the example is signed by the code
+# it ships beside.
+swift build -c release --product ship
+identity="$(.build/release/ship identity --team G387QW47LV)"
 codesign --force --options runtime --timestamp=none --entitlements "$entitlements" --sign "$identity" "$app"
 rm "$entitlements"
 codesign --verify --strict "$app"

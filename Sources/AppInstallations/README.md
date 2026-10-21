@@ -2,6 +2,8 @@
 
 An app's whole life on the Mac, owned by the app: where its bundle lives and moving it into Applications, the processes it runs beside itself (a launch agent, a root daemon, the app as a login item), an upgrade landing under it, and its removal when the bundle is deleted. One top-level name, `AppInstallation`; everything else is nested in it. macOS only.
 
+**No AppKit, so every process of the app links it:** the app, and the agents and root daemons that deliberately carry none (chilld, authzd). What an app does to itself goes through the system's own tools: opening a copy is `/usr/bin/open`; "is THE app already running there" is every process's image (`proc_pidpath`); copies of the app by bundle id come from Spotlight (`mdfind`) and the Applications folders; the app quits itself with a Quit Apple Event to its own process, sent from the main thread, which AppKit answers with a normal terminate (state saved). A process with no event loop to answer it exits after ten seconds.
+
 ```swift
 import AppInstallations
 
