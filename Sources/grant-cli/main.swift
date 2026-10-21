@@ -67,13 +67,13 @@ func resolve(_ argument: String) -> App {
 }
 
 /// The latest reading of each permission, from the app's unified log.
-func readings(of app: App) -> [(grant: String, word: String, tccd: Int?, at: String)] {
+func readings(of app: App) -> [(grant: String, word: String, from: String, at: String)] {
     let predicate = "subsystem == \"\(app.id)\" AND category == \"grant\""
     let out = run(
         "/usr/bin/log",
         ["show", "--last", "3d", "--info", "--style", "ndjson", "--predicate", predicate]
     ).out
-    var latest: [String: (word: String, tccd: Int?, at: String)] = [:]
+    var latest: [String: (word: String, from: String, at: String)] = [:]
     for line in out.split(separator: "\n") {
         guard
             let entry = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
@@ -87,12 +87,14 @@ func readings(of app: App) -> [(grant: String, word: String, tccd: Int?, at: Str
         else { continue }
         let word = msg.replacingOccurrences(of: "reads ", with: "")
             .replacingOccurrences(of: "changed to ", with: "")
-        latest[grant] = (
-            word, fields["tccd"] as? Int, String((entry["timestamp"] as? String ?? "").prefix(19))
-        )
+        // Where the answer came from (the hub's source, a fresh process or
+        // this one) and its raw code; a background service has neither.
+        let from = [fields["source"] as? String, (fields["code"] as? Int).map { "code \($0)" }]
+            .compactMap { $0 }.joined(separator: ", ")
+        latest[grant] = (word, from, String((entry["timestamp"] as? String ?? "").prefix(19)))
     }
     return latest.sorted { $0.key < $1.key }.map {
-        ($0.key, $0.value.word, $0.value.tccd, $0.value.at)
+        ($0.key, $0.value.word, $0.value.from, $0.value.at)
     }
 }
 
@@ -119,9 +121,9 @@ func status(_ app: App) {
         return
     }
     for row in rows {
-        let code = row.tccd.map { " (tccd \($0))" } ?? ""
+        let from = row.from.isEmpty ? "" : " (\(row.from))"
         print(
-            "  \(row.grant.padding(toLength: 24, withPad: " ", startingAt: 0)) \(row.word)\(code)  \(row.at)"
+            "  \(row.grant.padding(toLength: 24, withPad: " ", startingAt: 0)) \(row.word)\(from)  \(row.at)"
         )
     }
 }

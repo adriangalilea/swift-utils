@@ -1,5 +1,7 @@
 #if os(macOS)
+    import AVFoundation
     import AppKit
+    import ApplicationServices
     import Log
     import Observation
     import Synchronization
@@ -7,73 +9,50 @@
     private let grantLog = log.scope("grant")
 
     /// The live permissions of this app, ONE hub every surface and every
-    /// check reads. Never a remembered answer:
+    /// check reads.
     ///
-    /// - The public probes remember their first answer for the life of the
-    ///   process. `CGPreflightPostEventAccess` read "denied" in a running
-    ///   utter 30 s after tccd recorded "allowed", and sent tccd nothing after
-    ///   its first call (2026-10-20; `AXIsProcessTrusted` the same,
-    ///   2026-10-18). Only a new process saw the change.
-    /// - tccd is asked directly instead (`TCCAccessPreflight`, TCC.framework,
-    ///   the SPI AudioCap and steno bind): measured one tccd query per call,
-    ///   6-8 ms each, and a tri-state of its own (allowed / denied / no
-    ///   record), so no "asked before" flag can contradict it.
+    /// What macOS tells a running app is as of its launch. Asked about itself,
+    /// a process gets tccd's answer as it stood when the process started, for
+    /// a switch flipped later as for a revoked one (Accessibility read
+    /// "denied" while macOS already let grant-example type; the microphone
+    /// read "allowed" after it was reset; 2026-10-21), and the public probes
+    /// (`AXIsProcessTrusted`, `CGPreflight…`) are no better. The truth after
+    /// a change lives only in a NEW process. So:
     ///
-    /// When it reads: the first time a permission is asked for, synchronously
-    /// (a surface's first frame is the truth, never a loading state, never a
-    /// guess); then, for every permission read since, off the main thread
-    /// every 2 s, at once when the app becomes active, at once when macOS
-    /// announces an Accessibility change, and right after every ask. A change
-    /// publishes through Observation (a view that read it repaints) and to
-    /// every `observe` handler, and is logged with tccd's raw answer.
+    /// - **First read**: synchronous, in this process (a surface's first frame
+    ///   is the truth: at launch the two agree).
+    /// - **Idle otherwise.** Nothing is read while nothing can change.
+    /// - **The settings window**: two minutes after the app comes forward, an
+    ///   ask, a pane opened, or macOS announcing an Accessibility change (a
+    ///   switch only flips while the person is in System Settings). Every 2 s
+    ///   in it, ONE fresh process of the app's own binary (`--grant-probe`,
+    ///   spawned disowned so tccd judges it as itself) answers every watched
+    ///   permission, grants and revocations alike. Where macOS enforces the
+    ///   switch on the running app at once (`appliesLive`) the fresh answer
+    ///   is the answer; where it does not, a fresh "allowed" is
+    ///   `allowedOnReopen`. An app without the probe (`answerProbeIfAsked`
+    ///   missing from its main) is read in-process in the window instead.
+    ///
+    /// A change publishes through Observation (a view that read it repaints)
+    /// and to every `observe` handler, and is logged with its source and raw
+    /// code (scope `grant`; `grant status <app>` prints the latest).
     public final class Permissions: @unchecked Sendable {
         public static let shared = Permissions()
 
-        /// What macOS answers for one of this app's permissions, asked of
-        /// tccd itself. Nested: "Answer" is every app's word for its own
-        /// things (Authz's voice card, perceive's questions), never this
-        /// library's to take.
+        /// What macOS answers for one of this app's permissions. Nested:
+        /// "Answer" is every app's word for its own things (Authz's voice
+        /// card, perceive's questions), never this library's to take.
         public enum Answer: String, Sendable, Equatable {
             case allowed, denied
             /// No record: the person was never asked (or it was reset).
             case notAsked = "not asked"
-            /// Allowed in System Settings, not for this process: tccd answers
-            /// a running app as it stood at launch for some services (Input
-            /// Monitoring, Accessibility: macOS's own "Quit & Reopen"). A new
-            /// process of the same app reads it allowed (`answerProbeIfAsked`).
+            /// Allowed in System Settings, not usable by this running process
+            /// until it reopens (Input Monitoring: macOS's own "Quit & Reopen").
             case allowedOnReopen = "allowed on reopen"
+            /// The source cannot see it (System Audio Recording on the public
+            /// APIs: Apple ships no check for it).
+            case unknown
         }
-
-        /// A probe launch answers and exits: the app's `main` calls this
-        /// before anything else. The hub runs the app's own binary as a fresh
-        /// process (disowned, so tccd judges it as itself, never through this
-        /// running one) to learn what System Settings says now; without this
-        /// call it never does, and a switch flipped after launch reads denied
-        /// until the app reopens.
-        public static func answerProbeIfAsked() {
-            let args = CommandLine.arguments
-            if let at = args.firstIndex(of: probeFlag), at + 1 < args.count {
-                print(preflight(args[at + 1]))
-                exit(0)
-            }
-            probes.withLock { $0 = true }
-        }
-
-        private static let probeFlag = "--grant-probe"
-
-        /// Until when a denied permission is checked against a fresh process.
-        private static let settingsWindow = Mutex(Date.distantPast)
-
-        /// The person may be flipping switches now (an ask, a pane opened,
-        /// the app back in front): for two minutes, denied permissions are
-        /// checked against a fresh process, then re-read at once.
-        public func watchSettings() {
-            Self.settingsWindow.withLock { $0 = Date().addingTimeInterval(120) }
-            refreshSoon()
-        }
-        /// Set once the app's main called `answerProbeIfAsked`: only then is
-        /// its binary a probe (otherwise running it launches the app).
-        private static let probes = Mutex(false)
 
         /// The TCC services this hub reads, named for what they let an app do.
         public enum Service: String, Sendable, CaseIterable {
@@ -90,11 +69,10 @@
             case microphone = "kTCCServiceMicrophone"
 
             /// macOS enforces the switch on a running app at once, even while
-            /// tccd still answers that app's preflight as of its launch:
-            /// grant-example typed into TextEdit right after Accessibility was
-            /// switched on, its in-process answer still "denied" (2026-10-21).
-            /// Input Monitoring is not: macOS itself asks for "Quit & Reopen".
-            /// Unmeasured services stay on the relaunch side.
+            /// that app's own check answers as of its launch: grant-example
+            /// typed into TextEdit right after Accessibility was switched on
+            /// (2026-10-21). Input Monitoring is not: macOS itself asks for
+            /// "Quit & Reopen". Unmeasured services stay on the relaunch side.
             var appliesLive: Bool {
                 switch self {
                 case .accessibility, .postEvents: true
@@ -113,21 +91,99 @@
             }
         }
 
+        // MARK: The source, chosen once
+
+        /// Where every reading comes from, chosen ONCE at launch and never
+        /// mixed, so no two surfaces can read from different places:
+        /// - `tccd`: TCC.framework's `TCCAccessPreflight` (private): tccd's
+        ///   own tri-state for every service.
+        /// - `publicAPI`: what Apple documents (`AXIsProcessTrusted`,
+        ///   `CGPreflight…`, AVFoundation's status). The fallback for an OS
+        ///   without the private call: never-asked and denied look alike
+        ///   until this run's first ask, System Audio is `.unknown`.
+        /// `GRANT_PUBLIC_API=1` in the environment forces the fallback, so it
+        /// is exercised, never dead code.
+        public enum Source: String, Sendable {
+            case tccd
+            case publicAPI = "public API"
+        }
+
+        public static let source: Source = {
+            if ProcessInfo.processInfo.environment["GRANT_PUBLIC_API"] == "1" {
+                grantLog.warn("readings from the public APIs (GRANT_PUBLIC_API=1)")
+                return .publicAPI
+            }
+            guard preflightCall != nil else {
+                grantLog.error(
+                    "TCCAccessPreflight is gone from TCC.framework: readings fall back to the public APIs"
+                )
+                return .publicAPI
+            }
+            return .tccd
+        }()
+
+        /// This process's raw answer from the source: 0 allowed, 1 denied,
+        /// 2 no record, -1 the source cannot see it.
+        static func code(_ service: Service) -> Int {
+            switch source {
+            case .tccd: preflightCall!(service.rawValue as CFString, nil)
+            case .publicAPI: publicCode(service)
+            }
+        }
+
+        /// Services asked in this run: on the public APIs, the one way to
+        /// tell "never asked" from "denied" (both read false).
+        private static let asked = Mutex<Set<Service>>([])
+        static func noteAsked(_ service: Service) { asked.withLock { _ = $0.insert(service) } }
+
+        private static func publicCode(_ service: Service) -> Int {
+            let wasAsked = asked.withLock { $0.contains(service) }
+            let granted: Bool
+            switch service {
+            case .accessibility: granted = AXIsProcessTrusted()
+            case .postEvents: granted = CGPreflightPostEventAccess()
+            case .inputMonitoring: granted = CGPreflightListenEventAccess()
+            case .systemAudio: return -1
+            case .microphone:
+                switch AVCaptureDevice.authorizationStatus(for: .audio) {
+                case .authorized: return 0
+                case .notDetermined: return 2
+                default: return 1
+                }
+            }
+            return granted ? 0 : wasAsked ? 1 : 2
+        }
+
+        static func answer(code: Int) -> Answer {
+            switch code {
+            case 0: .allowed
+            case 1: .denied
+            case -1: .unknown
+            default: .notAsked
+            }
+        }
+
+        // MARK: Reading
+
         private let registrar = ObservationRegistrar()
         private let lock = NSLock()
         private var answers: [Service: Answer] = [:]
         private var handlers: [UUID: (Service, Answer) -> Void] = [:]
         private let queue = DispatchQueue(label: "grant.permissions", qos: .utility)
         private var started = false
+        /// Bumped on every change: what Observation tracks.
+        private var revision = 0
 
         private init() {}
 
-        /// The current answer. The first read of a service asks tccd now, on
-        /// the calling thread, and starts watching it.
+        /// The current answer. The first read of a service asks now, on the
+        /// calling thread, and starts watching it.
         public func answer(_ service: Service) -> Answer {
             registrar.access(self, keyPath: \.revision)
             if let known = lock.withLock({ answers[service] }) { return known }
-            return refresh(service)
+            startIfNeeded()
+            let code = Self.code(service)
+            return record(service, Self.answer(code: code), raw: code, fresh: false)
         }
 
         /// The hook: `handler` runs on the main thread with every change of
@@ -144,57 +200,61 @@
             _ = lock.withLock { handlers.removeValue(forKey: token) }
         }
 
-        /// Re-reads every watched service now, off the calling thread: the
-        /// moment something may have changed (an ask, a return from
-        /// System Settings).
-        public func refreshSoon() {
-            queue.async { [self] in
-                for service in lock.withLock({ Array(answers.keys) }) { refresh(service) }
+        /// Until when the hub reads, every 2 s.
+        private static let settingsWindow = Mutex(Date.distantPast)
+
+        /// The person may be changing permissions now (an ask, a pane opened,
+        /// the app back in front, macOS announcing an Accessibility change):
+        /// read at once, then every 2 s for two minutes.
+        public func watchSettings() {
+            Self.settingsWindow.withLock { $0 = Date().addingTimeInterval(120) }
+            queue.async { [self] in readAll() }
+        }
+
+        /// Every watched service, from a fresh process when the app has the
+        /// probe, else in-process.
+        private func readAll() {
+            let services = lock.withLock { Array(answers.keys) }
+            guard !services.isEmpty else { return }
+            let fresh = Self.freshCodes()
+            for service in services {
+                let own = Self.code(service)
+                guard let new = fresh?[service] else {
+                    record(service, Self.answer(code: own), raw: own, fresh: false)
+                    continue
+                }
+                let answer: Answer =
+                    new == 0 && own != 0 && !service.appliesLive
+                    ? .allowedOnReopen : Self.answer(code: new)
+                record(service, answer, raw: new, fresh: true)
             }
         }
 
-        /// Bumped on every change: what Observation tracks.
-        private var revision = 0
-
         @discardableResult
-        private func refresh(_ service: Service) -> Answer {
-            let code = Self.preflight(service.rawValue)
-            var answer: Answer =
-                switch code {
-                case 0: .allowed
-                case 1: .denied
-                default: .notAsked
-                }
-            // Denied for this process: does System Settings say so too? A
-            // switch only flips while the person is in System Settings, so a
-            // fresh process is asked only in the window after an ask, a pane
-            // opened or the app coming forward (`watchSettings`), never every
-            // 2 s for a permission declined for good.
-            if answer == .denied, Self.settingsWindow.withLock({ Date() < $0 }),
-                Self.fresh(service) == 0
-            {
-                answer = service.appliesLive ? .allowed : .allowedOnReopen
-            }
+        private func record(_ service: Service, _ answer: Answer, raw: Int, fresh: Bool) -> Answer {
             let (changed, first) = lock.withLock { () -> (Bool, Bool) in
                 let old = answers[service]
                 answers[service] = answer
                 return (old != answer, old == nil)
             }
-            startIfNeeded()
             guard changed else { return answer }
             grantLog.info(
                 first ? "reads \(answer.rawValue)" : "changed to \(answer.rawValue)",
-                ["grant": service.title, "service": service.rawValue, "tccd": code])
+                [
+                    "grant": service.title, "service": service.rawValue, "code": raw,
+                    "source": Self.source.rawValue + (fresh ? ", fresh process" : ""),
+                ])
             registrar.withMutation(of: self, keyPath: \.revision) {
                 lock.withLock { revision += 1 }
             }
             if !first {
                 let current = lock.withLock { Array(handlers.values) }
-                let now = answer
-                DispatchQueue.main.async { for handler in current { handler(service, now) } }
+                DispatchQueue.main.async { for handler in current { handler(service, answer) } }
             }
             return answer
         }
+
+        private var timer: DispatchSourceTimer?
 
         private func startIfNeeded() {
             let start = lock.withLock { () -> Bool in
@@ -206,7 +266,8 @@
             let timer = DispatchSource.makeTimerSource(queue: queue)
             timer.schedule(deadline: .now() + 2, repeating: 2, leeway: .milliseconds(500))
             timer.setEventHandler { [self] in
-                for service in lock.withLock({ Array(answers.keys) }) { refresh(service) }
+                guard Self.settingsWindow.withLock({ Date() < $0 }) else { return }
+                readAll()
             }
             timer.resume()
             self.timer = timer
@@ -216,48 +277,49 @@
             // Posted by macOS when the Accessibility list changes.
             DistributedNotificationCenter.default().addObserver(
                 forName: Notification.Name("com.apple.accessibility.api"), object: nil, queue: nil
-            ) { [weak self] _ in self?.refreshSoon() }
+            ) { [weak self] _ in self?.watchSettings() }
         }
 
-        private var timer: DispatchSourceTimer?
+        // MARK: The fresh process
 
-        private typealias Preflight = @convention(c) (CFString, CFDictionary?) -> Int
-        typealias Request =
-            @convention(c) (CFString, CFDictionary?, @escaping (Bool) -> Void) -> Void
-
-        /// A TCC.framework function, or a scream: an OS without it is a world
-        /// this code no longer understands.
-        static func tcc(_ name: String) -> UnsafeMutableRawPointer {
-            let handle = dlopen(
-                "/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC", RTLD_NOW)
-            precondition(handle != nil, "TCC.framework failed to load")
-            let symbol = dlsym(handle, name)
-            precondition(symbol != nil, "\(name) missing from TCC.framework")
-            return symbol!
+        /// A probe launch answers and exits: the app's `main` calls this
+        /// before anything else. Without it the hub reads in-process, as of
+        /// launch, and a change shows only when the app reopens.
+        public static func answerProbeIfAsked() {
+            if CommandLine.arguments.contains(probeFlag) {
+                for service in Service.allCases { print(service.rawValue, code(service)) }
+                exit(0)
+            }
+            probes.withLock { $0 = true }
         }
-        private static let preflightCall = unsafeBitCast(
-            tcc("TCCAccessPreflight"), to: Preflight.self)
 
-        /// tccd's answer for this process: 0 allowed, 1 denied, else no record.
-        private static func preflight(_ service: String) -> Int {
-            preflightCall(service as CFString, nil)
-        }
+        private static let probeFlag = "--grant-probe"
+        /// Set once the app's main called `answerProbeIfAsked`: only then is
+        /// its binary a probe (otherwise running it launches the app).
+        private static let probes = Mutex(false)
 
         private typealias Disclaim =
-            @convention(c) (
-                UnsafeMutablePointer<posix_spawnattr_t?>, Int32
-            ) -> Int32
+            @convention(c) (UnsafeMutablePointer<posix_spawnattr_t?>, Int32) -> Int32
         /// libsystem's responsibility SPI, how Xcode launches an app as
         /// itself: a child is otherwise judged through its parent, whose
-        /// answer is the stale one.
-        private static let disclaim: Disclaim? = dlsym(
-            UnsafeMutableRawPointer(bitPattern: -2), "responsibility_spawnattrs_setdisclaim"
-        ).map { unsafeBitCast($0, to: Disclaim.self) }
+        /// answer is the stale one. Missing, the probe is off (logged once).
+        private static let disclaim: Disclaim? = {
+            guard
+                let symbol = dlsym(
+                    UnsafeMutableRawPointer(bitPattern: -2), "responsibility_spawnattrs_setdisclaim"
+                )
+            else {
+                grantLog.error(
+                    "responsibility_spawnattrs_setdisclaim is gone: no fresh probe, changes show on reopen"
+                )
+                return nil
+            }
+            return unsafeBitCast(symbol, to: Disclaim.self)
+        }()
 
-        /// tccd's answer for a NEW process of this app (the app's binary with
-        /// `--grant-probe`), or nil when the app has no probe (its main does
-        /// not call `answerProbeIfAsked`) or the probe failed.
-        private static func fresh(_ service: Service) -> Int? {
+        /// Every service's code as a NEW process of this app sees it, or nil
+        /// (no probe in this app, no disclaim, or the probe failed).
+        private static func freshCodes() -> [Service: Int]? {
             guard probes.withLock({ $0 }), let disclaim,
                 let executable = Bundle.main.executableURL?.path
             else { return nil }
@@ -272,7 +334,7 @@
             guard Darwin.pipe(&pipe) == 0 else { return nil }
             posix_spawn_file_actions_adddup2(&actions, pipe[1], STDOUT_FILENO)
             posix_spawn_file_actions_addclose(&actions, pipe[0])
-            let argv = [executable, probeFlag, service.rawValue].map { strdup($0) } + [nil]
+            let argv = [executable, probeFlag].map { strdup($0) } + [nil]
             defer { argv.forEach { free($0) } }
             var pid: pid_t = 0
             let spawned = posix_spawn(&pid, executable, &actions, &attr, argv, environ)
@@ -285,9 +347,38 @@
             let output = FileHandle(fileDescriptor: pipe[0]).readDataToEndOfFile()
             var status: Int32 = 0
             waitpid(pid, &status, 0)
-            return Int(
-                String(decoding: output, as: UTF8.self).trimmingCharacters(
-                    in: .whitespacesAndNewlines))
+            var codes: [Service: Int] = [:]
+            for line in String(decoding: output, as: UTF8.self).split(separator: "\n") {
+                let parts = line.split(separator: " ")
+                guard parts.count == 2, let service = Service(rawValue: String(parts[0])),
+                    let code = Int(parts[1])
+                else { continue }
+                codes[service] = code
+            }
+            guard codes.count == Service.allCases.count else {
+                grantLog.warn("fresh probe answered \(codes.count) of \(Service.allCases.count)")
+                return nil
+            }
+            return codes
+        }
+
+        // MARK: TCC.framework
+
+        private typealias Preflight = @convention(c) (CFString, CFDictionary?) -> Int
+        typealias Request =
+            @convention(c) (CFString, CFDictionary?, @escaping (Bool) -> Void) -> Void
+
+        /// A TCC.framework function, or nil (an OS without it: the public
+        /// APIs take over, `source`).
+        static func tcc(_ name: String) -> UnsafeMutableRawPointer? {
+            guard
+                let handle = dlopen(
+                    "/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC", RTLD_NOW)
+            else { return nil }
+            return dlsym(handle, name)
+        }
+        private static let preflightCall: Preflight? = tcc("TCCAccessPreflight").map {
+            unsafeBitCast($0, to: Preflight.self)
         }
     }
 

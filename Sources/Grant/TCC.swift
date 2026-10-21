@@ -36,7 +36,9 @@
             case .allowed: true
             // Allowed in System Settings, not usable by this process yet.
             case .denied, .allowedOnReopen: false
-            case .notAsked: nil
+            // Unseeable (public APIs, System Audio) reads as never asked: the
+            // ask is the one act that can find out.
+            case .notAsked, .unknown: nil
             }
         }
 
@@ -73,6 +75,7 @@
             // the main thread, or a bug. A command-line tool has no NSApp,
             // and nothing to bring forward.
             MainActor.assumeIsolated { NSApp?.activate() }
+            Permissions.noteAsked(service)
             let allowed = request()
             grantLog.info(
                 "asked macOS",
@@ -134,10 +137,15 @@
                 return
             }
             ask(.systemAudio, pane: "Privacy_AudioCapture") {
-                let request = unsafeBitCast(
-                    Permissions.tcc("TCCAccessRequest"), to: Permissions.Request.self)
+                // No TCCAccessRequest (an OS without it): the pane is the one
+                // place left to grant it.
+                guard let symbol = Permissions.tcc("TCCAccessRequest") else {
+                    openSettings(pane: "Privacy_AudioCapture")
+                    return false
+                }
+                let request = unsafeBitCast(symbol, to: Permissions.Request.self)
                 request(Permissions.Service.systemAudio.rawValue as CFString, nil) { allowed in
-                    Permissions.shared.refreshSoon()
+                    Permissions.shared.watchSettings()
                     Task { @MainActor in answered?(allowed) }
                 }
                 return false
@@ -164,7 +172,7 @@
             }
             ask(.microphone, pane: "Privacy_Microphone") {
                 AVCaptureDevice.requestAccess(for: .audio) { allowed in
-                    Permissions.shared.refreshSoon()
+                    Permissions.shared.watchSettings()
                     Task { @MainActor in answered?(allowed) }
                 }
                 return false

@@ -329,10 +329,11 @@ process (measured: "denied" 30 s after tccd recorded "allowed", no tccd
 query after the first call), while tccd's own preflight is one query per
 call (6-8 ms) with a tri-state of its own, so no app keeps an "asked
 before" flag. The first read of a service is synchronous, so a surface's
-first frame is the truth (never a loading state, never a guess); every
-service read since is re-read off the main thread every 2 s, at once on
-app activation, on macOS's Accessibility-change notification, and after
-every ask. Changes publish through Observation (a view that read one
+first frame is the truth (never a loading state, never a guess). After
+that the hub is IDLE until something can change: for two minutes after
+the app comes forward, an ask, a pane opened, or macOS's
+Accessibility-change notification, it reads every 2 s off the main thread
+(see the fresh process below), then stops. Changes publish through Observation (a view that read one
 repaints) and to `Permissions.shared.observe { service, answer in }`, the
 hook: no app writes a polling loop. `TCC` is the vocabulary over it
 (`accessibility()`, `postEvents()`, `inputMonitoring()`, `systemAudio()`,
@@ -347,8 +348,8 @@ System Settings after launch, tccd keeps answering the running process's
 preflight as it stood (Accessibility read "denied" while macOS already let
 grant-example type into TextEdit). So the hub also asks a FRESH process of
 the app (its own binary with `--grant-probe`, spawned disowned so tccd
-judges it as itself) for any denied permission, in the two minutes after an
-ask, a pane opened or the app coming forward. Where macOS enforces the
+judges it as itself), ONE process answering every watched permission, each
+2 s of that window: grants and revocations alike. Where macOS enforces the
 switch at once (Accessibility, posting events, measured) the fresh "allowed"
 is `.allowed`; where it does not (Input Monitoring: macOS's own "Quit &
 Reopen") it is `.allowedOnReopen`, and `TCCGrant` shows "Reopen", which
@@ -357,6 +358,16 @@ in `main`: `Permissions.answerProbeIfAsked()`; without it a switch flipped
 after launch reads denied until the app reopens. A signature under the
 hardened runtime without `com.apple.security.device.audio-input` makes
 macOS deny the microphone without asking; `requestMicrophone` logs that.
+
+**The fallback, one source at a time.** `Permissions.source` is chosen once
+at launch and never mixed: `tccd` (the private preflight) or, when an OS
+lacks it, `publicAPI` (`AXIsProcessTrusted`, `CGPreflight…`, AVFoundation's
+status), where never-asked and denied look alike until this run's first ask
+and System Audio Recording reads `.unknown` ("macOS doesn't tell apps this
+one"). Without the disowning spawn the fresh probe switches off and changes
+show on reopen. Each loss is one logged error, never a crash; every reading
+logs its source, so `grant status` shows which an app is on.
+`GRANT_PUBLIC_API=1` forces the fallback, so it stays exercised.
 
 Every reading is logged in the app's unified log, scope `grant`, the first
 time and at each change, with tccd's raw code, and so is every ask and

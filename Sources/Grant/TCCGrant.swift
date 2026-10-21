@@ -26,6 +26,7 @@
             switch Permissions.shared.answer(service) {
             case .allowed: .good
             case .allowedOnReopen: .broken("Reopen", note: "Allowed. Applies when the app reopens.")
+            case .unknown: .unknown(note: "macOS doesn't tell apps this one.")
             case .notAsked: .askable("Allow\u{2026}")
             case .denied:
                 .broken(
