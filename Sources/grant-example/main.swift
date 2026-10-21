@@ -25,7 +25,8 @@ extension PermissionGrant {
         .motion, title: "Head gestures", why: "A nod says yes, a shake says no.", required: false)
     /// The helper's person-facing side.
     static let helper = PermissionGrant.backgroundService(
-        .helper, title: "Background helper", why: "Keeps running when the window is closed.")
+        .helper, title: "Background helper", why: "Keeps running when the window is closed.",
+        installFor: [.everyone, .me])
 }
 
 extension AppInstallation.Job {

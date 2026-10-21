@@ -32,8 +32,9 @@ public struct PermissionGrant: Sendable {
             /// Privacy & Security › Automation: Apple Events to one app.
             case automation(bundleID: String)
             /// A process run beside the app (swift-utils
-            /// `AppInstallation.Job`): its state, rendered.
-            case backgroundService(AppInstallation.Job)
+            /// `AppInstallation.Job`): its state, rendered, and the installs
+            /// a misplaced app offers to move into.
+            case backgroundService(AppInstallation.Job, installFor: [AppInstallation.Scope])
         #endif
         #if os(macOS) || os(iOS)
             /// Notifications posted from the app's own process.
@@ -94,14 +95,22 @@ public struct PermissionGrant: Sendable {
 
         /// A job the app runs beside itself, declared once as an
         /// `AppInstallation.Job` (its probe included): this is the person's
-        /// side of it.
+        /// side of it. `installFor` is what the app offers when it runs from
+        /// outside an Applications folder, in order: one scope moves there;
+        /// both ask the Installer's question (`[.everyone, .me]`). A root
+        /// daemon can only be installed for everyone.
         public static func backgroundService(
             _ job: AppInstallation.Job, title: String, why: String,
-            symbol: String = "gearshape.2", required: Bool = true
+            symbol: String = "gearshape.2", required: Bool = true,
+            installFor: [AppInstallation.Scope] = [.everyone]
         ) -> PermissionGrant {
-            PermissionGrant(
-                kind: .backgroundService(job), title: title, why: why, symbol: symbol,
-                required: required)
+            precondition(!installFor.isEmpty, "\(title): offer at least one install scope")
+            precondition(
+                installFor.allSatisfy(job.scopes.contains),
+                "\(title): \(job.name) cannot run from an install \(installFor)")
+            return PermissionGrant(
+                kind: .backgroundService(job, installFor: installFor), title: title, why: why,
+                symbol: symbol, required: required)
         }
     #endif
 
@@ -131,8 +140,8 @@ public struct PermissionGrant: Sendable {
                 Readings.shared.standing("automation \(bundleID)") {
                     Automation.standing(of: bundleID)
                 }
-            case .backgroundService(let job):
-                Readings.shared.standing("job \(job.kind)") { JobGrant.standing(job) }
+            case .backgroundService(let job, let offers):
+                Readings.shared.standing("job \(job.kind)") { JobGrant.standing(job, offers) }
         #endif
         #if os(macOS) || os(iOS)
             case .notifications:
@@ -168,7 +177,7 @@ public struct PermissionGrant: Sendable {
         #if os(macOS)
             case .privacy(let privacy): await PrivacyHub.shared.ask(privacy)
             case .automation(let bundleID): await Automation.ask(bundleID)
-            case .backgroundService(let job): await JobGrant.ask(job)
+            case .backgroundService(let job, let offers): await JobGrant.ask(job, offers)
         #endif
         #if os(macOS) || os(iOS)
             case .notifications(let options): await Notifications.ask(options: options)
@@ -185,7 +194,7 @@ public struct PermissionGrant: Sendable {
         /// unchecks): the reverse of `ask`, idempotent. Only a background
         /// service can be withdrawn by the app.
         public func unregister() {
-            guard case .backgroundService(let job) = kind else {
+            guard case .backgroundService(let job, _) = kind else {
                 preconditionFailure("\(title): only a background service unregisters")
             }
             do {

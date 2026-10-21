@@ -259,7 +259,8 @@ included: [Sources/PermissionGrants/README.md](Sources/PermissionGrants/README.m
 ## AppInstallations
 
 An app's whole life on the Mac as `AppInstallation`: where the bundle lives and
-moving it into Applications (`home`, `moveHome()`), the jobs it runs beside
+moving it into Applications, for everyone or just this account as the app
+offers and the person picks (`home`, `moveHome(to:)`), the jobs it runs beside
 itself (`Job`: a launch agent, a root daemon, the login item; installed,
 approved, answering a probe, read live as one `state`), and what happens when
 the bundle is upgraded or deleted under it (`ImageWatch`: jobs restart into the

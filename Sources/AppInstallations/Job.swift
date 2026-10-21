@@ -44,6 +44,15 @@
             /// The app as its own login item.
             public static let loginItem = Job(.loginItem, name: "the login item")
 
+            /// The installs this job runs from. A root daemon only from an
+            /// install for everyone: from a folder the person can write to,
+            /// replacing its binary would run anyone's code as root. An
+            /// agent or a login item runs as the person, from either.
+            public var scopes: Set<Scope> {
+                if case .daemon = kind { return [.everyone] }
+                return Set(Scope.allCases)
+            }
+
             var service: SMAppService {
                 switch kind {
                 case .agent(let plist): .agent(plistName: plist)
@@ -82,7 +91,7 @@
                 case awaitingApproval(needsAdmin: Bool)
                 /// Registered and approved, and not answering its probe.
                 case silent
-                /// The app runs from somewhere a registration cannot live.
+                /// The app runs from somewhere this job cannot (`scopes`).
                 case misplaced(Home)
                 /// This build has no such job (no plist in the bundle).
                 case bare(missing: String)
@@ -98,13 +107,15 @@
                             atPath: bundle.appending(path: plistPath).path)
                     else { return .bare(missing: plistPath) }
                 }
-                // A job lives with the app in Applications, so the place is
-                // judged before anything macOS remembers: a record can outlive
-                // the copy it was made for (a deleted app's stays enabled), and
+                // A job lives with the installed app, so the place is judged
+                // before anything macOS remembers: a record can outlive the
+                // copy it was made for (a deleted app's stays enabled), and
                 // reading it from a copy elsewhere would offer to restart the
                 // job from there.
                 let home = AppInstallation.home
-                guard home == .applications else { return .misplaced(home) }
+                guard case .installed(let scope) = home, scopes.contains(scope) else {
+                    return .misplaced(home)
+                }
                 switch service.status {
                 case .enabled:
                     if case .loginItem = kind { return .running }
@@ -133,16 +144,22 @@
                     "awaiting approval in \(Self.approvalPath)"
                         + (needsAdmin ? " (an admin's act)" : "")
                 case .silent: "registered, but not answering"
-                case .misplaced(let home):
-                    "running from \(home.words); \(name) runs only from Applications"
+                case .misplaced(let home): "running from \(home.words); \(needs)"
                 case .bare(let missing): "not part of this build (no \(missing))"
                 }
+            }
+
+            /// Where the job needs the app, in words.
+            var needs: String {
+                scopes == [.everyone]
+                    ? "\(name) runs only from an install for everyone (/Applications)"
+                    : "\(name) runs only from an Applications folder"
             }
 
             // MARK: Verbs
 
             public enum Failure: Error, CustomStringConvertible, Equatable {
-                case misplaced(Home)
+                case misplaced(Home, needs: String)
                 case bare(missing: String)
                 /// macOS refused the registration, with its reason.
                 case register(String)
@@ -154,8 +171,7 @@
 
                 public var description: String {
                     switch self {
-                    case .misplaced(let home):
-                        "running from \(home.words): move the app into Applications first"
+                    case .misplaced(let home, let needs): "running from \(home.words): \(needs)"
                     case .bare(let missing): "not part of this build (no \(missing))"
                     case .register(let why): "macOS refused the registration: \(why)"
                     case .awaitingApproval(let needsAdmin):
@@ -176,7 +192,7 @@
             public func install(approvalWait: Duration = .seconds(60)) async throws -> State {
                 switch state {
                 case .running: return .running
-                case .misplaced(let home): throw Failure.misplaced(home)
+                case .misplaced(let home): throw Failure.misplaced(home, needs: needs)
                 case .bare(let missing): throw Failure.bare(missing: missing)
                 case .off, .awaitingApproval, .silent: break
                 }

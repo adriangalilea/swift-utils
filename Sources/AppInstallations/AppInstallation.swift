@@ -31,10 +31,38 @@
     ///
     /// The module's one top-level name; everything else is nested here.
     public enum AppInstallation {
+        /// Who an install is for, macOS Installer's own question: everyone
+        /// on this Mac (/Applications) or just this account
+        /// (~/Applications). Data never follows it: settings, records and
+        /// caches are per account wherever the bundle lives, so an install
+        /// for everyone still keeps each account's data apart.
+        public enum Scope: Hashable, Sendable, CaseIterable {
+            case everyone
+            case me
+
+            /// The Applications folder this scope installs into.
+            public var folder: URL {
+                switch self {
+                case .everyone: URL(filePath: "/Applications")
+                case .me:
+                    FileManager.default.homeDirectoryForCurrentUser.appending(path: "Applications")
+                }
+            }
+
+            /// The choice, in the Installer's words.
+            public var words: String {
+                switch self {
+                case .everyone: "For Everyone on This Mac"
+                case .me: "Just for Me"
+                }
+            }
+        }
+
         /// Where this app's bundle stands.
         public enum Home: Equatable, Sendable {
-            /// In /Applications: the one place a registration may be bound to.
-            case applications
+            /// In an Applications folder: installed, for everyone or for
+            /// this account.
+            case installed(Scope)
             /// Anywhere else, and where (a person knows the first two by name).
             case elsewhere(URL, Origin)
             /// Not running from an app bundle at all (a `swift build` binary).
@@ -52,7 +80,8 @@
             /// Where it stands, in a person's words.
             public var words: String {
                 switch self {
-                case .applications: "Applications"
+                case .installed(.everyone): "Applications"
+                case .installed(.me): "your own Applications folder"
                 case .elsewhere(_, .diskImage): "the disk image"
                 case .elsewhere(_, .translocated): "a copy macOS made of the download"
                 case .elsewhere(let url, .folder):
@@ -74,20 +103,13 @@
             return bundle.pathExtension == "app" ? bundle : nil
         }
 
-        /// The two folders macOS treats as Applications: the system's, where
-        /// an app is moved, and the person's own (~/Applications), where an
-        /// app installed for one account lives. A registration is valid
-        /// from either.
-        public static let applicationsFolders = [
-            URL(filePath: "/Applications"),
-            FileManager.default.homeDirectoryForCurrentUser.appending(path: "Applications"),
-        ]
-
         public static var home: Home {
             guard let bundle else { return .noBundle }
             let folder = bundle.deletingLastPathComponent().standardizedFileURL.path
-            if applicationsFolders.contains(where: { $0.standardizedFileURL.path == folder }) {
-                return .applications
+            if let scope = Scope.allCases.first(where: {
+                $0.folder.standardizedFileURL.path == folder
+            }) {
+                return .installed(scope)
             }
             if bundle.path.hasPrefix("/Volumes/") { return .elsewhere(bundle, .diskImage) }
             if bundle.path.contains("/AppTranslocation/") {
@@ -96,17 +118,15 @@
             return .elsewhere(bundle, .folder)
         }
 
-        /// Where `moveHome` puts the app: /Applications/<its name>.
-        public static var homeURL: URL? {
-            bundle.map { applicationsFolders[0].appending(path: $0.lastPathComponent) }
-        }
-
-        /// An install of this app already in either Applications folder,
-        /// which is THE app: the system's first.
-        public static var installedCopy: URL? {
-            guard let name = bundle?.lastPathComponent else { return nil }
-            return applicationsFolders.map { $0.appending(path: name) }
-                .first { FileManager.default.fileExists(atPath: $0.path) }
+        /// An install of this app already in one of `scopes`' folders, which
+        /// is THE app (everyone's first), and never this copy itself.
+        public static func installedCopy(in scopes: [Scope] = Scope.allCases) -> URL? {
+            guard let bundle else { return nil }
+            return scopes.map { $0.folder.appending(path: bundle.lastPathComponent) }
+                .first {
+                    $0.standardizedFileURL != bundle.standardizedFileURL
+                        && FileManager.default.fileExists(atPath: $0.path)
+                }
         }
 
         public enum MoveError: Error, CustomStringConvertible {
@@ -124,24 +144,28 @@
         }
 
         /// Puts the app where it belongs and moves the person there: an
-        /// install already in an Applications folder is THE app and is
-        /// opened; otherwise this bundle is copied into /Applications (a
-        /// copy: a disk image is read-only and a translocated bundle's
-        /// origin is hidden from it), that copy is opened, and this process
-        /// quits. A new instance, since it shares this process's bundle id.
-        @MainActor public static func moveHome() async throws {
-            guard let bundle, let homeURL else { throw MoveError.noBundle }
+        /// install already in `scope`'s folder is THE app and is opened;
+        /// otherwise this bundle is copied there (a copy: a disk image is
+        /// read-only and a translocated bundle's origin is hidden from it),
+        /// that copy is opened, and this process quits. A new instance,
+        /// since it shares this process's bundle id. Which scopes to offer is
+        /// the app's call; the person picks.
+        @MainActor public static func moveHome(to scope: Scope) async throws {
+            guard let bundle else { throw MoveError.noBundle }
             let target: URL
-            if let installedCopy {
-                target = installedCopy
+            if let existing = installedCopy(in: [scope]) {
+                target = existing
             } else {
+                target = scope.folder.appending(path: bundle.lastPathComponent)
                 do {
-                    try FileManager.default.copyItem(at: bundle, to: homeURL)
-                    installLog.info("copied into Applications", ["from": bundle.path])
+                    try FileManager.default.createDirectory(
+                        at: scope.folder, withIntermediateDirectories: true)
+                    try FileManager.default.copyItem(at: bundle, to: target)
+                    installLog.info(
+                        "copied into Applications", ["from": bundle.path, "to": target.path])
                 } catch {
                     throw MoveError.copy(error.localizedDescription)
                 }
-                target = homeURL
             }
             let open = NSWorkspace.OpenConfiguration()
             open.createsNewApplicationInstance = true

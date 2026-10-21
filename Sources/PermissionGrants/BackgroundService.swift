@@ -1,5 +1,6 @@
 #if os(macOS)
     import AppInstallations
+    import AppKit
     import Log
     import ServiceManagement
     import Synchronization
@@ -11,7 +12,9 @@
     /// (registering, approval, its probe, the place the bundle stands);
     /// this renders its state and asks the one way each state is fixed.
     enum JobGrant {
-        static func standing(_ job: AppInstallation.Job) -> PermissionGrant.Standing {
+        static func standing(
+            _ job: AppInstallation.Job, _ offers: [AppInstallation.Scope]
+        ) -> PermissionGrant.Standing {
             if let failure = failures.withLock({ $0[job.name] }) {
                 return .broken("Try Again", note: failure)
             }
@@ -31,10 +34,17 @@
             case .silent:
                 return .broken("Restart", note: "Installed, but not answering.")
             case .misplaced:
+                // An install already there is opened; with a choice to make,
+                // the label's ellipsis says a question comes first.
+                let label =
+                    AppInstallation.installedCopy(in: offers) != nil
+                    ? "Open in Applications"
+                    : offers.count > 1 ? "Move to Applications…" : "Move to Applications"
                 return .broken(
-                    AppInstallation.installedCopy != nil
-                        ? "Open in Applications" : "Move to Applications",
-                    note: "Only works from the Applications folder.")
+                    label,
+                    note: job.scopes == [.everyone]
+                        ? "Only works installed for everyone, in Applications."
+                        : "Only works from the Applications folder.")
             case .bare:
                 return .unknown(note: "Not part of this build.")
             }
@@ -42,19 +52,49 @@
 
         /// The state's one fix: move the app home, open Login Items, or
         /// install (which registers, waits for the OK and for an answer).
-        @MainActor static func ask(_ job: AppInstallation.Job) async {
+        @MainActor static func ask(
+            _ job: AppInstallation.Job, _ offers: [AppInstallation.Scope]
+        ) async {
             failures.withLock { $0[job.name] = nil }
             switch job.state {
             case .running, .bare:
                 return
             case .misplaced:
-                do { try await AppInstallation.moveHome() } catch { fail(job, "\(error)") }
+                guard let scope = pick(offers) else { return }
+                do { try await AppInstallation.moveHome(to: scope) } catch { fail(job, "\(error)") }
             case .awaitingApproval:
                 grantLog.info("opened Login Items", ["grant": job.name])
                 SMAppService.openSystemSettingsLoginItems()
             case .off, .silent:
                 do { try await job.install() } catch { fail(job, "\(error)") }
             }
+        }
+
+        /// The install to move into: an existing one in an offered folder
+        /// (THE app, no question), the one offered, or the person's answer
+        /// to the Installer's question. nil: they cancelled.
+        @MainActor private static func pick(_ offers: [AppInstallation.Scope]) -> AppInstallation
+            .Scope?
+        {
+            if let existing = offers.first(where: {
+                AppInstallation.installedCopy(in: [$0]) != nil
+            }) {
+                return existing
+            }
+            guard offers.count > 1 else { return offers[0] }
+            let alert = NSAlert()
+            let name =
+                Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
+                ?? ProcessInfo.processInfo.processName
+            alert.messageText = "Install \(name) for everyone on this Mac, or just for you?"
+            alert.informativeText =
+                "For everyone puts it in Applications. Just for you puts it in the Applications folder in your home folder. Settings stay yours either way."
+            for scope in offers { alert.addButton(withTitle: scope.words) }
+            alert.addButton(withTitle: "Cancel")
+            let answer =
+                alert.runModal().rawValue
+                - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+            return offers.indices.contains(answer) ? offers[answer] : nil
         }
 
         private static func fail(_ job: AppInstallation.Job, _ why: String) {
