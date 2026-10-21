@@ -288,6 +288,34 @@ never UI divergence. An unreadable switch is `unknown`, not off and not
 good: only the capability seen live right now vouches for it, a past
 success is a witness of the past.
 
+**Ready grants.** `TCCGrant(.microphone, title:, why:, required:, withoutIt:)`
+is any TCC permission the hub reads as a grant in one line: the app writes
+what it is for, the standing and the ask are `TCC`'s.
+`BackgroundServiceGrant(.agent(plist:) | .daemon(plist:) | .loginItem, title:, why:)`
+is a process the app runs beside itself through `SMAppService`, judged the
+way chill learned to: `.notFound` alone means three things, so the status is
+read against where the bundle stands (`Placement`: in /Applications it
+registers; from the disk image or translocated it moves the app into
+/Applications and reopens it there; with no plist inside it says the build
+is bare). `.requiresApproval` opens Login Items, and approving a daemon is an
+admin's act, so a standard account is told to ask one. A failed register is
+the row's note until the next try.
+
+**Shapes, none forced.** Every surface composes from the same grants:
+`GrantSection(title?, grants, footer:)` (a Settings section, required first;
+untitled inside a host's own `Section`), `GrantSheet(title:, subtitle:,
+grants, optionalNote:) { done }` (everything on one sheet, required and
+optional apart, "later" while a required one needs the person, "done" after),
+`GrantSteps(grants, welcome: { … }) { done }` (a page per grant, which moves
+on by itself the moment its grant is good; an optional one can be skipped, a
+required one waits), `GrantPage(grant:)` (one such page alone) and
+`GrantChip(grant)` (inline, only while it needs the person, its note or name
+beside the button, nothing once good). `LaunchAtLoginToggle(label)` is
+"open at login" as the choice it is, never a requirement. Each re-reads its
+grants every second and at once through the hub, so none can show a stale
+state or a loading one. `swift run grant-example` shows them all live over
+one set of grants (`--render <dir>` writes each as a PNG).
+
 **`Permissions`, the one live answer for every TCC service** (macOS):
 Accessibility, posting events, Input Monitoring, System Audio Recording,
 the microphone. It asks tccd itself (`TCCAccessPreflight`, TCC.framework)

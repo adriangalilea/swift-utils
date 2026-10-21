@@ -1,0 +1,130 @@
+import Grant
+import SwiftUI
+
+// The Grant shapes, live: `swift run grant-example`. One set of grants drawn as
+// a Settings section, one sheet, steps (a page per grant) and inline chips;
+// pick a shape at the top. The TCC rows are this process's real answers from
+// tccd; "a demo grant" moves askable → broken → good by its own button, so
+// every transition can be watched. `--render <dir>` writes each shape as a PNG.
+
+/// A grant whose standing its own act advances: askable, broken, good.
+@Observable final class DemoState { var step = 0 }
+
+struct DemoGrant: Grant {
+    let state: DemoState
+    let symbol = "sparkles"
+    let title = "a demo grant"
+    let why = "Moves askable → broken → good each time its button is pressed."
+    let required = true
+    var standing: Standing {
+        switch state.step {
+        case 0: .askable("Allow\u{2026}")
+        case 1:
+            .broken("Open Settings\u{2026}", note: "Denied in the demo. Press again to allow it.")
+        default: .good
+        }
+    }
+    func act() { state.step += 1 }
+}
+
+let demo = DemoState()
+let grants: [any Grant] = [
+    DemoGrant(state: demo),
+    TCCGrant(.microphone, title: "Microphone", why: "Hears what you say.", required: false),
+    TCCGrant(
+        .inputMonitoring, title: "Input Monitoring", why: "Lights Caps Lock while the mic is open.",
+        required: false, withoutIt: "The key works; its light stays off."),
+    BackgroundServiceGrant(
+        .agent(plist: "garden.untitled.example.plist"), title: "the helper",
+        why: "Keeps working while the window is closed."),
+]
+
+enum Shape: String, CaseIterable { case section, sheet, steps, chip }
+
+struct Gallery: View {
+    @State private var shape = Shape.section
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $shape) {
+                ForEach(Shape.allCases, id: \.self) { Text($0.rawValue) }
+            }
+            .pickerStyle(.segmented).labelsHidden().padding(12)
+            Divider()
+            view(shape).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .frame(width: 520, height: 440)
+    }
+}
+
+@MainActor @ViewBuilder func view(_ shape: Shape, rendering: Bool = false) -> some View {
+    switch shape {
+    case .section:
+        // ImageRenderer draws no Form: the render shows the section bare.
+        if rendering {
+            GrantSection("Permissions", grants, footer: "Rows read live; nothing here holds state.")
+                .padding(20)
+        } else {
+            Form {
+                Section("Permissions") {
+                    GrantSection(grants, footer: "Rows read live; nothing here holds state.")
+                }
+            }
+            .formStyle(.grouped)
+        }
+    case .sheet:
+        GrantSheet(
+            title: "quick setup", subtitle: "one grant to start, three optional.", grants,
+            optionalNote: "Without them the example still runs; it just does less."
+        ) {}
+    case .steps:
+        GrantSteps(grants) {
+            VStack(spacing: 12) {
+                Image(systemName: "hand.wave").font(.system(size: 48)).foregroundStyle(.secondary)
+                Text("Welcome").font(.title.bold())
+                Text("A page per grant. Each moves on by itself once its grant is good.")
+                    .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(
+                        maxWidth: 340)
+            }
+        } onDone: {
+        }
+    case .chip:
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Inline: only what needs the person, nothing once it is good.")
+                .font(.caption).foregroundStyle(.secondary)
+            ForEach(Array(grants.enumerated()), id: \.offset) { _, grant in GrantChip(grant) }
+        }
+        .padding(20)
+    }
+}
+
+struct GrantExample: App {
+    var body: some Scene {
+        WindowGroup("grant shapes") {
+            Gallery().onAppear { NSApp.activate() }
+        }
+        .windowResizability(.contentSize)
+    }
+}
+
+let args = CommandLine.arguments
+if let at = args.firstIndex(of: "--render"), at + 1 < args.count {
+    let dir = URL(fileURLWithPath: args[at + 1])
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    for shape in Shape.allCases {
+        MainActor.assumeIsolated {
+            let renderer = ImageRenderer(
+                content: view(shape, rendering: true).frame(width: 520, height: 400)
+                    .background(Color(nsColor: .windowBackgroundColor)).environment(
+                        \.colorScheme, .dark))
+            renderer.scale = 2
+            guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
+                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
+            else { preconditionFailure("render \(shape) failed") }
+            try? png.write(to: dir.appending(path: "\(shape.rawValue).png"))
+        }
+    }
+    print("rendered \(Shape.allCases.count) shapes to \(dir.path)")
+} else {
+    NSApplication.shared.setActivationPolicy(.regular)
+    GrantExample.main()
+}

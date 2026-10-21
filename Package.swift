@@ -131,6 +131,8 @@ let package = Package(
         .target(name: "Biometrics", dependencies: ["Ink"]),
         .target(name: "Grant", dependencies: ["Log"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
+        // Every Grant shape live, one set of grants: `swift run grant-example`.
+        .executableTarget(name: "grant-example", dependencies: ["Grant"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap", "Ink"]),
         .target(
