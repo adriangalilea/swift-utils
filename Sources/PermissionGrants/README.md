@@ -36,6 +36,10 @@ The kinds:
 - `.notifications(why:)`: notifications posted from the app's own process.
 - `PermissionGrant(title:why:symbol:standing:act:)`: the app's own, two closures run on the main thread (hollow's file-system module, a helper's recorded notification reach).
 
+In a target that is MainActor by default (`-default-isolation MainActor`), declare them `nonisolated static let`: a `PermissionGrant` is Sendable, and an actor that gates on one (steno's recorder) must reach it.
+
+A library declares its grants with a name no app will take (`listenMicrophone`, not `microphone`): every importer shares the one `PermissionGrant` namespace.
+
 Every grant answers the same five things: `standing`, `isAllowed` (the gate: `standing` is good), `blocking` (required and broken: the one banner/preflight predicate), `ask()` and `act()` (its button: `ask` without waiting), and `observe`. A background service also has `unregister()`.
 
 ## Standing
