@@ -130,7 +130,7 @@ let package = Package(
         .target(name: "Biometrics", dependencies: ["Ink"]),
         // Ink: the studio's one tooltip (a chip's note), its tokens.
         .target(
-            name: "PermissionGrants", dependencies: ["Log", "Ink"],
+            name: "PermissionGrants", dependencies: ["Log", "Ink", "AppInstallations"],
             exclude: ["README.md", "CLAUDE.md"]),
         .target(name: "AppInstallations", dependencies: ["Log"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),

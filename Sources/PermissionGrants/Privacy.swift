@@ -381,7 +381,10 @@
             case .allowed:
                 return
             case .allowedOnReopen:
-                return Self.reopen()
+                // What makes an allowed-on-reopen switch count. macOS's own
+                // "Quit & Reopen" quit grant-example and never opened it
+                // again (2026-10-21).
+                return AppInstallation.reopen("a permission applies on reopen")
             case .denied:
                 grantLog.info("asked again: opening its pane", ["grant": privacy.title])
                 Self.openSettings(pane: privacy.pane)
@@ -475,23 +478,6 @@
             let call = unsafeBitCast(symbol, to: Request.self)
             return await withCheckedContinuation { done in
                 call(privacy.rawValue as CFString, nil) { done.resume(returning: $0) }
-            }
-        }
-
-        /// Opens a new instance of this app, then quits this one: what makes
-        /// an allowed-on-reopen switch count. macOS's own "Quit & Reopen"
-        /// quit grant-example and never opened it again (2026-10-21).
-        @MainActor static func reopen() {
-            let open = NSWorkspace.OpenConfiguration()
-            open.createsNewApplicationInstance = true
-            grantLog.info("reopening to apply a permission")
-            NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: open) {
-                _, error in
-                if let error {
-                    grantLog.error("reopen failed", ["err": error])
-                    return
-                }
-                Task { @MainActor in NSApp?.terminate(nil) }
             }
         }
 

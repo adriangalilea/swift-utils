@@ -126,17 +126,19 @@
                                 required.contains { $0.standing.grade.needsUser } ? "Later" : "Done"
                             )
                         ) { onDone() }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.inkProminent)
                     }
                 }
                 .padding(20)
             }
         }
 
-        /// One grant per page: its symbol large, its title and one line, and
-        /// its action. The page moves on by itself the moment its grant is
-        /// good; "Skip" passes an optional one, and a required one waits. An
-        /// optional welcome page opens it; `onDone` runs after the last page.
+        /// One grant per page, on Ink's walk (`InkPages`: pages sliding the
+        /// way walked, dots as markers, Back, ← → ⏎): its symbol large, its
+        /// title and one line, and its action. The page moves on by itself the
+        /// moment its grant is good; "Skip" passes an optional one, and a
+        /// required one waits. An optional welcome page opens it; `onDone`
+        /// runs after the last page.
         public struct Steps<Welcome: View>: View {
             let grants: [PermissionGrant]
             let welcome: Welcome?
@@ -157,71 +159,126 @@
             private var count: Int { grants.count + offset }
 
             public var body: some View {
-                VStack(spacing: 0) {
-                    Group {
-                        if page < offset, let welcome {
-                            welcome
-                        } else {
-                            Page(grants[page - offset])
-                        }
+                // The dots are a checklist: each grant's in its standing's
+                // hue (green once allowed), and any of them a click away.
+                InkPages(
+                    page: $page, count: count, canAdvance: mayLeave, jump: .any,
+                    marker: { index in
+                        grant(index).map { grant in
+                            let grade = grant.standing.grade
+                            return grade == .good
+                                ? .green : grade.needsUser ? PermissionGrant.hue(grade) : nil
+                        } ?? nil
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(32)
-                    Divider()
-                    footer.padding(16)
+                ) { index in
+                    if index < offset, let welcome {
+                        welcome
+                    } else {
+                        Page(grants[index - offset])
+                    }
+                } action: { index in
+                    action(index)
                 }
-                .onChange(of: currentIsGood) { _, good in if good { next() } }
-            }
-
-            private var current: PermissionGrant? { page >= offset ? grants[page - offset] : nil }
-            private var currentIsGood: Bool { current?.standing.grade == .good }
-
-            @ViewBuilder private var footer: some View {
-                HStack {
-                    Text("\(page + 1) of \(count)").font(.caption.monospaced()).foregroundStyle(
-                        .tertiary)
-                    Spacer()
-                    if let current, !current.required, current.standing.grade != .good {
-                        Button(letterCase.apply("Skip")) { next() }
-                    }
-                    if let current, current.standing.grade.needsUser {
-                        Button(letterCase.apply(current.standing.actionTitle)) { current.act() }
-                            .keyboardShortcut(.defaultAction)
-                    } else if current == nil || current?.standing.grade == .good
-                        || current?.standing.grade == .unknown
-                    {
-                        Button(letterCase.apply(page == count - 1 ? "Done" : "Continue")) {
-                            next()
-                        }
-                        .keyboardShortcut(.defaultAction)
-                    }
+                // On only when the grant turns good WHILE its page is shown:
+                // arriving at one already good (Back onto it) is not that, and
+                // moving on then bounced the walk forward from under the person.
+                .onChange(of: Here(page: page, good: currentIsGood)) { before, now in
+                    if now.page == before.page, now.good, !before.good { next() }
                 }
             }
 
+            private func grant(_ index: Int) -> PermissionGrant? {
+                index >= offset ? grants[index - offset] : nil
+            }
+            private var currentIsGood: Bool { grant(page)?.standing.grade == .good }
+
+            /// The page and whether its grant is good, watched together.
+            private struct Here: Equatable {
+                let page: Int
+                let good: Bool
+            }
+
+            /// Forward past a page: a welcome, a grant that is good, one the
+            /// app can't see, or an optional one; a required one waits.
+            private func mayLeave(_ index: Int) -> Bool {
+                guard let grant = grant(index) else { return true }
+                return !grant.required || !grant.standing.grade.needsUser
+            }
+
+            /// The footer only walks: the grant's own ask is in its page,
+            /// beside the words that explain it. ONE button, always there, one
+            /// width, so a pointer resting on it (clicking through the walk)
+            /// always lands on it: "Continue" ("Done" on the last) when
+            /// nothing waits; "Skip" while an optional grant waits; a disabled
+            /// "Continue" while a required one does (its page moves on by
+            /// itself once it is good).
+            @ViewBuilder private func action(_ index: Int) -> some View {
+                let waiting = grant(index).map { $0.standing.grade.needsUser } ?? false
+                let required = grant(index)?.required ?? false
+                let words = index == count - 1 ? "Done" : "Continue"
+                if waiting && !required {
+                    Button {
+                        next()
+                    } label: {
+                        footerLabel("Skip")
+                    }.buttonStyle(.ink)
+                } else {
+                    Button {
+                        next()
+                    } label: {
+                        footerLabel(words)
+                    }
+                    .buttonStyle(.inkProminent)
+                    .keyboardShortcut(waiting ? nil : .defaultAction)
+                    .disabled(waiting)
+                }
+            }
+
+            /// Every footer word in one width: the button never resizes.
+            private func footerLabel(_ words: String) -> some View {
+                Text(letterCase.apply(words)).frame(minWidth: 74)
+            }
+
+            /// On a page; `InkPages` slides there (one path for every move).
             private func next() {
-                if page >= count - 1 { onDone() } else { page += 1 }
+                guard page < count - 1 else { return onDone() }
+                page += 1
             }
         }
 
-        /// One grant, large: the page of `Steps`, usable alone.
+        /// One grant, large: the page of `Steps`, usable alone. Its symbol,
+        /// its title and one line, and right under them its own action, large
+        /// (⏎ presses it), or the status mark once it is good.
         public struct Page: View {
             let grant: PermissionGrant
+            @Environment(\.permissionGrantCase) private var letterCase
             public init(_ grant: PermissionGrant) { self.grant = grant }
 
             public var body: some View {
                 let standing = grant.standing
                 VStack(spacing: 16) {
-                    Image(
-                        systemName: standing.grade == .good ? "checkmark.circle.fill" : grant.symbol
-                    )
-                    .font(.system(size: 48))
-                    .foregroundStyle(
-                        standing.grade == .good ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
+                    Image(systemName: grant.symbol)
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
                     Text(grant.title).font(.title2.bold())
                     // Two texts, as a row: the note when there is one, else why.
                     Text(standing.note ?? grant.why)
                         .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(
                             maxWidth: 360)
+                    Group {
+                        if standing.grade.needsUser {
+                            GrantAction(hue: PermissionGrant.hue(standing.grade), fill: false) {
+                                grant.act()
+                            } label: { _ in
+                                Text(letterCase.apply(standing.actionTitle))
+                            }
+                            .keyboardShortcut(.defaultAction)
+                        } else {
+                            GrantMark(grade: standing.grade)
+                        }
+                    }
+                    .controlSize(.large)
+                    .padding(.top, 8)
                 }
                 .onAppear { PermissionGrant.surfaceAppeared() }
             }
@@ -229,33 +286,22 @@
 
         /// One element that is the warning AND its fix, there only while the
         /// grant needs the person (and truly nothing otherwise: no space, no
-        /// gap in a stack): a dot in the standing's hue and what is not
-        /// working (`label`, "can't type into apps yet"; the grant's title when
-        /// none is given). Hovered or focused, the same box says the fix
-        /// ("open settings…") in the label's place, the note as its Ink tip; a
-        /// click acts. Both texts hold the box's width, so hovering never
-        /// moves anything.
+        /// gap in a stack): the grant action (`GrantAction`, the one control
+        /// every surface draws) saying what is not working (`label`, "can't
+        /// type into apps yet"; the grant's title when none is given).
+        /// Hovered or focused, the same box says the fix ("open settings…")
+        /// in its place; a click acts. Both texts hold the box's width, so
+        /// hovering never moves anything. The resting words say it all: no
+        /// tooltip.
         ///
         /// `fill`: the width the host gives it (a menu's full row, aligned with
-        /// the controls above and below); otherwise it hugs its text.
+        /// the controls above and below); otherwise it hugs its text. Its size
+        /// follows `.controlSize` (`.small` for a dense line beside icons).
         public struct Chip: View {
             let grant: PermissionGrant
             let label: String?
             let fill: Bool
             @Environment(\.permissionGrantCase) private var letterCase
-            /// `.regular` for a menu or a toolbar; `.small` and `.mini` for a
-            /// dense line (a HUD beside its icons).
-            @Environment(\.controlSize) private var size
-            @State private var hovering = false
-            @FocusState private var focused: Bool
-
-            private var metrics: (font: CGFloat, dot: CGFloat, x: CGFloat, y: CGFloat) {
-                switch size {
-                case .mini: (9.5, 4, 6, 2)
-                case .small: (10.5, 5, 7, 3)
-                default: (11.5, 6, 9, 5)
-                }
-            }
 
             public init(_ grant: PermissionGrant, label: String? = nil, fill: Bool = false) {
                 self.grant = grant
@@ -266,44 +312,19 @@
             public var body: some View {
                 let standing = grant.standing
                 if standing.grade.needsUser {
-                    let fixing = hovering || focused
                     let what = label ?? grant.title
                     let fix = letterCase.apply(standing.actionTitle)
-                    Button {
+                    GrantAction(hue: PermissionGrant.hue(standing.grade), fill: fill) {
                         grant.act()
-                    } label: {
-                        HStack(spacing: metrics.x - 2) {
-                            Circle().fill(Self.hue(standing.grade))
-                                .frame(width: metrics.dot, height: metrics.dot)
-                            ZStack(alignment: .leading) {
-                                Text(what).opacity(fixing ? 0 : 1)
-                                Text(fix).opacity(fixing ? 1 : 0)
-                            }
-                            .lineLimit(1)
+                    } label: { engaged in
+                        ZStack(alignment: .leading) {
+                            Text(what).opacity(engaged ? 0 : 1)
+                            Text(fix).opacity(engaged ? 1 : 0)
                         }
-                        .font(.system(size: metrics.font))
-                        .padding(.horizontal, metrics.x).padding(.vertical, metrics.y)
-                        .frame(maxWidth: fill ? .infinity : nil, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7)
-                                .fill(.primary.opacity(fixing ? 0.11 : 0.06))
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 7))
                     }
-                    .buttonStyle(.plain)
-                    .focused($focused)
-                    .onHover { hovering = $0 }
-                    .animation(.easeOut(duration: 0.12), value: fixing)
-                    .inkTip(standing.note ?? grant.why, tint: Self.hue(standing.grade))
                     .accessibilityLabel("\(what), \(fix)")
                     .onAppear { PermissionGrant.surfaceAppeared() }
                 }
-            }
-
-            /// Something to fix is orange; an offer the person has not
-            /// answered yet is the quieter yellow.
-            static func hue(_ grade: Standing.Grade) -> Color {
-                grade == .broken ? .orange : .yellow
             }
         }
 
@@ -322,7 +343,10 @@
                     let standing = grant.standing
                     // Read with the standing it moves with: the standing is
                     // what is observed, so this never lags it.
-                    let waiting = BackgroundService.loginItem.service.status == .requiresApproval
+                    let waiting =
+                        if case .awaitingApproval = AppInstallation.Job.loginItem.state {
+                            true
+                        } else { false }
                     VStack(alignment: .leading, spacing: 2) {
                         Toggle(
                             label,

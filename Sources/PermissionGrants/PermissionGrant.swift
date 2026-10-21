@@ -1,5 +1,11 @@
 import Foundation
+import Log
 
+#if os(macOS)
+    // A background service's grant is declared over its `AppInstallation.Job`:
+    // one import gives an app both.
+    @_exported import AppInstallations
+#endif
 #if os(macOS) || os(iOS)
     import UserNotifications
 #endif
@@ -25,8 +31,9 @@ public struct PermissionGrant: Sendable {
             case privacy(Privacy)
             /// Privacy & Security › Automation: Apple Events to one app.
             case automation(bundleID: String)
-            /// A process run beside the app through `SMAppService`.
-            case backgroundService(BackgroundService)
+            /// A process run beside the app (swift-utils
+            /// `AppInstallation.Job`): its state, rendered.
+            case backgroundService(AppInstallation.Job)
         #endif
         #if os(macOS) || os(iOS)
             /// Notifications posted from the app's own process.
@@ -85,12 +92,15 @@ public struct PermissionGrant: Sendable {
                 required: required)
         }
 
+        /// A job the app runs beside itself, declared once as an
+        /// `AppInstallation.Job` (its probe included): this is the person's
+        /// side of it.
         public static func backgroundService(
-            _ service: BackgroundService, title: String, why: String,
+            _ job: AppInstallation.Job, title: String, why: String,
             symbol: String = "gearshape.2", required: Bool = true
         ) -> PermissionGrant {
             PermissionGrant(
-                kind: .backgroundService(service), title: title, why: why, symbol: symbol,
+                kind: .backgroundService(job), title: title, why: why, symbol: symbol,
                 required: required)
         }
     #endif
@@ -121,10 +131,8 @@ public struct PermissionGrant: Sendable {
                 Readings.shared.standing("automation \(bundleID)") {
                     Automation.standing(of: bundleID)
                 }
-            case .backgroundService(let service):
-                Readings.shared.standing("background service \(service)") { [title] in
-                    service.standing(title: title)
-                }
+            case .backgroundService(let job):
+                Readings.shared.standing("job \(job.kind)") { JobGrant.standing(job) }
         #endif
         #if os(macOS) || os(iOS)
             case .notifications:
@@ -160,7 +168,7 @@ public struct PermissionGrant: Sendable {
         #if os(macOS)
             case .privacy(let privacy): await PrivacyHub.shared.ask(privacy)
             case .automation(let bundleID): await Automation.ask(bundleID)
-            case .backgroundService(let service): service.act(title: title)
+            case .backgroundService(let job): await JobGrant.ask(job)
         #endif
         #if os(macOS) || os(iOS)
             case .notifications(let options): await Notifications.ask(options: options)
@@ -177,10 +185,15 @@ public struct PermissionGrant: Sendable {
         /// unchecks): the reverse of `ask`, idempotent. Only a background
         /// service can be withdrawn by the app.
         public func unregister() {
-            guard case .backgroundService(let service) = kind else {
+            guard case .backgroundService(let job) = kind else {
                 preconditionFailure("\(title): only a background service unregisters")
             }
-            service.unregister(title: title)
+            do {
+                try job.uninstall()
+            } catch {
+                log.scope("grant").warn("could not turn off", ["grant": job.name, "err": error])
+            }
+            Readings.shared.readAll()
         }
 
         /// First thing in an app's `main`: a launch as the hub's fresh probe

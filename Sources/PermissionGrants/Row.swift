@@ -82,30 +82,34 @@
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
-                    switch standing.grade {
-                    case .good:
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title2)
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.green)
-                    case .unknown:
-                        Text("unknown")
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.tertiary)
-                    case .askable, .broken:
-                        Button(letterCase.apply(standing.actionTitle)) { grant.act() }
-                            .buttonStyle(.glassProminent)
+                    trailing(standing)
+                }
+            }
+
+            /// The one trailing element, in the actions' shape for every
+            /// standing: the action while it needs the person; the same pill
+            /// with a mark when it does not (a check, or the honest "unknown":
+            /// the app can't see it, so it neither vouches nor warns).
+            @ViewBuilder private func trailing(_ standing: Standing) -> some View {
+                switch standing.grade {
+                case .good, .unknown:
+                    GrantMark(grade: standing.grade)
+                case .askable, .broken:
+                    GrantAction(hue: PermissionGrant.hue(standing.grade), fill: false) {
+                        grant.act()
+                    } label: { _ in
+                        Text(letterCase.apply(standing.actionTitle))
                     }
                 }
             }
 
             /// The icon says the standing at a glance, as a device row does:
-            /// green when good, orange when the person must fix it.
+            /// green when good, the action's own hue while it needs the person.
             private func tint(_ grade: Standing.Grade) -> Color {
                 switch grade {
                 case .good: .green
-                case .broken: .orange
-                case .askable, .unknown: .secondary
+                case .askable, .broken: PermissionGrant.hue(grade)
+                case .unknown: .secondary
                 }
             }
 
@@ -127,22 +131,7 @@
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 12)
-                    switch standing.grade {
-                    case .good:
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .padding(.top, 2)
-                    case .unknown:
-                        // The honest mark: the app can't see this grant, so it
-                        // neither vouches (a checkmark) nor warns (a button).
-                        Text("unknown")
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.tertiary)
-                            .padding(.top, 3)
-                    case .askable, .broken:
-                        Button(letterCase.apply(standing.actionTitle)) { grant.act() }
-                            .controlSize(.small)
-                    }
+                    trailing(standing)
                 }
                 .padding(.vertical, 4)
             }
