@@ -129,9 +129,19 @@
         public static func microphone() -> Bool? { reading(.microphone) }
 
         /// AVFoundation's ask (the prompt quotes the app's
-        /// NSMicrophoneUsageDescription).
+        /// NSMicrophoneUsageDescription). Under the hardened runtime macOS
+        /// denies without asking unless the signature carries
+        /// `com.apple.security.device.audio-input` (grant-example,
+        /// 2026-10-21: asked and denied in the same instant, no prompt), so
+        /// a signature without it screams in the log instead of reading as
+        /// the person's no.
         public static func requestMicrophone(answered: (@MainActor @Sendable (Bool) -> Void)? = nil)
         {
+            if Signature.hardened, !Signature.entitled("com.apple.security.device.audio-input") {
+                grantLog.error(
+                    "the microphone can never be granted: the hardened runtime needs com.apple.security.device.audio-input in this app's entitlements, and macOS denies without asking"
+                )
+            }
             ask(.microphone, pane: "Privacy_Microphone") {
                 AVCaptureDevice.requestAccess(for: .audio) { allowed in
                     Permissions.shared.refreshSoon()
@@ -199,6 +209,32 @@
             grantLog.info("opened System Settings", ["pane": pane])
             NSWorkspace.shared.open(
                 URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
+        }
+
+        /// This process's own signature: what macOS weighs before it asks.
+        enum Signature {
+            /// Signed with the hardened runtime (where a missing device
+            /// entitlement is a silent denial).
+            static var hardened: Bool {
+                var code: SecCode?
+                guard SecCodeCopySelf([], &code) == errSecSuccess, let code else { return false }
+                var staticCode: SecStaticCode?
+                guard SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode
+                else { return false }
+                var info: CFDictionary?
+                guard
+                    SecCodeCopySigningInformation(
+                        staticCode, SecCSFlags(rawValue: kSecCSDynamicInformation), &info)
+                        == errSecSuccess,
+                    let flags = (info as? [String: Any])?[kSecCodeInfoFlags as String] as? UInt32
+                else { return false }
+                return flags & SecCodeSignatureFlags.runtime.rawValue != 0
+            }
+
+            static func entitled(_ key: String) -> Bool {
+                guard let task = SecTaskCreateFromSelf(nil) else { return false }
+                return SecTaskCopyValueForEntitlement(task, key as CFString, nil) as? Bool == true
+            }
         }
     }
 #endif

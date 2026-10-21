@@ -44,8 +44,20 @@ cat > "$app/Contents/Library/LaunchAgents/$agent" <<EOF
 </dict></plist>
 EOF
 
+# Under the hardened runtime macOS denies the microphone WITHOUT asking unless
+# the signature carries this entitlement.
+entitlements="$(mktemp -t grant-example).plist"
+cat > "$entitlements" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>com.apple.security.device.audio-input</key><true/>
+</dict></plist>
+EOF
+
 identity="$(ship identity --team G387QW47LV)"
-codesign --force --options runtime --timestamp=none --sign "$identity" "$app"
+codesign --force --options runtime --timestamp=none --entitlements "$entitlements" --sign "$identity" "$app"
+rm "$entitlements"
 codesign --verify --strict "$app"
 echo "built $app (signed $identity)"
 open "$app"

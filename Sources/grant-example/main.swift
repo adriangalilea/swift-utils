@@ -1,33 +1,12 @@
 import Grant
 import SwiftUI
 
-// The Grant shapes, live: `swift run grant-example`. One set of grants drawn as
-// a Settings section, one sheet, steps (a page per grant) and inline chips;
-// pick a shape at the top. The TCC rows are this process's real answers from
-// tccd; "a demo grant" moves askable → broken → good by its own button, so
-// every transition can be watched. `--render <dir>` writes each shape as a PNG.
+// The Grant shapes over real permissions: `mise run grant-example` builds and
+// opens a signed app with its own bundle id, so every answer is macOS's for
+// this app and every ask is the real one. One set of grants drawn as a Settings
+// section, one sheet, steps (a page per grant) and inline chips; pick a shape at
+// the top. `--render <dir>` writes each shape as a PNG.
 
-/// A grant whose standing its own act advances: askable, broken, good.
-@Observable final class DemoState { var step = 0 }
-
-struct DemoGrant: Grant {
-    let state: DemoState
-    let symbol = "sparkles"
-    let title = "a demo grant"
-    let why = "Moves askable → broken → good each time its button is pressed."
-    let required = true
-    var standing: Standing {
-        switch state.step {
-        case 0: .askable("Allow\u{2026}")
-        case 1:
-            .broken("Open Settings\u{2026}", note: "Denied in the demo. Press again to allow it.")
-        default: .good
-        }
-    }
-    func act() { state.step += 1 }
-}
-
-let demo = DemoState()
 /// The bundled launch agent (`mise run grant-example` builds the app that
 /// carries it): the same binary idling with `--helper`. Declared before
 /// `grants`: main.swift initializes top-level constants in order, and one
@@ -37,7 +16,6 @@ let helper = BackgroundServiceGrant(
     .agent(plist: "garden.untitled.grant-example.helper.plist"), title: "the helper",
     why: "Keeps working while the window is closed.")
 let grants: [any Grant] = [
-    DemoGrant(state: demo),
     TCCGrant(.microphone, title: "Microphone", why: "Hears what you say.", required: false),
     TCCGrant(
         .inputMonitoring, title: "Input Monitoring", why: "Lights Caps Lock while the mic is open.",
