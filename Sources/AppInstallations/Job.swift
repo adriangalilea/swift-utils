@@ -34,11 +34,32 @@
             /// What logs and words call it ("chilld", "awake's agent").
             public let name: String
             let answers: (@Sendable () -> Bool)?
+            let handBack: (@Sendable () -> Void)?
 
-            public init(_ kind: Kind, name: String, answers: (@Sendable () -> Bool)? = nil) {
+            /// `answers`: the job's own probe, the strongest witness that it
+            /// runs (an XPC hello). `handBack`: what the job must give back
+            /// before it is stopped, asked of it by the app (chill: the fans
+            /// to Apple over XPC): unregistering stops a job without a
+            /// SIGTERM, so every unregister this module makes (`uninstall`, a
+            /// fresh registration, a move's hand-over) runs it first.
+            public init(
+                _ kind: Kind, name: String, answers: (@Sendable () -> Bool)? = nil,
+                handBack: (@Sendable () -> Void)? = nil
+            ) {
                 self.kind = kind
                 self.name = name
                 self.answers = answers
+                self.handBack = handBack
+            }
+
+            /// Unregisters, the job's hand-back first: every stop this module
+            /// makes goes through here.
+            private func stop() throws {
+                if let handBack {
+                    installLog.info("handing back before stopping", ["job": name])
+                    handBack()
+                }
+                try service.unregister()
             }
 
             /// The app as its own login item.
@@ -251,7 +272,7 @@
                             ? "registered for another copy: moving the registration here"
                             : "on but not answering: registering afresh",
                         ["job": name])
-                    try? await service.unregister()
+                    try? stop()
                 }
                 try await register()
                 try await awaitApproval(within: approvalWait)
@@ -261,13 +282,13 @@
             }
 
             /// Off: unregistered, idempotent (a job not registered is already
-            /// the goal). Unregistering a daemon stops it without a SIGTERM,
-            /// so what it must hand back happens before (chill: fans to Apple).
+            /// the goal). Unregistering stops a job without a SIGTERM, so its
+            /// `handBack` runs first (chill: the fans to Apple).
             public func uninstall() throws {
                 let status = service.status
                 guard status == .enabled || status == .requiresApproval else { return }
                 do {
-                    try service.unregister()
+                    try stop()
                     installLog.info("uninstalled", ["job": name])
                 } catch let error as NSError where error.code == kSMErrorJobNotFound {
                     return

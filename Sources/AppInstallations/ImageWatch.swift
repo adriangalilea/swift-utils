@@ -17,10 +17,10 @@
         ///   MOVED: nothing is forgotten; a job leaves launchd (its record
         ///   names the old path, which launchd would retry forever) and the
         ///   moved copy registers it again when it opens; the app reopens
-        ///   from the moved copy. With no copy anywhere it was DELETED:
-        ///   `onGone` runs (hand back what the process holds: chill's fans to
-        ///   Apple), the app's state goes to the Trash (`forget`), and the
-        ///   process leaves. A job leaves launchd only when launchd's process
+        ///   from the moved copy. With no copy anywhere it was DELETED: the
+        ///   app's state goes to the Trash (`forget`) and the process leaves.
+        ///   Whichever it was, `beforeLeaving` runs first (hand back what
+        ///   the process holds: chilld's fans to Apple). A job leaves launchd only when launchd's process
         ///   for its label is this one: a newer copy may already have
         ///   registered the label.
         /// - **Replaced** (another file at the path) and whole: the new image
@@ -47,7 +47,7 @@
             private let keeps: [URL]
             private let links: [Link]
             private let goneAfter: Int
-            private let onGone: @Sendable () -> Void
+            private let beforeLeaving: @Sendable () -> Void
             private var gone = 0
             private var timer: DispatchSourceTimer?
 
@@ -58,12 +58,15 @@
             /// them on delete; a daemon's are exact files it created.
             /// `links`: its command lines on PATH. `every`: how often it looks.
             /// `goneAfter`: how many looks in a row the executable must be
-            /// missing before it is gone. `onGone`: what the process hands
-            /// back before a delete's cleanup.
+            /// missing before it is gone. `beforeLeaving`: what the process
+            /// hands back before it stops, whatever the reason the watch found
+            /// (deleted, moved, replaced): chilld's fans to Apple. It runs
+            /// before any cleanup or hand-over, since a hand-over's fresh
+            /// registration stops this process.
             public static func start(
                 jobs: [Job] = [], keeps: [URL] = [], links: [Link] = [],
                 every: Duration = .seconds(1), goneAfter: Int = 15,
-                onGone: @escaping @Sendable () -> Void = {}
+                beforeLeaving: @escaping @Sendable () -> Void = {}
             ) -> ImageWatch {
                 guard let path = Bundle.main.executableURL?.resolvingSymlinksInPath().path else {
                     preconditionFailure("a process with no executable URL")
@@ -79,7 +82,7 @@
                 let watch = ImageWatch(
                     path: path, inode: info.st_ino, job: AppInstallation.ownJob,
                     bundleID: bundleID, bundle: bundle, keeps: keeps, links: links,
-                    goneAfter: goneAfter, onGone: onGone)
+                    goneAfter: goneAfter, beforeLeaving: beforeLeaving)
                 installLog.info("watching the image", ["path": path, "as": watch.job ?? "the app"])
                 if watch.job == nil {
                     // A new copy of the app is where a job's record and a
@@ -108,7 +111,7 @@
                 path: String, inode: ino_t, job: (label: String, plist: String)?, bundleID: String,
                 bundle: URL,
                 keeps: [URL], links: [Link], goneAfter: Int,
-                onGone: @escaping @Sendable () -> Void
+                beforeLeaving: @escaping @Sendable () -> Void
             ) {
                 self.path = path
                 self.inode = inode
@@ -119,7 +122,7 @@
                 self.keeps = keeps
                 self.links = links
                 self.goneAfter = goneAfter
-                self.onGone = onGone
+                self.beforeLeaving = beforeLeaving
             }
 
             private func begin(every: Duration) {
@@ -149,12 +152,13 @@
                         installLog.info(
                             "the app moved: leaving, nothing forgotten",
                             ["from": bundle.path, "to": moved.path])
+                        beforeLeaving()
                         AppInstallation.leave(job: job, reopening: moved, handoff: jobPlist)
                         return
                     }
                     installLog.warn(
                         "the app was deleted: cleaning up and leaving", ["path": bundle.path])
-                    onGone()
+                    beforeLeaving()
                     AppInstallation.forget(
                         bundleID: bundleID, bundle: bundle, keeps: keeps, links: links)
                     AppInstallation.leave(job: job, reopening: nil)
@@ -168,6 +172,9 @@
                 }
                 timer?.cancel()
                 installLog.info("a new image is in place: running it", ["path": path])
+                // Before the hand-over: the new copy's fresh registration
+                // stops this process, maybe mid-wait.
+                beforeLeaving()
                 if let job {
                     // launchd would restart the bundle it registered (the old
                     // one, now in the Trash): the copy at this path takes the
