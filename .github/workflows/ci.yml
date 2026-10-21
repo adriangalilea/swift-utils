@@ -30,7 +30,7 @@ permissions: {}
 
 jobs:
   check:
-    uses: adriangalilea/ci/.github/workflows/mise.yml@b2324769d05804a2ce77a197ec2d0d0cb4f6ed87 # v1.9.0
+    uses: adriangalilea/ci/.github/workflows/mise.yml@1107aeabdeda92374665017fef2ed1c1861c86d6 # v1.10.0
     with:
       runner: ${{ github.event_name == 'push' && vars.MAC_RUNNER || 'macos-26' }}
       cache: .build
@@ -41,7 +41,7 @@ jobs:
     strategy:
       matrix:
         platform: [iOS, tvOS]
-    uses: adriangalilea/ci/.github/workflows/mise.yml@b2324769d05804a2ce77a197ec2d0d0cb4f6ed87 # v1.9.0
+    uses: adriangalilea/ci/.github/workflows/mise.yml@1107aeabdeda92374665017fef2ed1c1861c86d6 # v1.10.0
     with:
       runner: ${{ github.event_name == 'push' && vars.MAC_RUNNER || 'macos-26' }}
       task: platforms ${{ matrix.platform }}
@@ -52,7 +52,7 @@ jobs:
   version:
     needs: [check, platforms]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: adriangalilea/ci/.github/workflows/next-version.yml@b2324769d05804a2ce77a197ec2d0d0cb4f6ed87 # v1.9.0
+    uses: adriangalilea/ci/.github/workflows/next-version.yml@1107aeabdeda92374665017fef2ed1c1861c86d6 # v1.10.0
     with:
       v-prefix: false
     permissions:
@@ -61,7 +61,7 @@ jobs:
   release:
     needs: version
     if: needs.version.outputs.tag != ''
-    uses: adriangalilea/ci/.github/workflows/release.yml@b2324769d05804a2ce77a197ec2d0d0cb4f6ed87 # v1.9.0
+    uses: adriangalilea/ci/.github/workflows/release.yml@1107aeabdeda92374665017fef2ed1c1861c86d6 # v1.10.0
     with:
       tag: ${{ needs.version.outputs.tag }}
     permissions:
