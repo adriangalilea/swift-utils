@@ -28,15 +28,24 @@ struct DemoGrant: Grant {
 }
 
 let demo = DemoState()
+/// The bundled launch agent (`mise run grant-example` builds the app that
+/// carries it): the same binary idling with `--helper`. Declared before
+/// `grants`: main.swift initializes top-level constants in order, and one
+/// read before its line is an uninitialized value (an empty plist name that
+/// crashed SMAppService.status).
+let helper = BackgroundServiceGrant(
+    .agent(plist: "garden.untitled.grant-example.helper.plist"), title: "the helper",
+    why: "Keeps working while the window is closed.")
 let grants: [any Grant] = [
     DemoGrant(state: demo),
     TCCGrant(.microphone, title: "Microphone", why: "Hears what you say.", required: false),
     TCCGrant(
         .inputMonitoring, title: "Input Monitoring", why: "Lights Caps Lock while the mic is open.",
         required: false, withoutIt: "The key works; its light stays off."),
-    BackgroundServiceGrant(
-        .agent(plist: "garden.untitled.example.plist"), title: "the helper",
-        why: "Keeps working while the window is closed."),
+    TCCGrant(
+        .postEvents, title: "Accessibility", why: "Types into other apps.", required: false,
+        withoutIt: "It can show text, never type it."),
+    helper,
 ]
 
 enum Shape: String, CaseIterable { case section, sheet, steps, chip }
@@ -51,6 +60,14 @@ struct Gallery: View {
             .pickerStyle(.segmented).labelsHidden().padding(12)
             Divider()
             view(shape).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            Divider()
+            HStack {
+                Text("replay: `grant reset grant-example` clears the permissions")
+                    .font(.caption).foregroundStyle(.tertiary)
+                Spacer()
+                Button("turn the helper off") { helper.unregister() }.controlSize(.small)
+            }
+            .padding(10)
         }
         .frame(width: 520, height: 440)
     }
@@ -107,7 +124,10 @@ struct GrantExample: App {
 }
 
 let args = CommandLine.arguments
-if let at = args.firstIndex(of: "--render"), at + 1 < args.count {
+if args.contains("--helper") {
+    // The launch agent: alive, doing nothing, until launchd stops it.
+    dispatchMain()
+} else if let at = args.firstIndex(of: "--render"), at + 1 < args.count {
     let dir = URL(fileURLWithPath: args[at + 1])
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     for shape in Shape.allCases {

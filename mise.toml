@@ -53,6 +53,10 @@ TABLE
 description = "format + build (release) + test: the macOS gate, fast enough to run before every push; CI adds `platforms` beside it"
 run = ["mise run format", "swift build -c release", "mise run test", "echo 'swift-utils: check passed'"]
 
+[tasks.grant-example]
+description = "Grant's shapes as a real, signed app with its own permissions and a helper to install (grant reset grant-example replays it)"
+run = "bash scripts/grant-example-app.sh"
+
 [tasks.overlay]
 description = "Run the keymap overlay example"
 run = "swift run keymap-overlay"
