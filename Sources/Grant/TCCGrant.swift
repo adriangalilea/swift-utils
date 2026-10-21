@@ -25,6 +25,7 @@
         public var standing: Standing {
             switch Permissions.shared.answer(service) {
             case .allowed: .good
+            case .allowedOnReopen: .broken("Reopen", note: "Allowed. Applies when the app reopens.")
             case .notAsked: .askable("Allow\u{2026}")
             case .denied:
                 .broken(

@@ -342,6 +342,22 @@ request made (with no record it prompts and lists the app), the pane
 opened when the person already said no. Per-app Apple Events stay on
 `AEDeterminePermissionToAutomateTarget`, with its per-process answer cache.
 
+**A running app is answered as of its launch.** For a switch flipped in
+System Settings after launch, tccd keeps answering the running process's
+preflight as it stood (Accessibility read "denied" while macOS already let
+grant-example type into TextEdit). So the hub also asks a FRESH process of
+the app (its own binary with `--grant-probe`, spawned disowned so tccd
+judges it as itself) for any denied permission, in the two minutes after an
+ask, a pane opened or the app coming forward. Where macOS enforces the
+switch at once (Accessibility, posting events, measured) the fresh "allowed"
+is `.allowed`; where it does not (Input Monitoring: macOS's own "Quit &
+Reopen") it is `.allowedOnReopen`, and `TCCGrant` shows "Reopen", which
+opens a new instance and quits this one. An app opts in with ONE line, first
+in `main`: `Permissions.answerProbeIfAsked()`; without it a switch flipped
+after launch reads denied until the app reopens. A signature under the
+hardened runtime without `com.apple.security.device.audio-input` makes
+macOS deny the microphone without asking; `requestMicrophone` logs that.
+
 Every reading is logged in the app's unified log, scope `grant`, the first
 time and at each change, with tccd's raw code, and so is every ask and
 every pane opened. `grant status <app>` (this package's CLI, installed like

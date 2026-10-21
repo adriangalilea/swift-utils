@@ -34,8 +34,26 @@
         private static func reading(_ service: Permissions.Service) -> Bool? {
             switch Permissions.shared.answer(service) {
             case .allowed: true
-            case .denied: false
+            // Allowed in System Settings, not usable by this process yet.
+            case .denied, .allowedOnReopen: false
             case .notAsked: nil
+            }
+        }
+
+        /// Opens a new instance of this app, then quits this one: what makes
+        /// an allowed-on-reopen permission count. macOS's own "Quit & Reopen"
+        /// quit grant-example and never opened it again (2026-10-21).
+        @MainActor public static func reopen() {
+            let open = NSWorkspace.OpenConfiguration()
+            open.createsNewApplicationInstance = true
+            grantLog.info("reopening to apply a permission")
+            NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: open) {
+                _, error in
+                if let error {
+                    grantLog.error("reopen failed", ["err": error])
+                    return
+                }
+                Task { @MainActor in NSApp?.terminate(nil) }
             }
         }
 
@@ -50,6 +68,7 @@
         ) {
             let before = Permissions.shared.answer(service)
             guard before != .allowed else { return }
+            if before == .allowedOnReopen { return MainActor.assumeIsolated { reopen() } }
             // An ask is a person's click (or a command line's first use):
             // the main thread, or a bug. A command-line tool has no NSApp,
             // and nothing to bring forward.
@@ -59,7 +78,8 @@
                 "asked macOS",
                 ["grant": service.title, "before": before.rawValue, "allowed": allowed])
             if before == .denied { openSettings(pane: pane) }
-            Permissions.shared.refreshSoon()
+            // The person is about to flip a switch (or answer a prompt).
+            Permissions.shared.watchSettings()
         }
 
         // MARK: Accessibility (the AX API grant)
