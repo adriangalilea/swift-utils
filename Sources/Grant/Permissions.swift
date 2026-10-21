@@ -206,8 +206,13 @@
         /// The person may be changing permissions now (an ask, a pane opened,
         /// the app back in front, macOS announcing an Accessibility change):
         /// read at once, then every 2 s for two minutes.
-        public func watchSettings() {
-            Self.settingsWindow.withLock { $0 = Date().addingTimeInterval(120) }
+        public func watchSettings(_ why: String = "asked") {
+            let opened = Self.settingsWindow.withLock { until in
+                defer { until = Date().addingTimeInterval(120) }
+                return Date() >= until
+            }
+            // Logged when it opens, so what keeps a hub busy is never a guess.
+            if opened { grantLog.info("watching for permission changes", ["why": why]) }
             queue.async { [self] in readAll() }
         }
 
@@ -273,11 +278,11 @@
             self.timer = timer
             NotificationCenter.default.addObserver(
                 forName: NSApplication.didBecomeActiveNotification, object: nil, queue: nil
-            ) { [weak self] _ in self?.watchSettings() }
+            ) { [weak self] _ in self?.watchSettings("app came forward") }
             // Posted by macOS when the Accessibility list changes.
             DistributedNotificationCenter.default().addObserver(
                 forName: Notification.Name("com.apple.accessibility.api"), object: nil, queue: nil
-            ) { [weak self] _ in self?.watchSettings() }
+            ) { [weak self] _ in self?.watchSettings("macOS: Accessibility changed") }
         }
 
         // MARK: The fresh process

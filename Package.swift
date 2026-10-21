@@ -129,7 +129,7 @@ let package = Package(
         .target(name: "Entitlement", resources: [.process("Resources")]),
         // The yes it draws wears Ink's prominent button.
         .target(name: "Biometrics", dependencies: ["Ink"]),
-        .target(name: "Grant", dependencies: ["Log"]),
+        .target(name: "Grant", dependencies: ["Log"], exclude: ["README.md", "CLAUDE.md"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         // Every Grant shape live, one set of grants: `swift run grant-example`.
         .executableTarget(name: "grant-example", dependencies: ["Grant"]),
