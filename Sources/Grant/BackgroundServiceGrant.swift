@@ -63,7 +63,9 @@
             if let failure = Self.failures.withLock({ $0[kind] }) {
                 return .broken("try again", note: failure)
             }
-            switch service.status {
+            let status = service.status
+            record(status)
+            switch status {
             case .enabled:
                 return .good
             case .requiresApproval:
@@ -149,6 +151,29 @@
 
         /// A failed register, shown until the next act.
         private static let failures = Mutex<[Kind: String]>([:])
+
+        /// The last status logged per service: a reading is logged the first
+        /// time and at each change (surfaces read every second), like
+        /// `Permissions`' TCC readings, so `grant status` shows it too.
+        private static let readings = Mutex<[Kind: Int]>([:])
+
+        private func record(_ status: SMAppService.Status) {
+            let changed = Self.readings.withLock { readings in
+                guard readings[kind] != status.rawValue else { return false }
+                readings[kind] = status.rawValue
+                return true
+            }
+            guard changed else { return }
+            let word =
+                switch status {
+                case .enabled: "allowed"
+                case .requiresApproval: "awaiting approval"
+                case .notRegistered: "not asked"
+                case .notFound: "not found (\(Placement.of(kind)))"
+                @unknown default: "status \(status.rawValue)"
+                }
+            grantLog.info("reads \(word)", ["grant": title, "status": status.rawValue])
+        }
 
         static var appName: String {
             Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "the app"
