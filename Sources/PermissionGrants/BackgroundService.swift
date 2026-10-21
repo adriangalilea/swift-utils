@@ -32,7 +32,7 @@
                 return .broken("Restart", note: "Installed, but not answering.")
             case .misplaced:
                 return .broken(
-                    AppInstallation.installedCopyExists
+                    AppInstallation.installedCopy != nil
                         ? "Open in Applications" : "Move to Applications",
                     note: "Only works from the Applications folder.")
             case .bare:

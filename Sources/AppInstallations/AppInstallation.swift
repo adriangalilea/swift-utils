@@ -74,9 +74,21 @@
             return bundle.pathExtension == "app" ? bundle : nil
         }
 
+        /// The two folders macOS treats as Applications: the system's, where
+        /// an app is moved, and the person's own (~/Applications), where an
+        /// app installed for one account lives. A registration is valid
+        /// from either.
+        public static let applicationsFolders = [
+            URL(filePath: "/Applications"),
+            FileManager.default.homeDirectoryForCurrentUser.appending(path: "Applications"),
+        ]
+
         public static var home: Home {
             guard let bundle else { return .noBundle }
-            if bundle.deletingLastPathComponent().path == "/Applications" { return .applications }
+            let folder = bundle.deletingLastPathComponent().standardizedFileURL.path
+            if applicationsFolders.contains(where: { $0.standardizedFileURL.path == folder }) {
+                return .applications
+            }
             if bundle.path.hasPrefix("/Volumes/") { return .elsewhere(bundle, .diskImage) }
             if bundle.path.contains("/AppTranslocation/") {
                 return .elsewhere(bundle, .translocated)
@@ -84,14 +96,17 @@
             return .elsewhere(bundle, .folder)
         }
 
-        /// The app where it belongs: /Applications/<its name>.
+        /// Where `moveHome` puts the app: /Applications/<its name>.
         public static var homeURL: URL? {
-            bundle.map { URL(filePath: "/Applications").appending(path: $0.lastPathComponent) }
+            bundle.map { applicationsFolders[0].appending(path: $0.lastPathComponent) }
         }
 
-        /// An install already in /Applications, which is THE app.
-        public static var installedCopyExists: Bool {
-            homeURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+        /// An install of this app already in either Applications folder,
+        /// which is THE app: the system's first.
+        public static var installedCopy: URL? {
+            guard let name = bundle?.lastPathComponent else { return nil }
+            return applicationsFolders.map { $0.appending(path: name) }
+                .first { FileManager.default.fileExists(atPath: $0.path) }
         }
 
         public enum MoveError: Error, CustomStringConvertible {
@@ -109,25 +124,29 @@
         }
 
         /// Puts the app where it belongs and moves the person there: an
-        /// install already in /Applications is THE app and is opened;
-        /// otherwise this bundle is copied there (a copy: a disk image is
-        /// read-only and a translocated bundle's origin is hidden from it),
-        /// that copy is opened, and this process quits. A new instance,
-        /// since it shares this process's bundle id.
+        /// install already in an Applications folder is THE app and is
+        /// opened; otherwise this bundle is copied into /Applications (a
+        /// copy: a disk image is read-only and a translocated bundle's
+        /// origin is hidden from it), that copy is opened, and this process
+        /// quits. A new instance, since it shares this process's bundle id.
         @MainActor public static func moveHome() async throws {
             guard let bundle, let homeURL else { throw MoveError.noBundle }
-            if !installedCopyExists {
+            let target: URL
+            if let installedCopy {
+                target = installedCopy
+            } else {
                 do {
                     try FileManager.default.copyItem(at: bundle, to: homeURL)
                     installLog.info("copied into Applications", ["from": bundle.path])
                 } catch {
                     throw MoveError.copy(error.localizedDescription)
                 }
+                target = homeURL
             }
             let open = NSWorkspace.OpenConfiguration()
             open.createsNewApplicationInstance = true
             do {
-                _ = try await NSWorkspace.shared.openApplication(at: homeURL, configuration: open)
+                _ = try await NSWorkspace.shared.openApplication(at: target, configuration: open)
             } catch {
                 throw MoveError.open(error.localizedDescription)
             }
