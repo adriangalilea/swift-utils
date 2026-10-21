@@ -1,2 +1,4 @@
 .build/
 .DS_Store
+# The assembled example app (mise run grant-example).
+/build/
