@@ -96,6 +96,11 @@ func shell(_ script: String, env: [String: String] = [:]) {
     must(["/bin/sh", "-c", script], env: env)
 }
 
+/// A line for the person on stderr, where stdout carries a result.
+func say(_ line: String) {
+    FileHandle.standardError.write(Data((line + "\n").utf8))
+}
+
 func die(_ message: String) -> Never {
     FileHandle.standardError.write(Data("ship: \(message)\n".utf8))
     exit(1)

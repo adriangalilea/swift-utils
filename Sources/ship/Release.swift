@@ -484,6 +484,8 @@ func release(_ manifests: [String]) -> Never {
         else { die("cannot write \(app.app)'s release record") }
         print("ship: \(app.app) built in \(Int(result.seconds[app.app] ?? 0)) s")
     }
+    // The run's hand-off, now in each record and toolchain.txt.
+    try? FileManager.default.removeItem(atPath: resultPath)
     print(
         "ship: released \(names.joined(separator: ", ")) in \(Int(Date().timeIntervalSince(began))) s"
     )
@@ -562,7 +564,9 @@ func releaseRun(_ arguments: [String]) -> Never {
         group.enter()
         DispatchQueue.global().async {
             let began = Date()
-            print("ship: \(app.app): building (log: \(app.log))")
+            // Progress goes to stderr: the run's stdout is the approver's
+            // word, kept in approval.txt.
+            say("ship: \(app.app): building (log: \(app.log))")
             let process = Process()
             process.executableURL = URL(filePath: app.script)
             process.arguments = [app.root]
@@ -587,12 +591,12 @@ func releaseRun(_ arguments: [String]) -> Never {
                 for artifact in app.artifacts { made[artifact] = digest(app.root + "/" + artifact) }
             }
             if status == 0 {
-                print("ship: \(app.app): built in \(Int(seconds)) s")
+                say("ship: \(app.app): built in \(Int(seconds)) s")
             } else {
                 let tail =
                     (try? String(contentsOfFile: app.log, encoding: .utf8))?
                     .split(separator: "\n").suffix(15).joined(separator: "\n") ?? ""
-                print(
+                say(
                     "ship: \(app.app): FAILED (exit \(status)) after \(Int(seconds)) s; the end of \(app.log):\n\(tail)"
                 )
             }
