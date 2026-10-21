@@ -57,6 +57,8 @@ withExtendedLifetime(watch) { App.main() }
 - **Gone** `goneAfter` ticks in a row (one missing tick is an upgrade mid-copy): `onGone` runs (hand back what the process holds, move its state to the Trash), then the process leaves. A job boots itself out of launchd, since a deleted app cannot unregister it and `KeepAlive` would retry the missing binary forever; the app quits.
 - **Replaced** and whole (signed as this process is, its designated requirement holding): a job exits and launchd restarts it into the new image, which needs `KeepAlive` in its plist; the app reopens into it.
 
+- **A new copy keeps the person's choice.** The app's watch, at launch, registers again every job its bundle declares that macOS records as on yet launchd does not run: the record was made for a copy that moved (into another Applications folder), was replaced or was deleted. A job turned off, or held for approval, is never touched; one still silent after this is a real failure and offers its Restart.
+
 A process is a job only when one of the bundle's own job plists declares the label launchd gave it (`ownJobLabel`). launchd names every process it starts, an app opened from Finder included, so the name alone proves nothing. The label is read when the watch starts, while the bundle can still vouch for it.
 
 ## Proof

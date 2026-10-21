@@ -49,6 +49,8 @@
                     path: path, inode: info.st_ino, job: AppInstallation.ownJobLabel,
                     goneAfter: goneAfter, onGone: onGone)
                 installLog.info("watching the image", ["path": path, "as": watch.job ?? "the app"])
+                // A new copy of the app is where a job's record goes stale.
+                if watch.job == nil { Job.reattachDeclared() }
                 watch.begin(every: every)
                 return watch
             }

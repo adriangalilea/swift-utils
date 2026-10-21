@@ -238,6 +238,45 @@
                 installLog.info("restarted", ["job": name, "status": result])
             }
 
+            /// The person's choice kept across copies of the app. Every job
+            /// this bundle declares (its LaunchAgents and LaunchDaemons
+            /// plists) that macOS records as on yet launchd does not run is
+            /// registered again for this copy: the record was made for a copy
+            /// that moved, was replaced or was deleted, and the person who
+            /// turned it on should not have to again. A job turned off is
+            /// never touched, nor one held for approval. The app runs this at
+            /// launch (`ImageWatch.start`), off the main thread; a job still
+            /// silent after it is a real failure and reads as one.
+            static func reattachDeclared() {
+                guard let bundle = AppInstallation.bundle else { return }
+                let declared: [Job] =
+                    ["LaunchAgents", "LaunchDaemons"].flatMap { folder in
+                        let names =
+                            (try? FileManager.default.contentsOfDirectory(
+                                atPath: bundle.appending(path: "Contents/Library/\(folder)").path))
+                            ?? []
+                        return names.filter { $0.hasSuffix(".plist") }.map { plist in
+                            Job(
+                                folder == "LaunchAgents"
+                                    ? .agent(plist: plist) : .daemon(plist: plist),
+                                name: plist)
+                        }
+                    }
+                for job in declared {
+                    guard job.state == .silent else { continue }
+                    installLog.info(
+                        "on, but not running from this copy: registering again", ["job": job.name])
+                    Task.detached {
+                        do {
+                            try await job.register()
+                        } catch {
+                            installLog.warn(
+                                "could not register again", ["job": job.name, "err": error])
+                        }
+                    }
+                }
+            }
+
             // MARK: Internals
 
             /// launchd's own answer: the job loaded and running (`launchctl
