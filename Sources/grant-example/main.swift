@@ -26,21 +26,37 @@ let grants: [any Grant] = [
 
 enum Shape: String, CaseIterable { case section, sheet, steps, chip }
 
-/// The ground truth for "Posting events": 3 s after the press (time to click
-/// into a text field in another app) this process posts "granted" as
-/// keystrokes. Whether the word appears is what macOS lets THIS process do,
-/// whatever any check answers.
+/// The ground truth for "Posting events": opens a fresh empty document in
+/// TextEdit and posts "granted" to it as keystrokes. Whether the word appears
+/// is what macOS lets THIS process do, whatever any check answers.
 @MainActor func typeTestWord() {
-    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+    let document = URL(filePath: NSTemporaryDirectory()).appending(
+        path: "grant-example-\(Int(Date().timeIntervalSince1970)).txt")
+    FileManager.default.createFile(atPath: document.path, contents: Data())
+    let textEdit = URL(filePath: "/System/Applications/TextEdit.app")
+    Task {
+        let app: NSRunningApplication
+        do {
+            app = try await NSWorkspace.shared.open(
+                [document], withApplicationAt: textEdit, configuration: .init())
+        } catch {
+            print("type test word: TextEdit did not open: \(error)")
+            return
+        }
+        // The document's window takes the keys once TextEdit is in front.
+        for _ in 0..<50 where !app.isActive { try? await Task.sleep(for: .milliseconds(100)) }
+        try? await Task.sleep(for: .milliseconds(300))
         let source = CGEventSource(stateID: .privateState)
         let word = Array("granted".utf16)
         for down in [true, false] {
             let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: down)
             event?.flags = []
             event?.keyboardSetUnicodeString(stringLength: word.count, unicodeString: word)
-            event?.post(tap: .cghidEventTap)
+            event?.postToPid(app.processIdentifier)
         }
-        print("typed test word; hub reads \(Permissions.shared.answer(.postEvents).rawValue)")
+        print(
+            "typed test word into TextEdit; hub reads \(Permissions.shared.answer(.postEvents).rawValue)"
+        )
     }
 }
 
