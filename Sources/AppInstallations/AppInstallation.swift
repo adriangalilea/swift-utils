@@ -93,19 +93,25 @@
         }
 
         /// The running app's bundle, from its executable with links resolved
-        /// (a command line symlinked into ~/.local/bin is the same app).
+        /// (a command line symlinked into ~/.local/bin is the same app). The
+        /// OUTERMOST .app around the executable: a helper nested inside the
+        /// app (`Contents/Library/LoginItems/authzd.app`, a tool in
+        /// `Contents/Helpers`) belongs to the app that carries it, whose
+        /// place, plists and identity are the ones that count.
         public static var bundle: URL? {
             guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath() else {
                 return nil
             }
-            let bundle = executable.deletingLastPathComponent().deletingLastPathComponent()
-                .deletingLastPathComponent()
-            return bundle.pathExtension == "app" ? bundle : nil
+            let components = executable.pathComponents
+            guard let outer = components.firstIndex(where: { $0.hasSuffix(".app") }) else {
+                return nil
+            }
+            return URL(filePath: NSString.path(withComponents: Array(components[...outer])))
         }
 
         /// The app's name as a person sees it.
         public static var displayName: String {
-            let info = Bundle.main.infoDictionary
+            let info = (bundle.flatMap { Bundle(url: $0) } ?? Bundle.main).infoDictionary
             return info?["CFBundleDisplayName"] as? String ?? info?["CFBundleName"] as? String
                 ?? ProcessInfo.processInfo.processName
         }
@@ -276,7 +282,9 @@
             let open = NSWorkspace.OpenConfiguration()
             open.createsNewApplicationInstance = true
             installLog.info("reopening", ["why": why])
-            NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: open) {
+            NSWorkspace.shared.openApplication(
+                at: bundle ?? Bundle.main.bundleURL, configuration: open
+            ) {
                 _, error in
                 if let error {
                     installLog.error("reopen failed", ["why": why, "err": error])
