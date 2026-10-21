@@ -15,14 +15,16 @@
         static func standing(
             _ job: AppInstallation.Job, _ offers: [AppInstallation.Scope]
         ) -> PermissionGrant.Standing {
-            if let failure = failures.withLock({ $0[job.name] }) {
-                return .broken("Try Again", note: failure)
-            }
             let state = job.state
             record(job, state)
+            // The last failed act, where nothing truer can be said: a job now
+            // running, or held for approval, says that instead.
+            let failure = failures.withLock { $0[job.name] }
             switch state {
             case .running:
                 return .good
+            case .off where failure != nil, .silent where failure != nil:
+                return .broken("Try Again", note: failure ?? "")
             case .off:
                 return .askable("Turn On")
             case .awaitingApproval(let needsAdmin):
@@ -69,7 +71,12 @@
                 grantLog.info("opened Login Items", ["grant": job.name])
                 SMAppService.openSystemSettingsLoginItems()
             case .off, .silent:
-                do { try await job.install() } catch { fail(job, "\(error)") }
+                do {
+                    try await job.install()
+                } catch AppInstallation.Job.Failure.awaitingApproval {
+                    // Still waiting for the person's switch is the state, said
+                    // by the row with its steer, never a failure over it.
+                } catch { fail(job, "\(error)") }
             }
         }
 

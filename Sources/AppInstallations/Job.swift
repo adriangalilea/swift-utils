@@ -483,6 +483,14 @@
                             "\(error.localizedDescription) (SMAppService needs the bundle signed by a team, never ad hoc)"
                         )
                     } catch {
+                        // macOS refuses to register a job it already holds
+                        // for approval (EPERM, "Operation not permitted"):
+                        // it is registered, waiting for the person's switch.
+                        if service.status == .requiresApproval {
+                            installLog.info(
+                                "held for approval already", ["job": name, "refusal": "\(error)"])
+                            return
+                        }
                         last = error
                     }
                 }
