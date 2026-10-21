@@ -5,6 +5,11 @@
 # push recompiles what it touched. The diff step makes format-clean a hard
 # requirement (swift-format changes nothing).
 #
+# A push to main runs on Adrian's Mac (the self-hosted runner labelled
+# swift-utils-mac, a launchd agent of his user; nothing here touches a secret),
+# a pull request on GitHub's macos-26: the repo is public, and a fork's code
+# never runs on the Mac.
+#
 # A green push to main is released at once: next-version reads the version from
 # the commits since the last tag (in 0.x a break bumps the minor, anything else
 # worth a release the patch, docs and the like none), and release.yml creates
@@ -26,6 +31,7 @@ jobs:
   check:
     uses: adriangalilea/ci/.github/workflows/mise.yml@b2324769d05804a2ce77a197ec2d0d0cb4f6ed87 # v1.9.0
     with:
+      runner: ${{ github.event_name == 'push' && 'swift-utils-mac' || 'macos-26' }}
       cache: .build
     permissions:
       contents: read
@@ -36,6 +42,7 @@ jobs:
         platform: [iOS, tvOS]
     uses: adriangalilea/ci/.github/workflows/mise.yml@b2324769d05804a2ce77a197ec2d0d0cb4f6ed87 # v1.9.0
     with:
+      runner: ${{ github.event_name == 'push' && 'swift-utils-mac' || 'macos-26' }}
       task: platforms ${{ matrix.platform }}
       cache: .build/platforms
     permissions:
