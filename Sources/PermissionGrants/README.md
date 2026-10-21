@@ -56,10 +56,12 @@ Every surface composes from the same grants; the app picks the one that fits the
 - `PermissionGrant.Section(title?, grants, footer:)`: a Settings section, required first; untitled inside a host's own `Section`.
 - `PermissionGrant.Sheet(title:, subtitle:, grants, optionalNote:) { done }`: everything on one sheet, required and optional apart, "later" while a required one needs the person, "done" after (hollow's).
 - `PermissionGrant.Steps(grants, welcome: { … }) { done }`: a page per grant that moves on by itself the moment its grant is good; an optional one can be skipped, a required one waits (steno's onboarding). `PermissionGrant.Page(grant)` is one page alone.
-- `PermissionGrant.Chip(grant)`: inline, only while it needs the person, its note or name beside the button, nothing once good.
+- `PermissionGrant.Chip(grant, label: "can't type into apps yet", fill:)`: the warning that is its own fix, for a menu or a toolbar. A dot (orange to fix, yellow to ask) and what is not working; hovered or focused, the same box says the fix, the note as its help; a click acts. Truly nothing once good, no gap in a stack. `fill` takes the host's width (a menu row aligned with its neighbours), otherwise it hugs its words.
 - `PermissionGrant.LaunchAtLogin(label)`: "open at login" as the choice it is, never a requirement.
 
-Each re-reads its grants every second and at once on a change, so none can show a stale state or a loading one.
+The words this library writes on buttons and headings ("Open Settings…", "Later", "Required") are Title Case, macOS's; an app with a lowercase voice sets `.permissionGrantCase(.lower)` once on its host and every one follows. Notes are sentences and keep their case.
+
+Every standing is observable, for every kind, so a surface repaints the moment what it shows changes and never otherwise: no timer, no stale state, no loading state. A surface appearing asks for a fresh read (on a Mac it opens the hub's settings window, below).
 
 ## Asking
 
@@ -71,14 +73,14 @@ Each re-reads its grants every second and at once on a change, so none can show 
 
 - **First read**: synchronous, in-process, so a surface's first frame is the truth (at launch the two agree).
 - **Idle otherwise**: nothing is read while nothing can change.
-- **The settings window**: two minutes after the app comes forward, an ask, a pane opened, or macOS's Accessibility-change notification (each opening logged with its reason). Every 2 s in it, ONE fresh process of the app's own binary (`--grant-probe`, spawned disowned with `responsibility_spawnattrs_setdisclaim` so tccd judges it as itself) answers every watched switch, grants and revocations alike.
+- **The settings window**: two minutes after the app comes forward, an ask, a pane opened, a grant surface appearing (a menu opening counts: a menu bar app never "comes forward"), or macOS's Accessibility-change notification (each opening logged with its reason). Every 2 s in it, ONE fresh process of the app's own binary (`--grant-probe`, spawned disowned with `responsibility_spawnattrs_setdisclaim` so tccd judges it as itself) answers every watched switch, grants and revocations alike.
 - **Live or on reopen**: where macOS enforces a switch on the running app at once (Accessibility, posting events: measured), the fresh answer is the answer; where it does not (Input Monitoring, Screen Recording: macOS's own "Quit & Reopen"), a fresh "allowed" reads "Reopen" (a new instance opened, this one quit; macOS's own "Quit & Reopen" once quit and never reopened). Unmeasured switches stay on the reopen side.
 
 **One line per app**, first in `main`: `PermissionGrant.answerProbeIfAsked()`. Without it there is no probe, and a change shows only when the app reopens.
 
 ## The hook
 
-`grant.observe { standing in }` runs on the main thread with each change of that grant's standing, for every kind. A Privacy switch is noticed through the hub, at once; what macOS does not announce (a background service's approval, a notification setting, an app's own state) is read every 2 s while any observer is registered and at once when the app comes forward, and nothing is read once the last observer cancels. No app writes a polling loop.
+`grant.observe { standing in }` runs on the main thread with each change of that grant's standing, for every kind: it is Observation over the same standing every view reads. A Privacy switch publishes through the hub; what macOS does not announce (a background service's registration, a notification setting, Apple Events consent) is re-read after an ask, when a surface appears, when the app comes forward, and on a Mac every 2 s inside the settings window; an app's own grant publishes through the observable state its closure reads. Outside those moments nothing is read. No app writes a polling loop.
 
 ## The fallback, one source at a time
 

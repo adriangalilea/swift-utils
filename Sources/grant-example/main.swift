@@ -146,10 +146,17 @@ struct Gallery: View {
         }
     case .chip:
         VStack(alignment: .leading, spacing: 10) {
-            Text("Inline: only what needs the person, nothing once it is good.")
+            Text("The warning is the button: hover says the fix. Nothing once it is good.")
                 .font(.caption).foregroundStyle(.secondary)
-            ForEach(Array(grants.enumerated()), id: \.offset) { _, grant in
-                PermissionGrant.Chip(grant)
+            // A menu's row: the width the menu gives it, in the app's voice.
+            PermissionGrant.Chip(.typing, label: "can't type into apps yet", fill: true)
+                .permissionGrantCase(.lower)
+            PermissionGrant.Chip(.speech, label: "can't turn speech into text yet", fill: true)
+                .permissionGrantCase(.lower)
+            // Inline: hugging its words, in macOS's case.
+            HStack(spacing: 8) {
+                PermissionGrant.Chip(.keyLight, label: "Caps Lock light")
+                PermissionGrant.Chip(.headMotion)
             }
         }
         .padding(20)

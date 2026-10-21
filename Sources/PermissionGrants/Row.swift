@@ -1,5 +1,4 @@
 #if os(macOS) || os(iOS)
-    import Combine
     import SwiftUI
     #if os(macOS)
         import AppKit
@@ -13,12 +12,9 @@
         /// The one row every grant surface wears: icon, title and one line
         /// under it, a live checkmark or the standing's action. SELF-SUFFICIENT
         /// by design, so a parent can never strand it stale: `Row(grant)` is
-        /// always live. Two update paths, both explicit: body reads
-        /// `grant.standing` (registering this view's own observation of any
-        /// observable state behind it, so a Privacy switch or a claim's
-        /// verdict repaints the instant it moves), and a re-read for what
-        /// nothing announces: on every activation, and on macOS a 1 s pulse
-        /// as well (System Settings changes them beside the running app).
+        /// always live: body reads `grant.standing`, which is observable for
+        /// every kind, so the row repaints the instant what it shows moves and
+        /// never otherwise. Appearing, it asks for a fresh read.
         ///
         /// DOCTRINE: action buttons carry NO hover tooltips: guidance a row
         /// needs is rendered INLINE as the standing's note, visible without
@@ -36,12 +32,7 @@
             // (the app regains focus with the grant still missing). Every
             // other transition renders immediately.
             @State private var shown: Standing?
-            #if os(macOS)
-                /// A Mac's grants change in System Settings beside the running
-                /// app, with no event: read each second. An iPhone's change
-                /// only in Settings, which the app returns from (`becameActive`).
-                private let pulse = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-            #endif
+            @Environment(\.permissionGrantCase) private var letterCase
 
             /// `row`: a settings list line (small icon, title and one line, a
             /// small control). `card`: a device-list card (a large icon tinted
@@ -60,10 +51,10 @@
                 let standing = shown ?? live
                 content(standing)
                     .onChange(of: live) { sync() }
-                    #if os(macOS)
-                        .onReceive(pulse) { _ in sync() }
-                    #endif
-                    .onAppear { sync(arrival: true) }
+                    .onAppear {
+                        PermissionGrant.surfaceAppeared()
+                        sync(arrival: true)
+                    }
                     // Back from Settings (where the person changes it) is RETURN.
                     .onReceive(NotificationCenter.default.publisher(for: becameActive)) { _ in
                         sync(arrival: true)
@@ -102,7 +93,7 @@
                             .font(.caption.monospaced())
                             .foregroundStyle(.tertiary)
                     case .askable, .broken:
-                        Button(standing.actionTitle) { grant.act() }
+                        Button(letterCase.apply(standing.actionTitle)) { grant.act() }
                             .buttonStyle(.glassProminent)
                     }
                 }
@@ -149,7 +140,7 @@
                             .foregroundStyle(.tertiary)
                             .padding(.top, 3)
                     case .askable, .broken:
-                        Button(standing.actionTitle) { grant.act() }
+                        Button(letterCase.apply(standing.actionTitle)) { grant.act() }
                             .controlSize(.small)
                     }
                 }

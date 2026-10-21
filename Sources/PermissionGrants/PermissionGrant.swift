@@ -108,17 +108,29 @@ public struct PermissionGrant: Sendable {
 
     // MARK: Reading
 
-    /// What every surface renders, read fresh on each access: the one place
-    /// a raw status becomes presentation.
+    /// What every surface renders: the one place a raw status becomes
+    /// presentation. Observable for every kind (a view or hook that reads it
+    /// is told when it changes): a Privacy switch through the hub, the kinds
+    /// macOS does not announce through `Readings`, the app's own through the
+    /// state its closure reads.
     public var standing: Standing {
         switch kind {
         #if os(macOS)
             case .privacy(let privacy): PrivacyHub.shared.standing(privacy)
-            case .automation(let bundleID): Automation.standing(of: bundleID)
-            case .backgroundService(let service): service.standing(title: title)
+            case .automation(let bundleID):
+                Readings.shared.standing("automation \(bundleID)") {
+                    Automation.standing(of: bundleID)
+                }
+            case .backgroundService(let service):
+                Readings.shared.standing("background service \(service)") { [title] in
+                    service.standing(title: title)
+                }
         #endif
         #if os(macOS) || os(iOS)
-            case .notifications: Notifications.standing(Notifications.reach())
+            case .notifications:
+                Readings.shared.standing("notifications") {
+                    Notifications.standing(Notifications.reach())
+                }
         #endif
         case .custom(let standing, _): MainActor.assumeIsolated { standing() }
         }
@@ -155,6 +167,8 @@ public struct PermissionGrant: Sendable {
         #endif
         case .custom(_, let act): act()
         }
+        // What the ask changed (a registration, a prompt's answer) shows now.
+        Readings.shared.readAll()
         return isAllowed
     }
 

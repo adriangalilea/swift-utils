@@ -138,8 +138,8 @@
     ///   `allowedOnReopen`. An app without the probe (`answerProbeIfAsked`
     ///   missing from its main) is read in-process in the window instead.
     ///
-    /// A change publishes through Observation (a view that read it repaints)
-    /// and to every `observe` handler, and is logged with its source and raw
+    /// A change publishes through Observation (a view or `observe` hook that
+    /// read it is told), and is logged with its source and raw
     /// code (scope `grant`; `grant status <app>` prints the latest).
     final class PrivacyHub: @unchecked Sendable {
         typealias Privacy = PermissionGrant.Privacy
@@ -265,7 +265,6 @@
         private let registrar = ObservationRegistrar()
         private let lock = NSLock()
         private var answers: [Privacy: Answer] = [:]
-        private var handlers: [UUID: (Privacy, Answer) -> Void] = [:]
         private let queue = DispatchQueue(label: "grant.privacy", qos: .utility)
         private var started = false
         /// Bumped on every change: what Observation tracks.
@@ -278,18 +277,9 @@
         func answer(_ privacy: Privacy) -> Answer {
             registrar.access(self, keyPath: \.revision)
             if let known = lock.withLock({ answers[privacy] }) { return known }
-            startIfNeeded()
+            start()
             let code = Self.code(privacy)
             return record(privacy, Self.answer(code: code), raw: code, fresh: false)
-        }
-
-        /// `handler` runs on the main thread with every change of any watched
-        /// switch (never for an unchanged reading).
-        @discardableResult
-        func observe(_ handler: @escaping (Privacy, Answer) -> Void) -> UUID {
-            let token = UUID()
-            lock.withLock { handlers[token] = handler }
-            return token
         }
 
         /// Until when the hub reads, every 2 s.
@@ -308,9 +298,11 @@
             queue.async { [self] in readAll() }
         }
 
-        /// Every watched switch, from a fresh process when the app has the
-        /// probe, else in-process.
+        /// Everything read so far: the kinds macOS does not announce
+        /// (`Readings`), then every watched switch, from a fresh process when
+        /// the app has the probe, else in-process.
         private func readAll() {
+            Readings.shared.readAll()
             let watched = lock.withLock { Array(answers.keys) }
             guard !watched.isEmpty else { return }
             let fresh = Self.freshCodes()
@@ -344,16 +336,13 @@
             registrar.withMutation(of: self, keyPath: \.revision) {
                 lock.withLock { revision += 1 }
             }
-            if !first {
-                let current = lock.withLock { Array(handlers.values) }
-                DispatchQueue.main.async { for handler in current { handler(privacy, answer) } }
-            }
             return answer
         }
 
         private var timer: DispatchSourceTimer?
 
-        private func startIfNeeded() {
+        /// The window's clock and its triggers, once per process; idempotent.
+        func start() {
             let start = lock.withLock { () -> Bool in
                 guard !started else { return false }
                 started = true
