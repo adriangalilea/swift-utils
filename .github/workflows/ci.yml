@@ -21,6 +21,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # main again, by hand (`gh workflow run ci -R adriangalilea/swift-utils`):
+  # a push whose run was cancelled is released by its rerun.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -32,7 +35,7 @@ jobs:
   check:
     uses: adriangalilea/ci/.github/workflows/mise.yml@5afd9365125449d69deb51e9e5ab2980260832fe # v1.10.1
     with:
-      runner: ${{ github.event_name == 'push' && vars.MAC_RUNNER || 'macos-26' }}
+      runner: ${{ github.event_name != 'pull_request' && vars.MAC_RUNNER || 'macos-26' }}
       cache: .build
     permissions:
       contents: read
@@ -43,7 +46,7 @@ jobs:
         platform: [iOS, tvOS]
     uses: adriangalilea/ci/.github/workflows/mise.yml@5afd9365125449d69deb51e9e5ab2980260832fe # v1.10.1
     with:
-      runner: ${{ github.event_name == 'push' && vars.MAC_RUNNER || 'macos-26' }}
+      runner: ${{ github.event_name != 'pull_request' && vars.MAC_RUNNER || 'macos-26' }}
       task: platforms ${{ matrix.platform }}
       cache: .build/platforms
     permissions:
@@ -51,7 +54,7 @@ jobs:
 
   version:
     needs: [check, platforms]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     uses: adriangalilea/ci/.github/workflows/next-version.yml@5afd9365125449d69deb51e9e5ab2980260832fe # v1.10.1
     with:
       v-prefix: false
