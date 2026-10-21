@@ -44,8 +44,8 @@ extension PermissionGrant {
         func track() {
             withObservationTracking {
                 _ = grant.standing
-            } onChange: {
-                Task { @MainActor [weak self] in self?.changed() }
+            } onChange: { [weak self] in
+                Task { @MainActor in self?.changed() }
             }
         }
 
