@@ -1,3 +1,4 @@
+import Ink
 import PermissionGrants
 import SwiftUI
 
@@ -22,10 +23,16 @@ extension PermissionGrant {
         required: false)
     static let headMotion = PermissionGrant.privacy(
         .motion, title: "Head gestures", why: "A nod says yes, a shake says no.", required: false)
-    /// The bundled launch agent: the same binary idling with `--helper`.
+    /// The helper's person-facing side.
     static let helper = PermissionGrant.backgroundService(
-        .agent(plist: "garden.untitled.grant-example.helper.plist"), title: "Background helper",
-        why: "Keeps running when the window is closed.")
+        .helper, title: "Background helper", why: "Keeps running when the window is closed.")
+}
+
+extension AppInstallation.Job {
+    /// The bundled launch agent: the same binary idling with `--helper`.
+    /// launchd is asked whether it runs (no probe of its own).
+    static let helper = AppInstallation.Job(
+        .agent(plist: "garden.untitled.grant-example.helper.plist"), name: "the helper")
 }
 
 let grants: [PermissionGrant] = [
@@ -84,29 +91,38 @@ enum Shape: String, CaseIterable { case section, sheet, steps, chip }
 }
 
 struct Gallery: View {
-    @State private var shape = Shape.section
+    /// `--shape chip` opens on that tab.
+    @State private var shape: Shape = {
+        let args = CommandLine.arguments
+        guard let at = args.firstIndex(of: "--shape"), at + 1 < args.count,
+            let shape = Shape(rawValue: args[at + 1])
+        else { return .section }
+        return shape
+    }()
+    /// The whole window on one material: flip it to see every control change.
+    @State private var material = InkMaterial.glass
+
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $shape) {
-                ForEach(Shape.allCases, id: \.self) { Text($0.rawValue) }
-            }
-            .pickerStyle(.segmented).labelsHidden().padding(12)
+            InkTabs($shape, Shape.allCases.map { InkTab($0.rawValue, $0) }).padding(12)
             Divider()
             view(shape).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             Divider()
-            HStack {
-                Text("replay: `grant reset grant-example` clears the permissions")
-                    .font(.caption).foregroundStyle(.tertiary)
+            HStack(spacing: 8) {
+                InkTabs(
+                    $material, [InkTab("glass", InkMaterial.glass), InkTab("flat", .flat)],
+                    size: .small)
                 Spacer()
                 Text(ListenTest.shared.result).font(.caption.monospaced())
-                Button("listen test") { ListenTest.shared.run() }.controlSize(.small)
-                Button("type a test word") { typeTestWord() }.controlSize(.small)
+                Button("listen test") { ListenTest.shared.run() }
+                Button("type a test word") { typeTestWord() }
                 Button("turn the helper off") { PermissionGrant.helper.unregister() }
-                    .controlSize(.small)
             }
+            .buttonStyle(.ink)
             .padding(10)
         }
-        .frame(width: 560, height: 600)
+        .inkMaterial(material)
+        .frame(width: 600, height: 620)
     }
 }
 
@@ -165,7 +181,9 @@ struct Gallery: View {
 
 struct GrantExample: App {
     var body: some Scene {
-        WindowGroup("grant shapes") {
+        // One window, the app's whole life: closing it quits, so the bundle
+        // is free to drag to the Trash (Finder refuses an app still running).
+        Window("grant shapes", id: "gallery") {
             Gallery().onAppear {
                 NSApp.activate()
                 // The hook, the way an app reacts to a change without a loop.
@@ -187,8 +205,11 @@ if args.contains("--reset-helper") {
     PermissionGrant.helper.unregister()
     print("helper unregistered")
 } else if args.contains("--helper") {
-    // The launch agent: alive, doing nothing, until launchd stops it.
-    dispatchMain()
+    // The launch agent: alive, doing nothing, until launchd stops it. Its app
+    // deleted, it leaves launchd; its app upgraded, KeepAlive restarts it
+    // into the new image.
+    let watch = AppInstallation.ImageWatch.start(goneAfter: 3) {}
+    withExtendedLifetime(watch) { dispatchMain() }
 } else if let at = args.firstIndex(of: "--render"), at + 1 < args.count {
     let dir = URL(fileURLWithPath: args[at + 1])
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -207,6 +228,12 @@ if args.contains("--reset-helper") {
     }
     print("rendered \(Shape.allCases.count) shapes to \(dir.path)")
 } else {
+    // Deleted while open: it tries to unregister the helper (macOS may refuse
+    // with the bundle gone; the helper then boots itself out), then quits.
+    // Upgraded: it reopens into the new build.
+    let watch = AppInstallation.ImageWatch.start {
+        try? AppInstallation.Job.helper.uninstall()
+    }
     NSApplication.shared.setActivationPolicy(.regular)
-    GrantExample.main()
+    withExtendedLifetime(watch) { GrantExample.main() }
 }

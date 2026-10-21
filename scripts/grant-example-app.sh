@@ -44,6 +44,7 @@ cat > "$app/Contents/Library/LaunchAgents/$agent" <<EOF
   <key>BundleProgram</key><string>Contents/MacOS/grant-example</string>
   <key>ProgramArguments</key><array><string>grant-example</string><string>--helper</string></array>
   <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
 </dict></plist>
 EOF
 

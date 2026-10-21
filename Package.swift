@@ -55,6 +55,12 @@ let package = Package(
         // fallback), background services, notifications, the app's own.
         // One top-level name; everything else nested in it.
         .library(name: "PermissionGrants", targets: ["PermissionGrants"]),
+        // An app's whole life on the Mac, the app's own job: where its bundle
+        // lives and moving it home, the agents and daemons it runs beside
+        // itself (installed, approved, answering, restarted into a new
+        // image), and its removal when the bundle is deleted. One top-level
+        // name, `AppInstallation`.
+        .library(name: "AppInstallations", targets: ["AppInstallations"]),
         // The system-wide shortcut overlay: a tiny background agent showing
         // the frontmost app's published keymap on one global chord (⌃⌘/).
         // Dogfood-first: `swift run keymap-overlay`.
@@ -128,14 +134,15 @@ let package = Package(
         .target(name: "Entitlement", resources: [.process("Resources")]),
         // The yes it draws wears Ink's prominent button.
         .target(name: "Biometrics", dependencies: ["Ink"]),
-        // Ink: the studio's one tooltip (a chip's note), its tokens.
+        // AppInstallations: a background service's grant renders a job's state.
+        // Ink: the studio's controls (the tinted action, the status mark).
         .target(
             name: "PermissionGrants", dependencies: ["Log", "Ink", "AppInstallations"],
             exclude: ["README.md", "CLAUDE.md"]),
         .target(name: "AppInstallations", dependencies: ["Log"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         // Every shape live over real permissions: `mise run grant-example`.
-        .executableTarget(name: "grant-example", dependencies: ["PermissionGrants"]),
+        .executableTarget(name: "grant-example", dependencies: ["PermissionGrants", "Ink"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap", "Ink"]),
         .target(
