@@ -36,6 +36,7 @@ public struct InkButtonStyle: ButtonStyle {
 
     private struct Styled: View {
         @Environment(\.isEnabled) private var enabled
+        @Environment(\.inkMaterial) private var material
         @State private var hovering = false
         let role: Role
         let trailing: CGFloat
@@ -60,15 +61,20 @@ public struct InkButtonStyle: ButtonStyle {
                             // brightness is unreadable for green and orange.
                             Capsule().fill(.black.opacity(0.3))
                         case .plain:
-                            // The primary ink, faint: white at a tenth was
-                            // a fill only a dark ground could show.
-                            Capsule().fill(.primary.opacity(0.1))
+                            // Flat: the primary ink, faint (white at a tenth
+                            // was a fill only a dark ground could show). On
+                            // glass the glass is the body.
+                            if material == .flat { Capsule().fill(.primary.opacity(0.1)) }
                         }
                         Capsule().fill(.primary.opacity(hovering ? 0.06 : 0))
                         Capsule().fill(.primary.opacity(configuration.isPressed ? 0.12 : 0))
                     }
                 }
+                // Interactive glass from rest, reacting as the system's own
+                // glass buttons do; the prominent tint stands on it.
+                .modifier(InkGlass(on: material == .glass, in: Capsule()))
                 .contentShape(Capsule())
+                .scaleEffect(configuration.isPressed ? 0.96 : 1)
                 .opacity(enabled ? 1 : 0.45)
                 .inkHover($hovering)
                 .animation(.inkFlick, value: hovering)

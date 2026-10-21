@@ -16,31 +16,30 @@ public struct InkTab<Value: Hashable>: Identifiable {
 
 /// Tabs, as ui's `tabs` draws them (one design on the web and here), in two looks:
 /// `segment`, the tabs in a sunken well and the chosen one lifted out of it; `line`, a
-/// rule under the tabs and the chosen one's stretch of it lit. Plain, or `glass`: the
-/// well a bar of Liquid Glass and the lift a lit pane, the line glowing. The lift
-/// glides to the tab chosen. Never the platform's segmented control, which paints the
-/// chosen one in the accent: a choice among equals is not a yes.
+/// rule under the tabs and the chosen one's stretch of it lit. On the host's material
+/// (`.inkMaterial`): glass, the well a bar of Liquid Glass and the lift a lit pane, the
+/// line glowing; flat, a quiet well and a raised lift. The lift glides to the tab
+/// chosen. Never the platform's segmented control, which paints the chosen one in the
+/// accent: a choice among equals is not a yes.
 public struct InkTabs<Value: Hashable>: View {
     public enum Look: Sendable { case segment, line }
-    public enum Material: Sendable { case plain, glass }
     /// The list's height: 28, 32, 40 (a toolbar's, a field's, a heading's).
     public enum Size: Sendable { case small, medium, large }
 
     @Binding var selection: Value
     let tabs: [InkTab<Value>]
     let look: Look
-    let material: Material
     let size: Size
+    @Environment(\.inkMaterial) private var material
     @Namespace private var lift
 
     public init(
         _ selection: Binding<Value>, _ tabs: [InkTab<Value>], look: Look = .segment,
-        material: Material = .plain, size: Size = .medium
+        size: Size = .medium
     ) {
         self._selection = selection
         self.tabs = tabs
         self.look = look
-        self.material = material
         self.size = size
     }
 
@@ -86,7 +85,7 @@ public struct InkTabs<Value: Hashable>: View {
 
     @ViewBuilder private var well: some View {
         switch material {
-        case .plain:
+        case .flat:
             RoundedRectangle(cornerRadius: .inkField, style: .continuous)
                 .fill(.primary.opacity(0.06))
         case .glass:
@@ -121,7 +120,7 @@ public struct InkTabs<Value: Hashable>: View {
 
     @ViewBuilder private var liftShape: some View {
         switch (look, material) {
-        case (.segment, .plain):
+        case (.segment, .flat):
             RoundedRectangle(cornerRadius: .inkRow, style: .continuous)
                 .fill(.primary.opacity(0.12))
                 .overlay(
@@ -132,7 +131,7 @@ public struct InkTabs<Value: Hashable>: View {
                 .matchedGeometryEffect(id: "lift", in: lift)
         case (.segment, .glass):
             Capsule().fill(.primary.opacity(0.14))
-                .glassEffect(.regular, in: Capsule())
+                .glassEffect(.regular.interactive(), in: Capsule())
                 .matchedGeometryEffect(id: "lift", in: lift)
         case (.line, let m):
             VStack {
