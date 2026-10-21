@@ -153,10 +153,27 @@
         /// `turningOn`: the jobs the person asked for when the move was the
         /// first step (a background service's Move button). The new copy
         /// turns them on at launch, so one press ends with the job working.
-        @MainActor public static func moveHome(to scope: Scope, turningOn jobs: [Job] = [])
+        /// Moving an install from one Applications folder to the other
+        /// leaves nothing behind: the jobs this copy has on go with it
+        /// (unregistered here, which stops them, then turned on there), and
+        /// this copy goes to the Trash once the new one is open. A download or
+        /// a build folder is never touched.
+        @MainActor public static func moveHome(to scope: Scope, turningOn asked: [Job] = [])
             async throws
         {
             guard let bundle else { throw MoveError.noBundle }
+            let leaving: Bool = {
+                if case .installed(let from) = home { return from != scope }
+                return false
+            }()
+            let jobs =
+                leaving
+                ? asked
+                    + Job.declared(in: bundle).filter { job in
+                        job.service.status == .enabled
+                            && !asked.contains { $0.handoff == job.handoff }
+                    }
+                : asked
             let target: URL
             if let existing = installedCopy(in: [scope]) {
                 target = existing
@@ -185,6 +202,18 @@
                 NSApp?.terminate(nil)
                 return
             }
+            if leaving {
+                // Unregistered here only now, the copy made: the new copy
+                // registers them fresh, and nothing of this copy's keeps
+                // running to race it.
+                for job in jobs where job.kind != .loginItem {
+                    do {
+                        try job.uninstall()
+                    } catch {
+                        installLog.warn("could not hand over", ["job": job.name, "err": error])
+                    }
+                }
+            }
             let open = NSWorkspace.OpenConfiguration()
             open.createsNewApplicationInstance = true
             open.arguments = jobs.flatMap { [Job.turnOnArgument, $0.handoff] }
@@ -193,7 +222,21 @@
             } catch {
                 throw MoveError.open(error.localizedDescription)
             }
-            installLog.info("opened the app in Applications; leaving", ["from": bundle.path])
+            installLog.info(
+                "opened the app in Applications; leaving",
+                ["from": bundle.path, "jobs handed over": jobs.map(\.name)])
+            if leaving {
+                do {
+                    var landed: NSURL?
+                    try FileManager.default.trashItem(at: bundle, resultingItemURL: &landed)
+                    installLog.info(
+                        "the copy left behind moved to the Trash",
+                        ["path": bundle.path, "now": landed?.path ?? "?"])
+                } catch {
+                    installLog.warn(
+                        "could not trash the copy left behind", ["path": bundle.path, "err": error])
+                }
+            }
             NSApp?.terminate(nil)
         }
 

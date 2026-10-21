@@ -3,24 +3,33 @@
     import Security
 
     extension AppInstallation {
-        /// This process watching its own executable, the same in the app and
-        /// in its jobs, because a bundle deleted or upgraded under a running
-        /// process announces nothing and runs no hook (a Trash drag, a cask's
-        /// sandboxed steps, Sparkle replacing the bundle):
+        /// This process keeping the app's whole life on this Mac, the same in
+        /// the app and in its jobs, because a bundle deleted, moved or
+        /// upgraded under a running process announces nothing and runs no hook
+        /// (a Trash drag, a cask's sandboxed steps, Sparkle replacing the
+        /// bundle). At the start, in the app: the jobs it was asked to turn
+        /// on and the ones whose record went stale are (re)registered for
+        /// this copy, and its command-line links are pointed here. Then it
+        /// watches its executable:
         ///
         /// - **Gone** `goneAfter` ticks in a row (one absent tick is an
-        ///   upgrade swapping bundles): `onGone` runs (hand back what the
-        ///   process holds, its state to the Trash), then the process leaves:
-        ///   a launchd job boots itself out of launchd (a deleted app cannot
-        ///   unregister it, and KeepAlive would retry the missing binary
-        ///   forever), an app quits.
+        ///   upgrade swapping bundles). With a copy of the app elsewhere it
+        ///   MOVED: nothing is forgotten; a job leaves launchd (its record
+        ///   names the old path, which launchd would retry forever) and the
+        ///   moved copy registers it again when it opens; the app reopens
+        ///   from the moved copy. With no copy anywhere it was DELETED:
+        ///   `onGone` runs (hand back what the process holds: chill's fans to
+        ///   Apple), the app's state goes to the Trash (`forget`), and the
+        ///   process leaves. A job leaves launchd only when launchd's process
+        ///   for its label is this one: a newer copy may already have
+        ///   registered the label.
         /// - **Replaced** (another file at the path) and whole: the new image
         ///   runs. Whole means signed as this one is (same designated
         ///   requirement): an installer still writing file by file leaves an
         ///   image launchd refuses, and after a few refusals it drops the job
-        ///   for good. A launchd job exits and launchd restarts it into the new
-        ///   image, which needs `KeepAlive` in its plist (without it the job
-        ///   simply stops); an app reopens into it.
+        ///   for good. A job exits and launchd restarts it into the new image,
+        ///   which needs `KeepAlive` in its plist (without it the job simply
+        ///   stops); an app reopens into it.
         ///
         /// Keep it for the life of the process: `ImageWatch.start(...)`.
         public final class ImageWatch: @unchecked Sendable {
@@ -29,39 +38,86 @@
             /// The bundle's job this process runs as (nil: the app), read at
             /// the start while the bundle can still vouch for it.
             private let job: String?
+            /// The plist declaring that job, its name in a hand-over.
+            private let jobPlist: String?
+            /// Who the app is and where it stood, read at the start: once the
+            /// bundle is gone nothing can be read from it.
+            private let bundleID: String
+            private let bundle: URL
+            private let keeps: [URL]
+            private let links: [Link]
             private let goneAfter: Int
             private let onGone: @Sendable () -> Void
             private var gone = 0
             private var timer: DispatchSourceTimer?
 
-            /// `every`: how often it looks. `goneAfter`: how many looks in a
-            /// row the executable must be missing before it is gone.
+            /// `jobs`: the app's own job declarations, whose probes are the
+            /// witnesses when the launch (re)registers them. `keeps`: where
+            /// the app keeps state beyond the standard places by bundle id
+            /// (`~/Library/Logs/steno`, a dotfolder), moved to the Trash with
+            /// them on delete; a daemon's are exact files it created.
+            /// `links`: its command lines on PATH. `every`: how often it looks.
+            /// `goneAfter`: how many looks in a row the executable must be
+            /// missing before it is gone. `onGone`: what the process hands
+            /// back before a delete's cleanup.
             public static func start(
+                jobs: [Job] = [], keeps: [URL] = [], links: [Link] = [],
                 every: Duration = .seconds(1), goneAfter: Int = 15,
-                onGone: @escaping @Sendable () -> Void
+                onGone: @escaping @Sendable () -> Void = {}
             ) -> ImageWatch {
                 guard let path = Bundle.main.executableURL?.resolvingSymlinksInPath().path else {
                     preconditionFailure("a process with no executable URL")
                 }
+                guard let bundle = AppInstallation.bundle,
+                    let bundleID = Bundle(url: bundle)?.bundleIdentifier
+                else {
+                    preconditionFailure(
+                        "ImageWatch watches an installed app; this is a bare build: \(path)")
+                }
                 var info = stat()
                 precondition(stat(path, &info) == 0, "the running executable is missing: \(path)")
                 let watch = ImageWatch(
-                    path: path, inode: info.st_ino, job: AppInstallation.ownJobLabel,
+                    path: path, inode: info.st_ino, job: AppInstallation.ownJob,
+                    bundleID: bundleID, bundle: bundle, keeps: keeps, links: links,
                     goneAfter: goneAfter, onGone: onGone)
                 installLog.info("watching the image", ["path": path, "as": watch.job ?? "the app"])
-                // A new copy of the app is where a job's record goes stale.
-                if watch.job == nil { Job.reattachDeclared() }
+                if watch.job == nil {
+                    // A new copy of the app is where a job's record and a
+                    // link into the bundle go stale.
+                    AppInstallation.repoint(links, to: bundle, bundleID: bundleID)
+                    let arguments = CommandLine.arguments
+                    if arguments.contains(Job.staleArgument) {
+                        // Opened by a moved job's old process to register it
+                        // here: done before any window, then gone.
+                        let done = DispatchSemaphore(value: 0)
+                        Task.detached {
+                            await Job.settle(in: bundle, own: jobs, arguments: arguments)
+                            done.signal()
+                        }
+                        done.wait()
+                        installLog.info("registered for this copy; exiting", ["path": bundle.path])
+                        exit(0)
+                    }
+                    Task.detached { await Job.settle(in: bundle, own: jobs, arguments: arguments) }
+                }
                 watch.begin(every: every)
                 return watch
             }
 
             private init(
-                path: String, inode: ino_t, job: String?, goneAfter: Int,
+                path: String, inode: ino_t, job: (label: String, plist: String)?, bundleID: String,
+                bundle: URL,
+                keeps: [URL], links: [Link], goneAfter: Int,
                 onGone: @escaping @Sendable () -> Void
             ) {
                 self.path = path
                 self.inode = inode
-                self.job = job
+                self.job = job?.label
+                self.jobPlist = job?.plist
+                self.bundleID = bundleID
+                self.bundle = bundle
+                self.keeps = keeps
+                self.links = links
                 self.goneAfter = goneAfter
                 self.onGone = onGone
             }
@@ -86,9 +142,22 @@
                         "executable missing", ["path": path, "tick": gone, "of": goneAfter])
                     guard gone >= goneAfter else { return }
                     timer?.cancel()
-                    installLog.warn("the app is gone: cleaning up and leaving", ["path": path])
+                    if let moved = AppInstallation.movedCopy(
+                        of: bundleID, named: bundle.lastPathComponent, besides: bundle,
+                        executable: inode)
+                    {
+                        installLog.info(
+                            "the app moved: leaving, nothing forgotten",
+                            ["from": bundle.path, "to": moved.path])
+                        AppInstallation.leave(job: job, reopening: moved, handoff: jobPlist)
+                        return
+                    }
+                    installLog.warn(
+                        "the app was deleted: cleaning up and leaving", ["path": bundle.path])
                     onGone()
-                    AppInstallation.leave(job: job)
+                    AppInstallation.forget(
+                        bundleID: bundleID, bundle: bundle, keeps: keeps, links: links)
+                    AppInstallation.leave(job: job, reopening: nil)
                     return
                 }
                 gone = 0
@@ -99,8 +168,17 @@
                 }
                 timer?.cancel()
                 installLog.info("a new image is in place: running it", ["path": path])
-                if job != nil {
-                    exit(0)  // KeepAlive restarts the job into the new image.
+                if let job {
+                    // launchd would restart the bundle it registered (the old
+                    // one, now in the Trash): the copy at this path takes the
+                    // job instead. A daemon exits; the app's launch rebinds it.
+                    if let jobPlist {
+                        AppInstallation.handOver(
+                            AppInstallation.launchdTarget(label: job, daemon: getuid() == 0),
+                            jobPlist,
+                            to: bundle)
+                    }
+                    exit(0)
                 }
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated { AppInstallation.reopen("an upgrade landed") }
@@ -135,33 +213,82 @@
         /// label), so the name alone says nothing: it counts only when one of
         /// the bundle's job plists declares it. Read while the bundle exists:
         /// once it is deleted, the plists that vouch for the label are gone.
-        public static var ownJobLabel: String? {
+        public static var ownJobLabel: String? { ownJob?.label }
+
+        /// The job this process runs as: its label and the plist declaring
+        /// it (the job's hand-off name), or nil for the app.
+        static var ownJob: (label: String, plist: String)? {
             guard let label = ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"],
                 !label.isEmpty, label != "0", let bundle
             else { return nil }
-            let declared = ["Contents/Library/LaunchAgents", "Contents/Library/LaunchDaemons"]
-                .flatMap { folder in
+            return ["Contents/Library/LaunchAgents", "Contents/Library/LaunchDaemons"]
+                .lazy.flatMap { folder in
                     let dir = bundle.appending(path: folder)
                     let names =
                         (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-                    return names.compactMap {
-                        NSDictionary(contentsOf: dir.appending(path: $0))?["Label"] as? String
+                    return names.compactMap { plist -> (label: String, plist: String)? in
+                        NSDictionary(contentsOf: dir.appending(path: plist))?["Label"] as? String
+                            == label ? (label, plist) : nil
                     }
-                }
-            return declared.contains(label) ? label : nil
+                }.first
         }
 
-        /// The process leaves for good: a job boots itself out (its domain by
-        /// who runs it: root's daemon is system's), launchd killing it inside
-        /// the call; the app quits.
-        static func leave(job: String?) {
+        /// This job's registration is stale (its app moved, or was replaced
+        /// by a new bundle: launchd would respawn the old one, from the Trash
+        /// or a vanished path), and this process is the witness. The copy
+        /// that is THE app now, opened headless, registers it afresh, which
+        /// stops this process too; returns if that did not happen within 20
+        /// seconds. A root daemon cannot open apps in the person's session:
+        /// it returns at once, and the app registers it at its next launch.
+        static func handOver(_ target: String, _ handoff: String, to app: URL) {
+            guard getuid() != 0 else { return }
+            installLog.info(
+                "asking the app's current copy to take this job", ["job": target, "to": app.path])
+            guard openHeadless(app, [Job.staleArgument, handoff]) == 0 else {
+                installLog.warn(
+                    "could not open the app's current copy", ["job": target, "app": app.path])
+                return
+            }
+            Thread.sleep(forTimeInterval: 20)
+            installLog.warn("still running after the hand-over", ["job": target])
+        }
+
+        /// The process leaves for good. A job boots its label out of launchd
+        /// (its domain by who runs it: root's daemon is system's), launchd
+        /// killing it inside the call, but only while launchd's process for
+        /// the label is this one: when a newer copy has registered the label
+        /// since, booting it out would stop that copy's job, so this one just
+        /// exits. The app quits, or reopens from `reopening` (a moved copy).
+        static func leave(job: String?, reopening moved: URL?, handoff: String? = nil) {
             if let label = job {
-                let domain = getuid() == 0 ? "system/\(label)" : "gui/\(getuid())/\(label)"
-                installLog.warn("leaving launchd", ["job": domain])
-                launchctl(["bootout", domain])
+                let target = launchdTarget(label: label, daemon: getuid() == 0)
+                if let moved, let handoff { handOver(target, handoff, to: moved) }
+                if launchdPID(target) == getpid() {
+                    installLog.warn("leaving launchd", ["job": target])
+                    launchctl(["bootout", target])
+                } else {
+                    installLog.info(
+                        "launchd's job is another copy's now: exiting only", ["job": target])
+                }
                 exit(0)
             }
-            DispatchQueue.main.async { MainActor.assumeIsolated { NSApp?.terminate(nil) } }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let moved else {
+                        NSApp?.terminate(nil)
+                        return
+                    }
+                    let open = NSWorkspace.OpenConfiguration()
+                    open.createsNewApplicationInstance = true
+                    NSWorkspace.shared.openApplication(at: moved, configuration: open) { _, error in
+                        if let error {
+                            installLog.error(
+                                "could not reopen the moved app", ["at": moved.path, "err": error])
+                        }
+                        Task { @MainActor in NSApp?.terminate(nil) }
+                    }
+                }
+            }
         }
     }
 #endif
