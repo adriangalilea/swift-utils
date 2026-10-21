@@ -176,7 +176,7 @@ func toolchain() -> [String] {
         let r = run(argv, quiet: true)
         guard r.code == 0, let first = r.out.split(separator: "\n").first else { return nil }
         return "\(name): \(first)"
-    } + ["ship: \(realPath(CommandLine.arguments[0]))"]
+    } + ["ship: \(shipPath)"]
 }
 
 // MARK: - git and hashes
@@ -223,6 +223,13 @@ func digest(_ path: String) -> String {
 func realPath(_ path: String) -> String {
     URL(filePath: path).resolvingSymlinksInPath().standardizedFileURL.path
 }
+
+/// This ship, as the kernel runs it: argv[0] is only what the caller typed
+/// (`ship`, found on PATH), never a path to run again.
+let shipPath: String = {
+    guard let executable = Bundle.main.executableURL else { die("ship has no executable path") }
+    return executable.resolvingSymlinksInPath().path
+}()
 
 // MARK: - ship release
 
@@ -405,7 +412,7 @@ func release(_ manifests: [String]) -> Never {
             "Release \(names.count == 1 ? names[0] : names.dropLast().joined(separator: ", ") + " and " + names.last!)?",
         lines: lines, secrets: secrets,
         run: .init(
-            argv: [realPath(CommandLine.arguments[0]), "release-run", planPath, planSHA], env: env,
+            argv: [shipPath, "release-run", planPath, planSHA], env: env,
             stdin: stdin))
 
     // The approver's word (its receipt of the yes) is kept with the release,
@@ -701,7 +708,7 @@ final class ReleaseKeychain: @unchecked Sendable {
         // Who may use the key without a question: codesign (what xcodebuild
         // signs through), and this program.
         var trusted: [SecTrustedApplication] = []
-        for path in ["/usr/bin/codesign", CommandLine.arguments[0]] {
+        for path in ["/usr/bin/codesign", shipPath] {
             var application: SecTrustedApplication?
             if SecTrustedApplicationCreateFromPath(path, &application) == errSecSuccess,
                 let application
