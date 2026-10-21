@@ -339,7 +339,9 @@
             guard Darwin.pipe(&pipe) == 0 else { return nil }
             posix_spawn_file_actions_adddup2(&actions, pipe[1], STDOUT_FILENO)
             posix_spawn_file_actions_addclose(&actions, pipe[0])
-            let argv = [executable, probeFlag].map { strdup($0) } + [nil]
+            // Typed: Xcode 26's solver reads the literal as strdup's pointers.
+            let words: [String] = [executable, probeFlag]
+            let argv: [UnsafeMutablePointer<CChar>?] = words.map { strdup($0) } + [nil]
             defer { argv.forEach { free($0) } }
             var pid: pid_t = 0
             let spawned = posix_spawn(&pid, executable, &actions, &attr, argv, environ)
