@@ -26,6 +26,41 @@ let grants: [any Grant] = [
 
 enum Shape: String, CaseIterable { case section, sheet, steps, chip }
 
+/// The ground truth for "Posting events": 3 s after the press (time to click
+/// into a text field in another app) this process posts "granted" as
+/// keystrokes. Whether the word appears is what macOS lets THIS process do,
+/// whatever any check answers.
+@MainActor func typeTestWord() {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        let source = CGEventSource(stateID: .privateState)
+        let word = Array("granted".utf16)
+        for down in [true, false] {
+            let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: down)
+            event?.flags = []
+            event?.keyboardSetUnicodeString(stringLength: word.count, unicodeString: word)
+            event?.post(tap: .cghidEventTap)
+        }
+        print("typed test word; hub reads \(Permissions.shared.answer(.postEvents).rawValue)")
+    }
+}
+
+/// The ground truth for Input Monitoring: may THIS process watch the keyboard
+/// right now? A listen-only event tap is refused (nil) without it.
+@Observable @MainActor final class ListenTest {
+    static let shared = ListenTest()
+    var result = ""
+    func run() {
+        let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly,
+            eventsOfInterest: CGEventMask(1 << CGEventType.keyDown.rawValue),
+            callback: { _, _, event, _ in Unmanaged.passUnretained(event) }, userInfo: nil)
+        let hub = Permissions.shared.answer(.inputMonitoring).rawValue
+        result = tap == nil ? "listen: REFUSED (hub: \(hub))" : "listen: WORKS (hub: \(hub))"
+        if let tap { CFMachPortInvalidate(tap) }
+        print(result)
+    }
+}
+
 struct Gallery: View {
     @State private var shape = Shape.section
     var body: some View {
@@ -41,6 +76,9 @@ struct Gallery: View {
                 Text("replay: `grant reset grant-example` clears the permissions")
                     .font(.caption).foregroundStyle(.tertiary)
                 Spacer()
+                Text(ListenTest.shared.result).font(.caption.monospaced())
+                Button("listen test") { ListenTest.shared.run() }.controlSize(.small)
+                Button("type a test word") { typeTestWord() }.controlSize(.small)
                 Button("turn the helper off") { helper.unregister() }.controlSize(.small)
             }
             .padding(10)
@@ -98,6 +136,9 @@ struct GrantExample: App {
         .windowResizability(.contentSize)
     }
 }
+
+// First thing: a probe launch answers the hub and exits.
+Permissions.answerProbeIfAsked()
 
 let args = CommandLine.arguments
 if args.contains("--helper") {

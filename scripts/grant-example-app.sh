@@ -60,4 +60,17 @@ codesign --force --options runtime --timestamp=none --entitlements "$entitlement
 rm "$entitlements"
 codesign --verify --strict "$app"
 echo "built $app (signed $identity)"
-open "$app"
+
+# Once moved to Applications (the helper's flow), that copy IS the app: it is
+# replaced with this build and opened, so two copies of one bundle id never
+# run different code (`open -b` and `grant reset` pick the installed one).
+installed="/Applications/grant-example.app"
+pkill -f "grant-example.app/Contents/MacOS/grant-example" || true
+if [ -d "$installed" ]; then
+    trash "$installed"
+    cp -R "$app" "$installed"
+    echo "replaced $installed"
+    open "$installed"
+else
+    open "$app"
+fi
