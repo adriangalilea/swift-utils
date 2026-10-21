@@ -4,7 +4,7 @@
     /// hub). One line instead of a struct per permission:
     ///
     ///     TCCGrant(.microphone, title: "Microphone", why: "Records your side of the call.")
-    public struct TCCGrant: Grant {
+    public struct TCCGrant: Grant, Sendable {
         public let service: Permissions.Service
         public let symbol: String
         public let title: String
