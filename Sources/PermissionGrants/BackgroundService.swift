@@ -28,9 +28,8 @@
             case .awaitingApproval(let needsAdmin):
                 return .broken(
                     "Open Login Items",
-                    note: needsAdmin
-                        ? "An admin must allow it in Login Items."
-                        : "Waiting for your OK in Login Items.")
+                    note: (needsAdmin ? "Needs an admin's OK. " : "Waiting for your OK. ")
+                        + AppInstallation.Job.approvalSteer)
             case .silent:
                 return .broken("Restart", note: "Installed, but not answering.")
             case .misplaced:

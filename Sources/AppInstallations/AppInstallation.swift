@@ -103,6 +103,36 @@
             return bundle.pathExtension == "app" ? bundle : nil
         }
 
+        /// The app's name as a person sees it.
+        public static var displayName: String {
+            let info = Bundle.main.infoDictionary
+            return info?["CFBundleDisplayName"] as? String ?? info?["CFBundleName"] as? String
+                ?? ProcessInfo.processInfo.processName
+        }
+
+        /// The name in the app's signing certificate ("Apple Development:
+        /// Adrian Galilea Delgado (TEAM)" → "Adrian Galilea Delgado"): what
+        /// macOS shows for an app signed by a person where it names apps by
+        /// developer (Login Items' Background App Activity). nil unsigned.
+        public static var signerName: String? {
+            var me: SecCode?
+            var code: SecStaticCode?
+            var info: CFDictionary?
+            guard SecCodeCopySelf([], &me) == errSecSuccess, let me,
+                SecCodeCopyStaticCode(me, [], &code) == errSecSuccess, let code,
+                SecCodeCopySigningInformation(
+                    code, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
+                let certificates = (info as? [String: Any])?[kSecCodeInfoCertificates as String]
+                    as? [SecCertificate],
+                let leaf = certificates.first,
+                let summary = SecCertificateCopySubjectSummary(leaf) as String?
+            else { return nil }
+            let name = summary.split(separator: ":", maxSplits: 1).last.map(String.init) ?? summary
+            let person = name.replacingOccurrences(
+                of: #"\s*\([A-Z0-9]+\)\s*$"#, with: "", options: .regularExpression)
+            return person.trimmingCharacters(in: .whitespaces)
+        }
+
         public static var home: Home {
             guard let bundle else { return .noBundle }
             let folder = bundle.deletingLastPathComponent().standardizedFileURL.path

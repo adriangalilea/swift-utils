@@ -141,14 +141,28 @@
             /// System Settings' own words for where approval happens.
             public static let approvalPath = "System Settings › General › Login Items & Extensions"
 
+            /// Where the switch is and what it is called, for a person
+            /// looking for it: macOS lists the app's jobs as one row under
+            /// Background App Activity, named for the app or, for an app
+            /// signed by a person, for that person; and it does not always
+            /// post the notification that leads there.
+            public static var approvalSteer: String {
+                let app = AppInstallation.displayName
+                let row =
+                    AppInstallation.signerName.map {
+                        "\(app) (it may be listed as \u{201C}\($0)\u{201D})"
+                    }
+                    ?? app
+                return "In Login Items, under Background App Activity, turn on \(row)."
+            }
+
             /// The state in a terminal's words, for an app's command line.
             public var words: String {
                 switch state {
                 case .running: "running"
                 case .off: kind == .loginItem ? "off" : "not installed"
                 case .awaitingApproval(let needsAdmin):
-                    "awaiting approval in \(Self.approvalPath)"
-                        + (needsAdmin ? " (an admin's act)" : "")
+                    "awaiting approval\(needsAdmin ? " (an admin's act)" : ""): \(Self.approvalSteer)"
                 case .silent:
                     registeredElsewhere
                         ? "registered for another copy of the app (moved or replaced)"
@@ -360,14 +374,32 @@
                     installLog.warn(
                         "named a job this copy does not declare; ignored", ["job": stranger])
                 }
+                // A delete since this install last looked: its jobs' records
+                // say "on" only because a deleted app could not unregister.
+                let bundleID = Bundle(url: bundle)?.bundleIdentifier ?? ""
+                let deleted = AppInstallation.Tombstone.pending(bundleID)
                 for job in all {
                     let afresh = stale.contains(job.handoff)
+                    let state = job.state
+                    let leftover: Bool =
+                        switch state {
+                        case .silent, .awaitingApproval: true
+                        default: false
+                        }
                     let why: String
                     if afresh {
                         why = "its old copy moved away: registering afresh here"
                     } else if asked.contains(job.handoff) {
                         why = "turning on, as asked before the move"
-                    } else if job.state == .silent {
+                    } else if let deleted, leftover {
+                        // The deleted install's intent (on, or awaiting an
+                        // approval never given), not this one's.
+                        installLog.info(
+                            "a deleted install's record: cleared, not revived",
+                            ["job": job.name, "deleted": deleted.ISO8601Format()])
+                        try? job.uninstall()
+                        continue
+                    } else if state == .silent {
                         why = "on, but not answering from this copy: registering afresh"
                     } else {
                         continue
@@ -379,6 +411,7 @@
                         installLog.warn("could not turn on", ["job": job.name, "err": error])
                     }
                 }
+                if let deleted { AppInstallation.Tombstone.applied(bundleID, deleted) }
             }
 
             // MARK: Internals

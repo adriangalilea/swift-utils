@@ -80,6 +80,7 @@
         /// empty, never recursively.
         static func forget(bundleID: String, bundle: URL, keeps: [URL], links: [Link]) {
             let fm = FileManager.default
+            Tombstone.write(bundleID)
             if getuid() == 0 {
                 for url in keeps {
                     var isDirectory: ObjCBool = false
@@ -139,6 +140,69 @@
                     installLog.warn(
                         "could not remove link", ["path": link.path.path, "err": error])
                 }
+            }
+        }
+
+        /// The fact a delete leaves behind for the next install: this app was
+        /// deleted at this time. macOS keeps a deleted app's job records "on"
+        /// (a deleted app cannot unregister), so a reinstall's launch would
+        /// read them as on-but-silent and revive them; the tombstone says
+        /// they are a deleted install's, to be cleared, not revived. Written
+        /// by whichever process ran the uninstall: the person's Library for a
+        /// user process, the system's for root. A root tombstone is not the
+        /// person's to delete, so the app records the newest one it applied
+        /// (in its own preferences, which the delete cleared) and never
+        /// applies one twice.
+        enum Tombstone {
+            static func folder(root: Bool) -> URL {
+                (root
+                    ? URL(filePath: "/Library")
+                    : FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library"))
+                    .appending(path: "Application Support/AppInstallations")
+            }
+
+            static func file(_ bundleID: String, root: Bool) -> URL {
+                folder(root: root).appending(path: "\(bundleID).deleted")
+            }
+
+            static func write(_ bundleID: String) {
+                let root = getuid() == 0
+                let url = file(bundleID, root: root)
+                do {
+                    try FileManager.default.createDirectory(
+                        at: folder(root: root), withIntermediateDirectories: true)
+                    try Data(Date.now.ISO8601Format().utf8).write(to: url, options: .atomic)
+                    installLog.info("tombstone written", ["path": url.path])
+                } catch {
+                    installLog.warn(
+                        "could not write the tombstone", ["path": url.path, "err": error])
+                }
+            }
+
+            private static let consumedKey = "AppInstallations.tombstoneApplied"
+
+            /// When this app was last deleted, if a tombstone this install has
+            /// not applied yet says so.
+            static func pending(_ bundleID: String) -> Date? {
+                let dates = [true, false].compactMap { root -> Date? in
+                    guard
+                        let text = try? String(
+                            contentsOf: file(bundleID, root: root), encoding: .utf8)
+                    else { return nil }
+                    return try? Date(
+                        text.trimmingCharacters(in: .whitespacesAndNewlines), strategy: .iso8601)
+                }
+                guard let newest = dates.max() else { return nil }
+                let applied = UserDefaults.standard.object(forKey: consumedKey) as? Date
+                return applied.map { newest > $0 } ?? true ? newest : nil
+            }
+
+            /// The tombstone acted on: recorded as applied, and the person's
+            /// own removed (root's stays, and is never applied again).
+            static func applied(_ bundleID: String, _ date: Date) {
+                UserDefaults.standard.set(date, forKey: consumedKey)
+                try? FileManager.default.removeItem(at: file(bundleID, root: false))
+                installLog.info("tombstone applied", ["deleted": date.ISO8601Format()])
             }
         }
 
