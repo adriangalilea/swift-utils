@@ -150,7 +150,12 @@
         /// that copy is opened, and this process quits. A new instance,
         /// since it shares this process's bundle id. Which scopes to offer is
         /// the app's call; the person picks.
-        @MainActor public static func moveHome(to scope: Scope) async throws {
+        /// `turningOn`: the jobs the person asked for when the move was the
+        /// first step (a background service's Move button). The new copy
+        /// turns them on at launch, so one press ends with the job working.
+        @MainActor public static func moveHome(to scope: Scope, turningOn jobs: [Job] = [])
+            async throws
+        {
             guard let bundle else { throw MoveError.noBundle }
             let target: URL
             if let existing = installedCopy(in: [scope]) {
@@ -167,8 +172,22 @@
                     throw MoveError.copy(error.localizedDescription)
                 }
             }
+            // THE app already running there is brought forward, never joined
+            // by a second instance; launch arguments only reach a launch, so
+            // the jobs asked for stay that copy's to turn on, said in the log.
+            if let running = NSWorkspace.shared.runningApplications.first(where: {
+                $0.bundleURL?.standardizedFileURL == target.standardizedFileURL
+            }) {
+                running.activate()
+                installLog.info(
+                    "the app in Applications is already running: brought forward; leaving",
+                    ["from": bundle.path, "jobs not carried": jobs.map(\.name)])
+                NSApp?.terminate(nil)
+                return
+            }
             let open = NSWorkspace.OpenConfiguration()
             open.createsNewApplicationInstance = true
+            open.arguments = jobs.flatMap { [Job.turnOnArgument, $0.handoff] }
             do {
                 _ = try await NSWorkspace.shared.openApplication(at: target, configuration: open)
             } catch {

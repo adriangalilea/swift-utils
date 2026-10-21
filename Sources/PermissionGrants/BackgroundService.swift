@@ -61,7 +61,11 @@
                 return
             case .misplaced:
                 guard let scope = pick(offers) else { return }
-                do { try await AppInstallation.moveHome(to: scope) } catch { fail(job, "\(error)") }
+                // The press asked for the job: the move is its first step,
+                // and the new copy turns it on.
+                do {
+                    try await AppInstallation.moveHome(to: scope, turningOn: [job])
+                } catch { fail(job, "\(error)") }
             case .awaitingApproval:
                 grantLog.info("opened Login Items", ["grant": job.name])
                 SMAppService.openSystemSettingsLoginItems()

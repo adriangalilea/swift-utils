@@ -187,9 +187,19 @@
             /// macOS settles), opens Login Items once when it needs the
             /// person's OK and waits up to `approvalWait` for it, then waits
             /// for it to answer; registered yet silent, registers again once.
-            /// Idempotent: a running job returns at once.
+            /// Idempotent: a running job returns at once. One install per job
+            /// at a time in the process: a second caller (a press while the
+            /// launch turns the job on) joins the one in flight, because its
+            /// silent branch unregisters, which would stop a job the first
+            /// had just started.
             @discardableResult
             public func install(approvalWait: Duration = .seconds(60)) async throws -> State {
+                try await InstallFlights.shared.run(handoff) {
+                    try await performInstall(approvalWait: approvalWait)
+                }
+            }
+
+            private func performInstall(approvalWait: Duration) async throws -> State {
                 switch state {
                 case .running: return .running
                 case .misplaced(let home): throw Failure.misplaced(home, needs: needs)
@@ -238,15 +248,49 @@
                 installLog.info("restarted", ["job": name, "status": result])
             }
 
-            /// The person's choice kept across copies of the app. Every job
-            /// this bundle declares (its LaunchAgents and LaunchDaemons
-            /// plists) that macOS records as on yet launchd does not run is
-            /// registered again for this copy: the record was made for a copy
-            /// that moved, was replaced or was deleted, and the person who
-            /// turned it on should not have to again. A job turned off is
-            /// never touched, nor one held for approval. The app runs this at
-            /// launch (`ImageWatch.start`), off the main thread; a job still
-            /// silent after it is a real failure and reads as one.
+            /// The installs in flight, one per job (by `handoff`), so a second
+            /// caller awaits the first's outcome instead of racing it.
+            private actor InstallFlights {
+                static let shared = InstallFlights()
+                private var running: [String: Task<State, Error>] = [:]
+
+                func run(
+                    _ key: String, _ body: @escaping @Sendable () async throws -> State
+                ) async throws -> State {
+                    if let flight = running[key] { return try await flight.value }
+                    let flight = Task { try await body() }
+                    running[key] = flight
+                    defer { running[key] = nil }
+                    return try await flight.value
+                }
+            }
+
+            /// How a job crosses into a new copy of the app: its plist, or
+            /// the login item's own word.
+            var handoff: String {
+                switch kind {
+                case .agent(let plist), .daemon(let plist): plist
+                case .loginItem: "login-item"
+                }
+            }
+
+            /// The launch argument naming a job the new copy turns on
+            /// (`moveHome(to:turningOn:)`).
+            static let turnOnArgument = "--app-installation-turn-on"
+
+            /// The person's choice kept across copies of the app, run by the
+            /// app at launch (`ImageWatch.start`), off the main thread:
+            ///
+            /// - A job the copy that moved here was asked to turn on
+            ///   (`moveHome(to:turningOn:)`) is installed now, the OS's
+            ///   approval included: one press, the job working.
+            /// - Every other job this bundle declares (its LaunchAgents and
+            ///   LaunchDaemons plists) that macOS records as on yet launchd
+            ///   does not run is registered again for this copy: the record
+            ///   was made for a copy that moved, was replaced or was deleted,
+            ///   and the person who turned it on should not have to again. A
+            ///   job turned off is never touched, nor one held for approval;
+            ///   one still silent after this is a real failure and reads as one.
             static func reattachDeclared() {
                 guard let bundle = AppInstallation.bundle else { return }
                 let declared: [Job] =
@@ -262,7 +306,29 @@
                                 name: plist)
                         }
                     }
-                for job in declared {
+                // Asked for by the copy that moved here: turned on now, the
+                // OS's approval included.
+                let arguments = CommandLine.arguments
+                let asked = Set(
+                    arguments.indices.dropLast().filter { arguments[$0] == turnOnArgument }
+                        .map { arguments[$0 + 1] })
+                let known = Set((declared + [.loginItem]).map(\.handoff))
+                for stranger in asked.subtracting(known) {
+                    installLog.warn(
+                        "asked to turn on a job this copy does not declare; ignored",
+                        ["job": stranger])
+                }
+                for job in declared + [.loginItem] where asked.contains(job.handoff) {
+                    installLog.info("turning on, as asked before the move", ["job": job.name])
+                    Task.detached {
+                        do {
+                            try await job.install()
+                        } catch {
+                            installLog.warn("could not turn on", ["job": job.name, "err": error])
+                        }
+                    }
+                }
+                for job in declared where !asked.contains(job.handoff) {
                     guard job.state == .silent else { continue }
                     installLog.info(
                         "on, but not running from this copy: registering again", ["job": job.name])
