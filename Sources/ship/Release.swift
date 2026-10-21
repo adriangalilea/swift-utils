@@ -6,8 +6,15 @@
 // (JSON on stdin, `ApprovalRequest`) that it shows a person, and that it
 // carries out only after their verified yes: it resolves the request's
 // secrets (by the opaque references the request names) into the command's
-// environment and nowhere else, runs the command, and exits with its
-// status. Anything that does that is an approver; ship never asks which.
+// STANDARD INPUT, one JSON object, and nowhere else (a process's
+// environment any process of its user can read), runs the command, and
+// exits with its status. Anything that does that is an approver; ship
+// never asks which.
+//
+// Every release keeps its own folder (`<app>/<stamp>/`): the plan approved,
+// the build's whole log, the approver's word, the toolchain, and the
+// record (commits, artifact digests, the certificate that signed,
+// Apple's notarization ids), so a postmortem reads what happened.
 //
 // What the yes covers is pinned by hashes the approver shows: the command
 // names the build plan's SHA-256, and `release-run` refuses a plan that
@@ -48,12 +55,19 @@ struct Manifest: Decodable {
     let secrets: [String: String]?
 }
 
-/// An app's last release: the commits the next one is compared with, and
-/// the digest of each artifact it made.
+/// One release of an app: the commits (what the next one is compared
+/// with), the digest of each artifact it made, the plan approved (its
+/// SHA-256), the certificate that signed (its SHA-1 and name), Apple's
+/// notarization submission ids (`xcrun notarytool log <id>` reads Apple's
+/// own account of them), and its folder. `<app>.json` is the last one.
 struct Record: Codable {
     var sources: [String: String]
     var at: Double
     var artifacts: [String: String]?
+    var plan: String?
+    var certificate: String?
+    var notarizations: [String]?
+    var folder: String?
 }
 
 let releases = URL(filePath: NSHomeDirectory()).appending(path: ".local/state/ship/releases")
@@ -83,13 +97,17 @@ struct ApprovalRequest: Codable {
     /// What the person reads: per tree, the commits since its last release.
     let lines: [String]
     /// Secret name → opaque reference. The approver resolves each one only
-    /// after the yes, and only into `run.env`, where `{name}` stands for it.
+    /// after the yes, and only into `run.stdin`, where `{name}` stands for it.
     let secrets: [String: String]
     let run: Run
     struct Run: Codable {
         let argv: [String]
-        /// Literal values, and `{name}` for a secret.
+        /// Literal values the command reads from its environment; never a
+        /// secret.
         let env: [String: String]
+        /// What the approver writes to the command's standard input as one
+        /// JSON object, `{name}` filled with that secret, then closes.
+        let stdin: [String: String]
     }
 }
 
@@ -111,7 +129,9 @@ struct Plan: Codable {
         let secrets: [String]
         let sources: String
         let heads: String
-        let log: String
+        /// This release's folder for the app; the build's log is in it.
+        let folder: String
+        var log: String { folder + "/release.log" }
     }
     struct Tree: Codable {
         let clone: String
@@ -127,6 +147,36 @@ struct Built: Codable {
     var artifacts: [String: [String: String]]
     /// App → seconds its build took.
     var seconds: [String: Double]
+    /// The identity in the release's keychain: "SHA-1 name".
+    var certificate: String = ""
+    /// The tools the build ran with, one "tool: version" line each.
+    var toolchain: [String] = []
+}
+
+/// Apple's notarization submission ids in a build's log (notarytool prints
+/// `id: <uuid>` for each submission).
+func notarizations(in log: String) -> [String] {
+    let text = (try? String(contentsOfFile: log, encoding: .utf8)) ?? ""
+    var ids: [String] = []
+    for match in text.matches(of: /id: ([0-9a-fA-F-]{36})/) where !ids.contains(String(match.1)) {
+        ids.append(String(match.1))
+    }
+    return ids
+}
+
+/// The tools a release ran with, as each says its version: what a
+/// postmortem compares when a build differs.
+func toolchain() -> [String] {
+    let tools: [(String, [String])] = [
+        ("macOS", ["sw_vers", "-productVersion"]), ("Xcode", ["xcodebuild", "-version"]),
+        ("Swift", ["swift", "--version"]), ("Rust", ["rustc", "--version"]),
+        ("Zig", ["zig", "version"]), ("Node", ["node", "--version"]),
+    ]
+    return tools.compactMap { name, argv in
+        let r = run(argv, quiet: true)
+        guard r.code == 0, let first = r.out.split(separator: "\n").first else { return nil }
+        return "\(name): \(first)"
+    } + ["ship: \(realPath(CommandLine.arguments[0]))"]
 }
 
 // MARK: - git and hashes
@@ -203,6 +253,12 @@ func release(_ manifests: [String]) -> Never {
     var lines: [String] = []
     var apps: [Plan.App] = []
     let began = Date()
+    // This release's name: its folder under each app, kept for good.
+    let stamp = ISO8601DateFormatter.string(
+        from: began, timeZone: .current,
+        formatOptions: [.withFullDate, .withTime, .withColonSeparatorInTime]
+    )
+    .replacingOccurrences(of: ":", with: "")
 
     for path in manifests {
         let manifestPath = realPath(path)
@@ -310,6 +366,11 @@ func release(_ manifests: [String]) -> Never {
             separator: " ")
         let scriptSHA = sha256(file: script)
         lines.append("  builds with \(manifest.script) (sha256 \(scriptSHA.prefix(16)))")
+        let folder = releases.appending(path: "\(manifest.app)/\(stamp)").path
+        do {
+            try FileManager.default.createDirectory(
+                atPath: folder, withIntermediateDirectories: true)
+        } catch { die("cannot make \(folder): \(error.localizedDescription)") }
         apps.append(
             Plan.App(
                 app: manifest.app, repo: sources[own.name]!, root: appRoot, script: script,
@@ -318,61 +379,77 @@ func release(_ manifests: [String]) -> Never {
                 sources: sourcesSaid,
                 heads: manifest.trees.map { "\($0.name)=\(heads[$0.name]!)" }.joined(
                     separator: " "),
-                log: releases.appending(path: "\(manifest.app)/release.log").path))
+                folder: folder))
     }
 
     // The plan, written once and pinned by its hash in the command the
-    // person approves.
-    try? FileManager.default.createDirectory(at: releases, withIntermediateDirectories: true)
-    let stamp = Int(Date().timeIntervalSince1970)
-    let planPath = releases.appending(path: "plan-\(stamp).json").path
-    let resultPath = releases.appending(path: "result-\(stamp).json").path
+    // person approves; kept, with the result, in the first app's folder.
+    let planPath = apps[0].folder + "/plan.json"
+    let resultPath = apps[0].folder + "/result.json"
     guard let planData = try? JSONEncoder().encode(Plan(apps: apps, result: resultPath)),
         FileManager.default.createFile(
             atPath: planPath, contents: planData, attributes: [.posixPermissions: 0o600])
     else { die("cannot write the build plan") }
     let planSHA = sha256(file: planPath)
 
-    var env = [
-        "SHIP_RELEASE_IDENTITY": "{identity}",
-        "SHIP_RELEASE_IDENTITY_PASSWORD": "{identityPassword}",
-        "SHIP_RELEASE_APPSTORE_KEY": "{appStoreKey}",
-    ]
+    var env: [String: String] = [:]
     for name in releaseValues { env[name] = environment[name]! }
-    for app in apps { for name in app.secrets { env[name] = "{\(name)}" } }
+    var stdin = [
+        "identity": "{identity}", "identityPassword": "{identityPassword}",
+        "appStoreKey": "{appStoreKey}",
+    ]
+    for app in apps { for name in app.secrets { stdin[name] = "{\(name)}" } }
     let names = apps.map(\.app)
     let request = ApprovalRequest(
         title:
             "Release \(names.count == 1 ? names[0] : names.dropLast().joined(separator: ", ") + " and " + names.last!)?",
         lines: lines, secrets: secrets,
         run: .init(
-            argv: [realPath(CommandLine.arguments[0]), "release-run", planPath, planSHA], env: env))
+            argv: [realPath(CommandLine.arguments[0]), "release-run", planPath, planSHA], env: env,
+            stdin: stdin))
 
+    // The approver's word (its receipt of the yes) is kept with the release,
+    // and still shown as it comes.
     print("ship: asking to release \(names.joined(separator: ", ")) (plan \(planSHA.prefix(16)))")
     let approval = Process()
     approval.executableURL = URL(filePath: "/bin/sh")
     approval.arguments = ["-c", approver]
     let input = Pipe()
+    let said = Pipe()
     approval.standardInput = input
+    approval.standardOutput = said
     do { try approval.run() } catch {
         die("SHIP_APPROVE (\(approver)): \(error.localizedDescription)")
     }
     guard let body = try? JSONEncoder().encode(request) else { die("cannot encode the request") }
     input.fileHandleForWriting.write(body)
     try? input.fileHandleForWriting.close()
+    var word = Data()
+    while case let chunk = said.fileHandleForReading.availableData, !chunk.isEmpty {
+        FileHandle.standardOutput.write(chunk)
+        word.append(chunk)
+    }
     approval.waitUntilExit()
-    try? FileManager.default.removeItem(atPath: planPath)
+    for app in apps {
+        FileManager.default.createFile(atPath: app.folder + "/approval.txt", contents: word)
+        if app.folder != apps[0].folder {
+            try? FileManager.default.copyItem(atPath: planPath, toPath: app.folder + "/plan.json")
+        }
+    }
     guard approval.terminationStatus == 0 else {
-        try? FileManager.default.removeItem(atPath: resultPath)
-        die("not released (the approver exited \(approval.terminationStatus))")
+        die(
+            "not released (the approver exited \(approval.terminationStatus)); kept in \(apps[0].folder)"
+        )
     }
 
     // Released: the artifacts where each manifest says, and the records.
     guard let resultData = FileManager.default.contents(atPath: resultPath),
         let result = try? JSONDecoder().decode(Built.self, from: resultData)
     else { die("the release ran but left no result at \(resultPath)") }
-    try? FileManager.default.removeItem(atPath: resultPath)
     for app in apps {
+        FileManager.default.createFile(
+            atPath: app.folder + "/toolchain.txt",
+            contents: Data((result.toolchain.joined(separator: "\n") + "\n").utf8))
         for artifact in app.artifacts {
             let built = app.root + "/" + artifact
             let destination = app.repo + "/" + artifact
@@ -389,8 +466,13 @@ func release(_ manifests: [String]) -> Never {
         }
         let record = Record(
             sources: app.trees.mapValues(\.head), at: Date().timeIntervalSince1970,
-            artifacts: result.artifacts[app.app])
-        guard let data = try? JSONEncoder().encode(record),
+            artifacts: result.artifacts[app.app], plan: planSHA, certificate: result.certificate,
+            notarizations: notarizations(in: app.log), folder: app.folder)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(record),
+            (try? data.write(to: URL(filePath: app.folder + "/record.json"), options: .atomic))
+                != nil,
             (try? data.write(to: recordFile(app.app), options: .atomic)) != nil
         else { die("cannot write \(app.app)'s release record") }
         print("ship: \(app.app) built in \(Int(result.seconds[app.app] ?? 0)) s")
@@ -414,7 +496,7 @@ func commonAncestor(_ paths: [String]) -> String {
 // MARK: - ship release-run (what the approver runs)
 
 /// `ship release-run <plan> <sha256>`: run by the approver after the yes,
-/// with the keys in its environment. The plan must be the one approved,
+/// the keys one JSON object on its standard input. The plan must be the one approved,
 /// every clone at its approved commit and clean, every script the one
 /// shown; then the keys go into a keychain of the release's own, every app
 /// builds at once (each into its own log), and what they made is digested.
@@ -438,15 +520,22 @@ func releaseRun(_ arguments: [String]) -> Never {
             die("\(app.app): \(app.script) changed since it was approved")
         }
     }
-    let keys = releaseKeys.map { environment[$0] ?? "" }
+    // The keys: one JSON object on stdin, read whole, never in the
+    // environment (which any process of this user can read).
+    let given = FileHandle.standardInput.readDataToEndOfFile()
+    guard let secrets = try? JSONDecoder().decode([String: String].self, from: given) else {
+        die("the approver gave no keys on stdin (one JSON object)")
+    }
+    let keys = ["identity", "identityPassword", "appStoreKey"].map { secrets[$0] ?? "" }
     guard !keys.contains(where: \.isEmpty) else {
-        die("the approver gave no keys (\(releaseKeys.joined(separator: ", ")))")
+        die("the approver's stdin lacks identity, identityPassword or appStoreKey")
     }
 
     let keychain: ReleaseKeychain
     do {
         keychain = try ReleaseKeychain(identity: keys[0], password: keys[1], appStoreKey: keys[2])
     } catch { die("\(error)") }
+    let tools = toolchain()
 
     let outcome = Outcome()
     let group = DispatchGroup()
@@ -457,7 +546,7 @@ func releaseRun(_ arguments: [String]) -> Never {
         ]
         for name in releaseValues { built[name] = environment[name]! }
         for name in app.secrets {
-            guard let value = environment[name], !value.isEmpty else {
+            guard let value = secrets[name], !value.isEmpty else {
                 die("\(app.app): the approver gave no \(name)")
             }
             do { built[name] = try keychain.write(name, value) } catch { die("\(error)") }
@@ -471,10 +560,7 @@ func releaseRun(_ arguments: [String]) -> Never {
             process.executableURL = URL(filePath: app.script)
             process.arguments = [app.root]
             process.currentDirectoryURL = URL(filePath: app.root)
-            process.environment = environment.filter {
-                !releaseKeys.contains($0.key) && !app.secrets.contains($0.key)
-            }
-            .merging(env) { $1 }
+            process.environment = environment.merging(env) { $1 }
             FileManager.default.createFile(atPath: app.log, contents: nil)
             let log = FileHandle(forWritingAtPath: app.log)
             process.standardOutput = log
@@ -508,9 +594,12 @@ func releaseRun(_ arguments: [String]) -> Never {
         }
     }
     group.wait()
+    let certificate = keychain.identity
     keychain.close()
-    let (result, failed) = outcome.read()
+    var (result, failed) = outcome.read()
     guard failed.isEmpty else { die("not released: \(failed.joined(separator: ", ")) failed") }
+    result.certificate = certificate
+    result.toolchain = tools
     guard let data = try? JSONEncoder().encode(result),
         FileManager.default.createFile(
             atPath: plan.result, contents: data, attributes: [.posixPermissions: 0o600])
@@ -548,6 +637,8 @@ final class ReleaseKeychain: @unchecked Sendable {
     /// (`--keychain`), so a second copy of the identity elsewhere is never
     /// chosen. Its password is never shared.
     let path: String
+    /// The identity it holds, for the record: its certificate's SHA-1 and name.
+    let identity: String
     private let directory: URL
     private let keychain: SecKeychain
     private let searched: [SecKeychain]
@@ -650,6 +741,10 @@ final class ReleaseKeychain: @unchecked Sendable {
                 "the release identity must be one Developer ID Application identity and nothing else; it holds \(all.count) item(s): \(names.joined(separator: ", "))"
             )
         }
+        var certificate: SecCertificate?
+        SecIdentityCopyCertificate(identities[0], &certificate)
+        let der = certificate.map { SecCertificateCopyData($0) as Data } ?? Data()
+        let sha1 = Insecure.SHA1.hash(data: der).map { String(format: "%02X", $0) }.joined()
         // codesign reads the key without a prompt; the keychain's password is
         // the throwaway one.
         let partition = run(
@@ -682,6 +777,7 @@ final class ReleaseKeychain: @unchecked Sendable {
         self.keychain = keychain
         self.searched = searched
         self.path = path
+        identity = "\(sha1) \(names[0])"
         appStoreKeyPath = keyPath
         opened = true
     }
