@@ -10,10 +10,11 @@ set -euo pipefail
 id="garden.untitled.grant-example"
 app="build/grant-example.app"
 agent="$id.helper.plist"
+daemon="$id.daemon.plist"
 
 swift build -c release --product grant-example
 rm -rf "$app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Library/LaunchAgents"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Library/LaunchAgents" "$app/Contents/Library/LaunchDaemons"
 cp .build/release/grant-example "$app/Contents/MacOS/grant-example"
 
 cat > "$app/Contents/Info.plist" <<EOF
@@ -48,6 +49,20 @@ cat > "$app/Contents/Library/LaunchAgents/$agent" <<EOF
 </dict></plist>
 EOF
 
+# The daemon: the same binary idling as root (--daemon), the root path's
+# proof (an admin's approval, an install for everyone only). It does nothing.
+cat > "$app/Contents/Library/LaunchDaemons/$daemon" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$id.daemon</string>
+  <key>BundleProgram</key><string>Contents/MacOS/grant-example</string>
+  <key>ProgramArguments</key><array><string>grant-example</string><string>--daemon</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict></plist>
+EOF
+
 # Under the hardened runtime macOS denies the microphone and the camera
 # WITHOUT asking unless the signature carries these entitlements.
 entitlements="$(mktemp -t grant-example).plist"
@@ -74,7 +89,11 @@ installed=""
 for folder in /Applications "$HOME/Applications"; do
     [ -d "$folder/grant-example.app" ] && { installed="$folder/grant-example.app"; break; }
 done
-pkill -f "grant-example.app/Contents/MacOS/grant-example" || true
+pkill -f "grant-example.app/Contents/MacOS/grant-example$" || true
+# The example's command line, as a person's install would link it (in the
+# temporary folder, never a real PATH): pointed at the build until a copy in
+# Applications opens and re-points it.
+[ -L "${TMPDIR}grant-example-cli" ] || ln -s "$PWD/$app/Contents/MacOS/grant-example" "${TMPDIR}grant-example-cli"
 if [ -n "$installed" ]; then
     trash "$installed"
     cp -R "$app" "$installed"

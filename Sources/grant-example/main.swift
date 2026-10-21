@@ -27,6 +27,10 @@ extension PermissionGrant {
     static let helper = PermissionGrant.backgroundService(
         .helper, title: "Background helper", why: "Keeps running when the window is closed.",
         installFor: [.everyone, .me])
+    /// The daemon's: a root job runs only from an install for everyone.
+    static let daemon = PermissionGrant.backgroundService(
+        .daemon, title: "Root daemon", why: "Runs as root, approved by an admin.",
+        symbol: "lock.shield", required: false)
 }
 
 extension AppInstallation.Job {
@@ -34,10 +38,21 @@ extension AppInstallation.Job {
     /// launchd is asked whether it runs (no probe of its own).
     static let helper = AppInstallation.Job(
         .agent(plist: "garden.untitled.grant-example.helper.plist"), name: "the helper")
+    /// The bundled launch daemon: the same binary idling as root with
+    /// `--daemon`.
+    static let daemon = AppInstallation.Job(
+        .daemon(plist: "garden.untitled.grant-example.daemon.plist"), name: "the daemon")
 }
 
+/// The example's command line as a person's install links it (the build
+/// script makes the link, in the temporary folder): re-pointed when another
+/// copy opens, removed when the app is deleted.
+let cli = AppInstallation.Link(
+    URL(filePath: NSTemporaryDirectory()).appending(path: "grant-example-cli"),
+    to: "Contents/MacOS/grant-example")
+
 let grants: [PermissionGrant] = [
-    .microphone, .keyLight, .typing, .speech, .headMotion, .helper,
+    .microphone, .keyLight, .typing, .speech, .headMotion, .helper, .daemon,
 ]
 
 enum Shape: String, CaseIterable { case section, sheet, steps, chip }
@@ -205,11 +220,12 @@ if args.contains("--reset-helper") {
     // Back to square one for the helper's flow (run from the installed copy).
     PermissionGrant.helper.unregister()
     print("helper unregistered")
-} else if args.contains("--helper") {
-    // The launch agent: alive, doing nothing, until launchd stops it. Its app
-    // deleted, it leaves launchd; its app upgraded, KeepAlive restarts it
-    // into the new image.
-    let watch = AppInstallation.ImageWatch.start(goneAfter: 3) {}
+} else if args.contains("--helper") || args.contains("--daemon") {
+    // A job (the agent, or the daemon as root): alive, doing nothing, until
+    // launchd stops it. Its app deleted, it cleans up and leaves launchd; its
+    // app moved, it leaves launchd for the moved copy to register again; its
+    // app upgraded, KeepAlive restarts it into the new image.
+    let watch = AppInstallation.ImageWatch.start(links: [cli], goneAfter: 3)
     withExtendedLifetime(watch) { dispatchMain() }
 } else if let at = args.firstIndex(of: "--render"), at + 1 < args.count {
     let dir = URL(fileURLWithPath: args[at + 1])
@@ -229,12 +245,11 @@ if args.contains("--reset-helper") {
     }
     print("rendered \(Shape.allCases.count) shapes to \(dir.path)")
 } else {
-    // Deleted while open: it tries to unregister the helper (macOS may refuse
-    // with the bundle gone; the helper then boots itself out), then quits.
-    // Upgraded: it reopens into the new build.
-    let watch = AppInstallation.ImageWatch.start {
-        try? AppInstallation.Job.helper.uninstall()
-    }
+    // At launch: the jobs asked for or gone stale registered for this copy,
+    // the command line pointed here. Deleted while open: its state to the
+    // Trash, the link removed, quits (each job leaves launchd itself). Moved:
+    // reopens from the moved copy. Upgraded: reopens into the new build.
+    let watch = AppInstallation.ImageWatch.start(jobs: [.helper, .daemon], links: [cli])
     NSApplication.shared.setActivationPolicy(.regular)
     withExtendedLifetime(watch) { GrantExample.main() }
 }
