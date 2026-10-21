@@ -1,9 +1,16 @@
 // ship: a Mac app's release outside the App Store, one implementation for
-// every app, holding no key. The signing keys live in a vault and reach a
-// release only after a person approves its exact commits (`authz release`,
-// github.com/adriangalilea/authz.space release/README.md): `ship build` runs
-// inside that release, `ship publish` afterwards from the app's checkout.
+// every app, holding no key. The signing keys reach a release only through
+// an approver, after a person approves its exact commits (`ship release`,
+// RELEASE.md beside this file): `ship build` runs inside that release,
+// `ship publish` afterwards from the app's checkout.
 //
+//   ship release [release.json…]  build, sign and notarize one or more apps
+//                              after one approval of their commits (the
+//                              approver `SHIP_APPROVE` names); their working
+//                              folders keep the build caches
+//   ship release-run <plan> <sha256>
+//                              what the approver runs after the yes, the
+//                              keys in its environment
 //   ship identity --team <T>   the signing identity's SHA-1: inside a release,
 //                              the one Developer ID its keychain holds;
 //                              anywhere else, the team's valid Apple
@@ -11,16 +18,16 @@
 //   ship check                 every gate publishing needs, ok or blocked,
 //                              each blocked one with the answer of the command
 //                              behind it; changes nothing
-//   ship build                 inside `authz release` only: assemble, sign,
+//   ship build                 inside a release only: assemble, sign,
 //                              notarize, the dmg (signed, notarized, stapled)
-//   ship publish               from the checkout, once `authz release` made
-//                              the dmg of exactly its commits: the tag pushed
+//   ship publish               from the checkout, once a release made the
+//                              dmg of exactly its commits: the tag pushed
 //                              with its branch, then the channels
-//   ship released              whether the last `authz release` of the
-//                              manifest here (release.json) is of exactly the
-//                              checkout's commits, Markdown aside: exit 0 or 1
-//                              with the reason (anything that publishes
-//                              without `ship publish` asks this first)
+//   ship released              whether the last release of the manifest here
+//                              (release.json) is of exactly the checkout's
+//                              commits, Markdown aside: exit 0 or 1 with the
+//                              reason (anything that publishes without
+//                              `ship publish` asks this first)
 //
 //   --team <T>           the Apple team whose identity signs (identity, build)
 //   --name <slug>        the dmg, its volume and the cask are named by it
@@ -40,9 +47,8 @@
 //
 // VERSION comes from the environment (the app's mise.toml), the release body
 // from notes/$VERSION.md. Inside a release, the environment names the
-// release's own keychain (AUTHZ_RELEASE_KEYCHAIN) and the App Store Connect
-// key it wrote for this release (APPSTORE_KEY, APPSTORE_KEY_ID,
-// APPSTORE_ISSUER).
+// release's own keychain (SHIP_KEYCHAIN) and the App Store Connect key it
+// wrote for this release (APPSTORE_KEY, APPSTORE_KEY_ID, APPSTORE_ISSUER).
 import CryptoKit
 import Foundation
 import Security
@@ -157,11 +163,11 @@ func units(of certificate: SecCertificate) -> [String] {
     }
 }
 
-/// The identity this context signs with: inside a release ($AUTHZ_RELEASE_KEYCHAIN),
+/// The identity this context signs with: inside a release ($SHIP_KEYCHAIN),
 /// the one Developer ID Application identity of `team` its keychain holds;
 /// anywhere else, `team`'s Apple Development identity that expires last.
 func signingIdentity(team: String) -> Identity {
-    if let keychain = ProcessInfo.processInfo.environment["AUTHZ_RELEASE_KEYCHAIN"],
+    if let keychain = ProcessInfo.processInfo.environment["SHIP_KEYCHAIN"],
         !keychain.isEmpty
     {
         let found = identities(in: keychain).filter {
@@ -216,11 +222,12 @@ let layout = """
 
 // MARK: - the arguments
 
-let verbs = ["identity", "check", "build", "publish", "released"]
+let verbs = ["release", "release-run", "identity", "check", "build", "publish", "released"]
 guard let verb = CommandLine.arguments.dropFirst().first, verbs.contains(verb) else {
     die(
         """
-        usage: ship identity --team <T>
+        usage: ship release [release.json…]
+               ship identity --team <T>
                ship check   --name <slug> --app <dir/X.app> [--github] [--cask]
                ship build   --team <T> --name <slug> --app <dir/X.app> --assemble <shell> [--sign <path>]… [--signed]
                ship publish --name <slug> --app <dir/X.app> [--tag <name>] [--github] [--after <shell>] [--cask]
@@ -239,6 +246,9 @@ func values(_ flag: String) -> [String] {
 }
 func has(_ flag: String) -> Bool { args.contains(flag) }
 
+if verb == "release" { release(args.isEmpty ? ["release.json"] : args) }
+if verb == "release-run" { releaseRun(args) }
+
 if verb == "identity" {
     guard let team = value("--team") else { die("--team <T> is required") }
     print(signingIdentity(team: team).sha1)
@@ -249,7 +259,7 @@ if verb == "released" {
     let released = releasedHere()
     print(
         released.ok
-            ? "released: the last authz release is of these commits"
+            ? "released: the last release is of these commits"
             : "not released: \(released.answer)")
     exit(released.ok ? 0 : 1)
 }
@@ -269,16 +279,16 @@ guard !dist.isEmpty, dist != ".", !dist.hasPrefix("/"), !dist.contains("..") els
     die("--app must sit in a subdirectory of the repo (dist/\(name).app), not \(app)")
 }
 
-// MARK: - the build (inside `authz release`)
+// MARK: - the build (inside `ship release`)
 
 if verb == "build" {
     guard let assemble = value("--assemble") else { die("--assemble <shell> is required") }
-    guard let keychain = env["AUTHZ_RELEASE_KEYCHAIN"], !keychain.isEmpty,
+    guard let keychain = env["SHIP_KEYCHAIN"], !keychain.isEmpty,
         let keyPath = env["APPSTORE_KEY"], let keyID = env["APPSTORE_KEY_ID"],
         let issuer = env["APPSTORE_ISSUER"]
     else {
         die(
-            "ship build runs inside `authz release` (its keychain and App Store Connect key are in the environment)"
+            "ship build runs inside `ship release` (its keychain and App Store Connect key are in the environment)"
         )
     }
     guard let team = value("--team") else { die("--team <T> is required") }
@@ -402,20 +412,19 @@ var blocked = false
     if let hint { print("           \(hint)") }
 }
 
-/// Whether the last `authz release` of this repo was of exactly its commits:
+/// Whether the last `ship release` of this repo was of exactly its commits:
 /// its manifest (`release.json`) names the trees, its record
-/// (~/.local/state/authz/releases/<app>.json) what each was released at. A
+/// (~/.local/state/ship/releases/<app>.json) what each was released at. A
 /// tree may have moved since by documentation alone (Markdown: the notes).
 func releasedHere() -> (ok: Bool, answer: String) {
     guard let manifest = try? Data(contentsOf: URL(filePath: "release.json")),
         let m = try? JSONSerialization.jsonObject(with: manifest) as? [String: Any],
         let appName = m["app"] as? String, let trees = m["trees"] as? [[String: Any]]
     else { return (false, "no release.json at the repo root") }
-    let recordPath = "\(NSHomeDirectory())/.local/state/authz/releases/\(appName).json"
-    guard let record = try? Data(contentsOf: URL(filePath: recordPath)),
+    guard let record = try? Data(contentsOf: recordFile(appName)),
         let r = try? JSONSerialization.jsonObject(with: record) as? [String: Any],
         let sources = r["sources"] as? [String: String]
-    else { return (false, "no release of \(appName) yet: authz release") }
+    else { return (false, "no release of \(appName) yet: ship release") }
     for tree in trees {
         guard let tree = tree["name"] as? String, let path = treePath(trees, tree) else { continue }
         guard let released = sources[tree] else {
@@ -474,7 +483,7 @@ if has("--cask") {
 }
 if verb == "publish" {
     let released = releasedHere()
-    gate("the last authz release is of these commits", released.ok, answer: released.answer)
+    gate("the last release is of these commits", released.ok, answer: released.answer)
     let stapled = run(["xcrun", "stapler", "validate", dmg], quiet: true)
     gate("\(dmg) is notarized and stapled", stapled.code == 0, answer: stapled.out)
     let developerID = run(
@@ -487,7 +496,7 @@ if verb == "publish" {
 }
 
 if verb == "check" {
-    print(blocked ? "\nblocked" : "\nready: authz release, then ship publish")
+    print(blocked ? "\nblocked" : "\nready: ship release, then ship publish")
     exit(blocked ? 1 : 0)
 }
 if blocked { die("a gate is blocked") }
