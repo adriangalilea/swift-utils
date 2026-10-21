@@ -35,6 +35,9 @@
         public final class ImageWatch: @unchecked Sendable {
             private let path: String
             private let inode: ino_t
+            /// This process's designated requirement, read at the start: a new
+            /// image is whole when it holds for it.
+            private let requirement: SecRequirement
             /// The bundle's job this process runs as (nil: the app), read at
             /// the start while the bundle can still vouch for it.
             private let job: String?
@@ -79,8 +82,24 @@
                 }
                 var info = stat()
                 precondition(stat(path, &info) == 0, "the running executable is missing: \(path)")
+                // Read now, while the image exists: once an upgrade deletes
+                // the old file (a cask, `rm -rf`), this process's own code can
+                // no longer be read, and a requirement asked for then never
+                // comes, so no new image would ever count as whole.
+                var me: SecCode?
+                var mine: SecStaticCode?
+                var requirement: SecRequirement?
+                guard SecCodeCopySelf([], &me) == errSecSuccess, let me,
+                    SecCodeCopyStaticCode(me, [], &mine) == errSecSuccess, let mine,
+                    SecCodeCopyDesignatedRequirement(mine, [], &requirement) == errSecSuccess,
+                    let requirement
+                else {
+                    preconditionFailure(
+                        "this process's designated requirement cannot be read: \(path)")
+                }
                 let watch = ImageWatch(
-                    path: path, inode: info.st_ino, job: AppInstallation.ownJob,
+                    path: path, inode: info.st_ino, requirement: requirement,
+                    job: AppInstallation.ownJob,
                     bundleID: bundleID, bundle: bundle, keeps: keeps, links: links,
                     goneAfter: goneAfter, beforeLeaving: beforeLeaving)
                 installLog.info("watching the image", ["path": path, "as": watch.job ?? "the app"])
@@ -101,9 +120,13 @@
                             bundleID: bundleID, bundle: deleted, keeps: keeps, links: links)
                         exit(0)
                     }
-                    // A new copy of the app is where a job's record and a
-                    // link into the bundle go stale.
-                    AppInstallation.repoint(links, to: bundle, bundleID: bundleID)
+                    // A new install of the app is where a job's record and a
+                    // link into the bundle go stale. Only an install: a copy
+                    // opened from a dmg, Downloads or a build folder would
+                    // take the links from the installed one.
+                    if case .installed = AppInstallation.home {
+                        AppInstallation.repoint(links, to: bundle, bundleID: bundleID)
+                    }
                     if arguments.contains(Job.staleArgument) {
                         // Opened by a moved job's old process to register it
                         // here: done before any window, then gone.
@@ -123,13 +146,15 @@
             }
 
             private init(
-                path: String, inode: ino_t, job: (label: String, plist: String)?, bundleID: String,
+                path: String, inode: ino_t, requirement: SecRequirement,
+                job: (label: String, plist: String)?, bundleID: String,
                 bundle: URL,
                 keeps: [URL], links: [Link], goneAfter: Int,
                 beforeLeaving: @escaping @Sendable () -> Void
             ) {
                 self.path = path
                 self.inode = inode
+                self.requirement = requirement
                 self.job = job?.label
                 self.jobPlist = job?.plist
                 self.bundleID = bundleID
@@ -194,7 +219,7 @@
                 }
                 gone = 0
                 guard info.st_ino != inode else { return }
-                guard Self.wholeAsSelf(path) else {
+                guard Self.whole(path, in: bundle, as: requirement) else {
                     installLog.info("a new image, not whole yet", ["path": path])
                     return
                 }
@@ -218,25 +243,29 @@
                 AppInstallation.reopen("an upgrade landed")
             }
 
-            /// The image at `path` is complete and signed as this process is:
-            /// its designated requirement holds for the new code.
-            static func wholeAsSelf(_ path: String) -> Bool {
-                var me: SecCode?
-                var mine: SecStaticCode?
-                var requirement: SecRequirement?
-                guard SecCodeCopySelf([], &me) == errSecSuccess, let me,
-                    SecCodeCopyStaticCode(me, [], &mine) == errSecSuccess, let mine,
-                    SecCodeCopyDesignatedRequirement(mine, [], &requirement) == errSecSuccess
-                else { return false }
-                var code: SecStaticCode?
+            /// The new image is complete and signed as this process is: the
+            /// executable at `path` holds `requirement` (this process's), and
+            /// the whole bundle around it is valid, nested code included, so a
+            /// helper still half copied counts as not yet whole. (The bundle's
+            /// own requirement is the app's, which a job's is not: the job
+            /// checks its executable by its own.)
+            static func whole(_ path: String, in bundle: URL, as requirement: SecRequirement)
+                -> Bool
+            {
+                var executable: SecStaticCode?
+                var app: SecStaticCode?
                 guard
-                    SecStaticCodeCreateWithPath(URL(filePath: path) as CFURL, [], &code)
-                        == errSecSuccess,
-                    let code
+                    SecStaticCodeCreateWithPath(URL(filePath: path) as CFURL, [], &executable)
+                        == errSecSuccess, let executable,
+                    SecStaticCodeCreateWithPath(bundle as CFURL, [], &app) == errSecSuccess, let app
                 else { return false }
                 return SecStaticCodeCheckValidity(
-                    code, SecCSFlags(rawValue: kSecCSCheckAllArchitectures), requirement)
+                    executable, SecCSFlags(rawValue: kSecCSCheckAllArchitectures), requirement)
                     == errSecSuccess
+                    && SecStaticCodeCheckValidity(
+                        app,
+                        SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSCheckNestedCode),
+                        nil) == errSecSuccess
             }
         }
 
