@@ -1,4 +1,5 @@
 #if os(macOS) || os(iOS)
+    import Ink
     import SwiftUI
     #if os(macOS)
         import AppKit
@@ -231,7 +232,7 @@
         /// gap in a stack): a dot in the standing's hue and what is not
         /// working (`label`, "can't type into apps yet"; the grant's title when
         /// none is given). Hovered or focused, the same box says the fix
-        /// ("open settings…") in the label's place, the note as its help; a
+        /// ("open settings…") in the label's place, the note as its Ink tip; a
         /// click acts. Both texts hold the box's width, so hovering never
         /// moves anything.
         ///
@@ -281,9 +282,8 @@
                     .focused($focused)
                     .onHover { hovering = $0 }
                     .animation(.easeOut(duration: 0.12), value: fixing)
-                    .help(standing.note ?? grant.why)
-                    .accessibilityLabel(what)
-                    .accessibilityHint(fix)
+                    .inkTip(standing.note ?? grant.why, tint: Self.hue(standing.grade))
+                    .accessibilityLabel("\(what), \(fix)")
                     .onAppear { PermissionGrant.surfaceAppeared() }
                 }
             }

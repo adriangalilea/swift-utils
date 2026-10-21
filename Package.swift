@@ -128,8 +128,10 @@ let package = Package(
         .target(name: "Entitlement", resources: [.process("Resources")]),
         // The yes it draws wears Ink's prominent button.
         .target(name: "Biometrics", dependencies: ["Ink"]),
+        // Ink: the studio's one tooltip (a chip's note), its tokens.
         .target(
-            name: "PermissionGrants", dependencies: ["Log"], exclude: ["README.md", "CLAUDE.md"]),
+            name: "PermissionGrants", dependencies: ["Log", "Ink"],
+            exclude: ["README.md", "CLAUDE.md"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         // Every shape live over real permissions: `mise run grant-example`.
         .executableTarget(name: "grant-example", dependencies: ["PermissionGrants"]),
