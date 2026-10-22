@@ -213,13 +213,26 @@ private struct PlacedTip: View {
             .position(point)
     }
 
+    /// Beside the control on `edge`, or on the opposite side when the layer has no
+    /// room there (a control along the window's top edge takes its tip below), so a
+    /// tip never squeezes against an edge away from what it names.
     private var point: CGPoint {
-        let gap: CGFloat = 14
+        let gap: CGFloat = 6
+        let above = anchor.minY - gap - size.height / 2
+        let below = anchor.maxY + gap + size.height / 2
+        let before = anchor.minX - gap - size.width / 2
+        let after = anchor.maxX + gap + size.width / 2
         switch edge {
-        case .top: return CGPoint(x: clampedX, y: anchor.minY - gap)
-        case .bottom: return CGPoint(x: clampedX, y: anchor.maxY + gap)
-        case .leading: return CGPoint(x: anchor.minX - gap, y: anchor.midY)
-        case .trailing: return CGPoint(x: anchor.maxX + gap, y: anchor.midY)
+        case .top:
+            return CGPoint(x: clampedX, y: above - size.height / 2 >= 0 ? above : below)
+        case .bottom:
+            return CGPoint(
+                x: clampedX, y: below + size.height / 2 <= bounds.height ? below : above)
+        case .leading:
+            return CGPoint(x: before - size.width / 2 >= 0 ? before : after, y: anchor.midY)
+        case .trailing:
+            return CGPoint(
+                x: after + size.width / 2 <= bounds.width ? after : before, y: anchor.midY)
         }
     }
 
