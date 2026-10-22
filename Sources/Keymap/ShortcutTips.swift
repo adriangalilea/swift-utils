@@ -210,39 +210,40 @@ private struct PlacedTip: View {
     var body: some View {
         ShortcutTipView(items: items, reveal: reveal)
             .onGeometryChange(for: CGSize.self, of: { $0.size }) { size = $0 }
-            .position(point)
+            .position(ShortcutTip.place(anchor: anchor, size: size, edge: edge, bounds: bounds))
     }
+}
 
-    /// Beside the control on `edge`, or on the opposite side when the layer has no
-    /// room there (a control along the window's top edge takes its tip below), so a
-    /// tip never squeezes against an edge away from what it names.
-    private var point: CGPoint {
-        let gap: CGFloat = 6
+extension ShortcutTip {
+    /// The space between a tip and the control it names.
+    public static let gap: CGFloat = 6
+
+    /// Where a tip of `size` centers, in the layer's coordinates (origin at
+    /// its top-left, `bounds` its size): beside `anchor` on `edge`, or on the
+    /// opposite side when the layer has no room there (a control along the
+    /// window's top edge takes its tip below), so a tip never squeezes against
+    /// an edge away from what it names. Above or below, the center-x clamps so
+    /// the left edge stays 8pt inside the layer and the right edge stays in
+    /// when it fits, otherwise spills right rather than off the left. Leading
+    /// is the left side: the layer is laid out left to right.
+    public static func place(anchor: CGRect, size: CGSize, edge: Edge, bounds: CGSize) -> CGPoint {
         let above = anchor.minY - gap - size.height / 2
         let below = anchor.maxY + gap + size.height / 2
         let before = anchor.minX - gap - size.width / 2
         let after = anchor.maxX + gap + size.width / 2
+        let half = size.width / 2
+        let lo = half + 8
+        let x = min(max(anchor.midX, lo), max(lo, bounds.width - half - 8))
         switch edge {
         case .top:
-            return CGPoint(x: clampedX, y: above - size.height / 2 >= 0 ? above : below)
+            return CGPoint(x: x, y: above - size.height / 2 >= 0 ? above : below)
         case .bottom:
-            return CGPoint(
-                x: clampedX, y: below + size.height / 2 <= bounds.height ? below : above)
+            return CGPoint(x: x, y: below + size.height / 2 <= bounds.height ? below : above)
         case .leading:
             return CGPoint(x: before - size.width / 2 >= 0 ? before : after, y: anchor.midY)
         case .trailing:
             return CGPoint(
                 x: after + size.width / 2 <= bounds.width ? after : before, y: anchor.midY)
         }
-    }
-
-    /// Center-x that keeps the capsule visible: the left edge never crosses
-    /// the margin; the right edge stays in bounds when it fits, otherwise it
-    /// spills right rather than off the left.
-    private var clampedX: CGFloat {
-        let half = size.width / 2
-        let lo = half + 8
-        let hi = max(lo, bounds.width - half - 8)
-        return min(max(anchor.midX, lo), hi)
     }
 }
