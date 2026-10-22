@@ -136,7 +136,8 @@ private struct ShortcutTipLayer: ViewModifier {
         content.overlayPreferenceValue(ShortcutTipKey.self) { tips in
             GeometryReader { proxy in
                 if let reveal = monitor.reveal {
-                    ForEach(tips) { tip in
+                    ForEach(Array(zip(ShortcutTip.keys(tips.map(\.id)), tips)), id: \.0) {
+                        _, tip in
                         PlacedTip(
                             items: tip.items, reveal: reveal,
                             anchor: proxy[tip.anchor], edge: tip.edge, bounds: proxy.size)
@@ -149,16 +150,35 @@ private struct ShortcutTipLayer: ViewModifier {
     }
 }
 
+extension ShortcutTip {
+    /// The layer's key for each tip, from the tips' ids in order: the id and which
+    /// occurrence of it this is, so one verb on several controls at once (a toolbar's
+    /// and a transport's play) is several tips, each keeping its key while the
+    /// others come and go.
+    public static func keys(_ ids: [String]) -> [String] {
+        var seen: [String: Int] = [:]
+        return ids.map { id in
+            let n = seen[id, default: 0]
+            seen[id] = n + 1
+            return "\(id)#\(n)"
+        }
+    }
+}
+
 extension View {
     /// Float a registry command's chords over this control. The layer picks
     /// the right one for whatever prefix is held. `extra` adds non-registry
     /// chords - e.g. the media-key glyphs (⏮ ⏭ ⏯).
+    /// The same verb may wear a tip on several controls at once. `present` stands
+    /// the tip down while its control is mounted but not the one a person uses
+    /// (a transport kept alive under another).
     public func shortcutTip<A: ActionSet>(
         _ action: A, _ store: KeymapStore<A>,
-        extra: [ShortcutChord] = [], edge: Edge = .top
+        extra: [ShortcutChord] = [], present: Bool = true, edge: Edge = .top
     ) -> some View {
         let item = ShortcutTip.Item(chords: store.chords(for: action) + extra, label: nil)
-        return modifier(TipAnchor(id: action.rawValue, items: [item], present: true, edge: edge))
+        return modifier(
+            TipAnchor(id: action.rawValue, items: [item], present: present, edge: edge))
     }
 
     /// Float a row of labeled actions. Only contributes while `present`

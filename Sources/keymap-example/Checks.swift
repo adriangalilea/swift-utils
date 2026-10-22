@@ -65,6 +65,14 @@ import SwiftUI
     monitor.suppressed = true
     law("a modal silences every reveal", monitor.reveal == nil)
 
+    // ---- identity: one verb on several controls is several tips ----
+    let keys = ShortcutTip.keys(["play", "search", "play", "play"])
+    law("every tip has its own key", Set(keys).count == keys.count, "\(keys)")
+    law(
+        "a tip keeps its key while a later one of its verb goes",
+        ShortcutTip.keys(["play", "search", "play"]).prefix(2)
+            == ShortcutTip.keys(["play", "search"]).prefix(2))
+
     // ---- placement: beside the anchor on its edge, the other side when there is no room ----
     let bounds = CGSize(width: 760, height: 480)
     let size = CGSize(width: 80, height: 22)
