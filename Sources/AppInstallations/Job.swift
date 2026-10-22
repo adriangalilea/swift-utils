@@ -267,6 +267,15 @@
 
             private func performInstall(approvalWait: Duration, afresh: Bool) async throws -> State
             {
+                switch state {
+                case .misplaced(let home): throw Failure.misplaced(home, needs: needs)
+                case .bare(let missing): throw Failure.bare(missing: missing)
+                default: break
+                }
+                // Before judging the state: a stray plist loaded under the
+                // label makes the status read enabled, and the bundled agent
+                // would never be registered.
+                removeStrayDefinition()
                 let before: State = afresh && service.status == .enabled ? .silent : state
                 switch before {
                 case .running: return .running
@@ -274,7 +283,6 @@
                 case .bare(let missing): throw Failure.bare(missing: missing)
                 case .off, .awaitingApproval, .silent: break
                 }
-                removeStrayDefinition()
                 if before == .silent {
                     // On and not answering here: the record is useless as it
                     // stands (made for another copy, or loaded and stuck, or
