@@ -26,6 +26,11 @@ let package = Package(
         // coloring and a short excerpt view, for surfaces that cannot run
         // JavaScriptCore (a widget, a Live Activity). No dependencies.
         .library(name: "SyntaxLines", targets: ["SyntaxLines"]),
+        // Markdown read and drawn: one parse (cmark-gfm: CommonMark and
+        // GitHub's extensions) into a Sendable tree that keeps every node's
+        // source position, and one SwiftUI page drawn from it. Its own
+        // product so only consumers that import it link the parser.
+        .library(name: "MarkdownText", targets: ["MarkdownText"]),
         .library(name: "Keymap", targets: ["Keymap"]),
         // Command-line output: the semantic palette (TTY + NO_COLOR /
         // FORCE_COLOR gated), ANSI-aware width/clip/pad, table/kv/tree.
@@ -114,7 +119,13 @@ let package = Package(
         // Syntax's engine: highlight.js run in JavaScriptCore, packaged.
         // The one third-party dependency in the repo; only the Syntax
         // product drags it, and only consumers that import Syntax link it.
-        .package(url: "https://github.com/raspu/Highlightr", from: "2.3.0")
+        .package(url: "https://github.com/raspu/Highlightr", from: "2.3.0"),
+        // MarkdownText's parser: cmark-gfm as swiftlang packages it, the one
+        // swift-markdown wraps. Read directly because swift-markdown attaches
+        // only tables, strikethrough and task lists: autolinks and footnotes
+        // are GitHub's too, and agent text is full of bare URLs. Only the
+        // MarkdownText product drags it.
+        .package(url: "https://github.com/swiftlang/swift-cmark", exact: "0.9.0"),
     ],
     targets: [
         .target(name: "Ink", resources: [.process("Resources")]),
@@ -124,6 +135,21 @@ let package = Package(
             name: "Syntax",
             dependencies: ["SyntaxLines", .product(name: "Highlightr", package: "Highlightr")]),
         .testTarget(name: "SyntaxTests", dependencies: ["Syntax"]),
+        .target(
+            name: "MarkdownText",
+            dependencies: [
+                "Ink", "Syntax",
+                .product(name: "cmark-gfm", package: "swift-cmark"),
+                .product(name: "cmark-gfm-extensions", package: "swift-cmark"),
+            ]),
+        // The fixtures (real agent answers and the edge cases) live with
+        // the tests; `mise run markdown-snapshots` draws each one light and
+        // dark on the Mac and in the iPhone simulator.
+        .testTarget(
+            name: "MarkdownTextTests", dependencies: ["MarkdownText"],
+            resources: [.copy("Fixtures")]),
+        // The fixtures in a window, the page and its two variants side by side.
+        .executableTarget(name: "markdown-example", dependencies: ["MarkdownText"]),
         .target(
             name: "Keymap",
             dependencies: ["Ink"],

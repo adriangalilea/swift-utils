@@ -102,6 +102,19 @@ Code colored for a person to read before they say yes to it, by what its sender 
 
 **SyntaxLines** is the half with no engine, for where JavaScriptCore cannot run (a widget, a Live Activity): `CodeColors` is a coloring as data (a palette and runs, a few hundred bytes), computed by `Syntax.colors` where the engine runs and painted anywhere by `paint`; `CodeExcerpt` draws an excerpt. Syntax re-exports it.
 
+## MarkdownText
+
+Markdown read once and drawn the same in every app: ui's `markdown` item on the Apple platforms. `MarkdownDocument(text)` is the parse (cmark-gfm: CommonMark, GitHub's tables, strikethrough, task lists, autolinks and footnotes, plus YAML/TOML front matter) as a `Sendable` value tree where every block keeps its source span. `MarkdownView(text)` draws it: headings, lists with hanging indents, task boxes, quotes, code blocks colored by their fence's language through `Syntax` and scrolled sideways, tables scrolled sideways, footnotes at the foot, links live only to the web, mail and a phone. Two departures from GitHub for agent text: a strike needs `~~` (`~5 min` is "about"), and punctuation is never made smart.
+
+```swift
+MarkdownView(message.text)                                     // a page
+MarkdownView(note).markdownStyle(.footnote)                     // a quiet aside
+MarkdownView(reply).markdownStyle(.body.preview(lines: 3))     // a row's preview
+MarkdownView(partial, streaming: true)                         // text still arriving
+```
+
+`streaming` settles what a cut left open at the end (an unclosed `**` or backtick, a link without its `)`, a table whose delimiter row has not arrived) so raw syntax never flashes. Every measure is in the reader's unit, read from the font at the reader's Dynamic Type size: line height 1.45 times the size, spacing and indents in ems, the measure in characters (`MarkdownStyle.measure`, 72). Colors are the primary ink at Ink's opacity tiers, so light and dark both hold. The parser is its own product's dependency (swift-cmark, pinned exact): only an app that imports MarkdownText links it. `swift run markdown-example` shows the fixtures (`Tests/MarkdownTextTests/Fixtures`: real agent answers and the edge cases); `mise run markdown-snapshots [dir]` writes each one light and dark as PNGs, the Mac's and the iPhone simulator's.
+
 ## Log
 
 The logging and tracing contract go-utils, ts-utils and py-utils share, in Swift, by the same verbs and the same bytes: [github.com/adriangalilea/utils](https://github.com/adriangalilea/utils) is the contract, and its conformance harness runs `probes/swift` against this module beside the other three. One stream of events, spans as start/end events, W3C `traceparent` across processes, the `LOG_*` variables, `LOG_SHIP`.

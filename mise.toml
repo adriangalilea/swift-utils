@@ -44,6 +44,7 @@ SyntaxLines iOS tvOS
 Entitlement iOS tvOS
 Colophon iOS tvOS
 MediaSpec iOS tvOS
+MarkdownText iOS tvOS
 Scores iOS tvOS
 Biometrics iOS
 TABLE
@@ -62,6 +63,23 @@ run = [
 [tasks.grant-example]
 description = "PermissionGrants' shapes as a real, signed app with its own permissions and a helper to install (grant reset grant-example replays it)"
 run = "bash scripts/grant-example-app.sh"
+
+[tasks.markdown-snapshots]
+description = "MarkdownText's fixtures drawn light and dark as PNGs into [dir] (default /tmp/md-fixtures): mac/ at a Mac's widths, iphone/ in the iPhone simulator"
+usage = 'arg "[dir]" help="where the PNGs go"'
+run = '''
+set -euo pipefail
+dir="${usage_dir:-/tmp/md-fixtures}"
+MARKDOWN_SNAPSHOTS="$dir" swift test --filter 'MarkdownTextTests'
+# By id: a package scheme's destinations do not resolve a device by its name.
+phone=$(xcrun simctl list devices available -j \
+  | jq -r '[.devices[][] | select(.name == "iPhone 17 Pro")][0].udid')
+[ "$phone" != null ] || { echo "markdown-snapshots: no iPhone 17 Pro simulator" >&2; exit 1; }
+TEST_RUNNER_MARKDOWN_SNAPSHOTS="$dir" xcodebuild test -scheme MarkdownTextTests \
+  -destination "platform=iOS Simulator,id=$phone" \
+  -derivedDataPath .build/markdown-snapshots -quiet
+echo "markdown-snapshots: $dir/mac and $dir/iphone"
+'''
 
 [tasks.overlay]
 description = "Run the keymap overlay example"
