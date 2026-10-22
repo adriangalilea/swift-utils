@@ -47,6 +47,24 @@ public enum Syntax {
         }
     }
 
+    /// Code in the language its author named, as a markdown fence names it (`swift`,
+    /// `ts`, `sh`; highlight.js takes its aliases). `diff` is colored by line prefix;
+    /// a block named as plain text (`text`, `txt`, `plaintext`) stays plain; a name the
+    /// grammars do not know is detected from the content. Never rewrites a character.
+    public static func highlight(_ text: String, language: String, on appearance: Appearance)
+        -> AttributedString
+    {
+        let name = language.lowercased()
+        if name == "diff" { return SyntaxLines.diff(text) }
+        guard !["text", "txt", "plain", "plaintext"].contains(name), text.utf8.count <= ceiling
+        else { return AttributedString(text) }
+        let key = "\(appearance.theme)|lang:\(name)|\(text.hashValue)"
+        if let hit = cached(key) { return hit }
+        let colored = code(text, language: name, theme: appearance.theme) ?? AttributedString(text)
+        remember(key, colored)
+        return colored
+    }
+
     /// The grammar's inks for `text` as data (`CodeColors`), for a surface
     /// that cannot run the engine to paint (`CodeExcerpt(colors:)`). Nil for
     /// a diff (line-colored without an engine) and plain text, or when the
@@ -111,7 +129,9 @@ public enum Syntax {
         store.lock.withLock {
             if store.cache[key] == nil {
                 store.order.append(key)
-                if store.order.count > 64 { store.cache[store.order.removeFirst()] = nil }
+                // A conversation's code blocks redraw on every scroll: room for a
+                // screenful of them and the approvals beside.
+                if store.order.count > 256 { store.cache[store.order.removeFirst()] = nil }
             }
             store.cache[key] = value
         }
