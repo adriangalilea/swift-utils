@@ -112,6 +112,17 @@
             return URL(filePath: NSString.path(withComponents: Array(components[...outer])))
         }
 
+        /// Whether this launch is this module's own (a copy opened to
+        /// register, turn on or forget a job, or the new copy a stale one
+        /// hands over to): the app's launch, whatever its parent. A
+        /// hand-over runs the new copy's executable as a child of the old
+        /// job, never through LaunchServices, so `getppid() == 1` is no
+        /// sign of the app. An app that dispatches on argv (an app that is
+        /// also a command line) asks this before reading a verb.
+        public static func isInstallationLaunch(_ arguments: [String]) -> Bool {
+            appArguments(arguments).count != arguments.count
+        }
+
         /// The launch arguments with this module's own removed (each flag
         /// and the value after it): what the app's verb parsing reads, so a
         /// copy opened to register, turn on or forget a job is the app, never
