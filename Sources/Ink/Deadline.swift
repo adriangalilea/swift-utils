@@ -78,15 +78,43 @@ public struct DeadlineRing: View {
         self.warning = warning
     }
 
+    /// A circular timer ProgressView is a ring only where WidgetKit draws it
+    /// (a widget, a Live Activity); in an app it is the activity spinner.
+    /// So in an app the ring draws itself, and in an extension the system does.
+    static let drawnBySystem = Bundle.main.bundleURL.pathExtension == "appex"
+
     public var body: some View {
-        TimelineView(.explicit([Date(), deadline.turns])) { context in
-            ProgressView(timerInterval: deadline.from...deadline.until, countsDown: true) {
-                EmptyView()
-            } currentValueLabel: {
-                if let symbol { Image(systemName: symbol).imageScale(.small) }
+        Group {
+            if Self.drawnBySystem {
+                TimelineView(.explicit([Date(), deadline.turns])) { context in
+                    ProgressView(timerInterval: deadline.from...deadline.until, countsDown: true) {
+                        EmptyView()
+                    } currentValueLabel: {
+                        if let symbol { Image(systemName: symbol).imageScale(.small) }
+                    }
+                    .progressViewStyle(.circular)
+                    .tint(context.date >= deadline.turns ? warning : tint)
+                }
+            } else {
+                // Four redraws a second: a ring a few points wide moves less
+                // than a pixel between them.
+                TimelineView(.periodic(from: .now, by: 0.25)) { context in
+                    let total = max(0.001, deadline.until.timeIntervalSince(deadline.from))
+                    let left = max(0, deadline.until.timeIntervalSince(context.date))
+                    let ink = context.date >= deadline.turns ? warning : tint
+                    ZStack {
+                        Circle().stroke(ink.opacity(0.2), lineWidth: 2.5)
+                        Circle()
+                            .trim(from: 0, to: left / total)
+                            .stroke(ink, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                        if let symbol {
+                            Image(systemName: symbol).imageScale(.small).foregroundStyle(ink)
+                        }
+                    }
+                    .padding(1.25)
+                }
             }
-            .progressViewStyle(.circular)
-            .tint(context.date >= deadline.turns ? warning : tint)
         }
         .accessibilityHidden(true)
     }
