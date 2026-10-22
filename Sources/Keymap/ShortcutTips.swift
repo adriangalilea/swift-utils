@@ -6,7 +6,7 @@ import SwiftUI
 /// have several (bare `⌫`, `⌘⌫`, `⇧⌘⌫`), each surfacing under a different
 /// held prefix. `isGlobal` marks the form that fires even when the app
 /// isn't key.
-public struct ShortcutChord: Sendable {
+public struct ShortcutChord: Sendable, Equatable {
     public let modifiers: EventModifiers
     public let display: String
     public let isGlobal: Bool
@@ -54,14 +54,15 @@ public func shortcutCompletions(_ chords: [ShortcutChord], _ reveal: RevealMonit
 /// on. The control contributes an anchor; ONE layer at the window root reads
 /// them all - so the tips overflow bounds (toolbar, list rows, glass) and
 /// never push a pixel of layout. One item per command; a row carries several
-/// labeled ones.
-public struct ShortcutTip: Identifiable {
+/// labeled ones. Equatable so a tree whose tips did not change (none, while
+/// no reveal is on) costs the root layer nothing.
+public struct ShortcutTip: Identifiable, Equatable {
     public let id: String
     public let anchor: Anchor<CGRect>
     public let edge: Edge
     public let items: [Item]
 
-    public struct Item {
+    public struct Item: Equatable {
         public let chords: [ShortcutChord]
         public let label: LocalizedStringKey?
         public init(chords: [ShortcutChord], label: LocalizedStringKey? = nil) {
@@ -157,9 +158,7 @@ extension View {
         extra: [ShortcutChord] = [], edge: Edge = .top
     ) -> some View {
         let item = ShortcutTip.Item(chords: store.chords(for: action) + extra, label: nil)
-        return anchorPreference(key: ShortcutTipKey.self, value: .bounds) {
-            [ShortcutTip(id: action.rawValue, anchor: $0, edge: edge, items: [item])]
-        }
+        return modifier(TipAnchor(id: action.rawValue, items: [item], present: true, edge: edge))
     }
 
     /// Float a row of labeled actions. Only contributes while `present`
@@ -167,9 +166,7 @@ extension View {
     public func shortcutActions(
         _ id: String, _ items: [ShortcutTip.Item], present: Bool, edge: Edge = .top
     ) -> some View {
-        anchorPreference(key: ShortcutTipKey.self, value: .bounds) {
-            present ? [ShortcutTip(id: id, anchor: $0, edge: edge, items: items)] : []
-        }
+        modifier(TipAnchor(id: id, items: items, present: present, edge: edge))
     }
 
     /// Install once at the window root: collects every tip anchor and
@@ -177,6 +174,24 @@ extension View {
     /// everything, hit-testing off, so it overflows freely and shifts
     /// nothing. Requires a `RevealMonitor` in the environment.
     public func shortcutTipLayer() -> some View { modifier(ShortcutTipLayer()) }
+}
+
+/// A control's tip anchor, contributed only while a reveal is on: at rest the
+/// tree carries no anchors, so scrolling and playback never re-reduce the
+/// preference or wake the root layer.
+private struct TipAnchor: ViewModifier {
+    let id: String
+    let items: [ShortcutTip.Item]
+    let present: Bool
+    let edge: Edge
+    @Environment(RevealMonitor.self) private var monitor: RevealMonitor?
+
+    func body(content: Content) -> some View {
+        let shown = present && monitor?.revealing == true
+        content.anchorPreference(key: ShortcutTipKey.self, value: .bounds) {
+            shown ? [ShortcutTip(id: id, anchor: $0, edge: edge, items: items)] : []
+        }
+    }
 }
 
 /// One floating tip, kept on screen. A wide row capsule centered on a
