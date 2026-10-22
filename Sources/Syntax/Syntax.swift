@@ -192,12 +192,20 @@ public struct SyntaxText: View {
     }
 
     public var body: some View {
-        Text(Syntax.highlight(text, as: format, on: Syntax.Appearance(scheme)))
-            .font(font)
-            // tvOS selects nothing: there is no pointer to drag across text.
-            #if !os(tvOS)
-                .textSelection(.enabled)
-            #endif
-            .frame(maxWidth: .infinity, alignment: .leading)
+        // A shell command wears its prompt, as `CodeExcerpt` draws it on a
+        // glance: it reads as something that will run, on every surface.
+        // Outside the selection, so a copied command is the command.
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if format == .shell {
+                Text("$").foregroundStyle(.secondary).accessibilityHidden(true)
+            }
+            Text(Syntax.highlight(text, as: format, on: Syntax.Appearance(scheme)))
+                // tvOS selects nothing: there is no pointer to drag across text.
+                #if !os(tvOS)
+                    .textSelection(.enabled)
+                #endif
+        }
+        .font(font)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
