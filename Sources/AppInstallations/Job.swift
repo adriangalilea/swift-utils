@@ -478,6 +478,13 @@
                 }
             }
 
+            /// The witness for an agent that runs once and exits (a login
+            /// job): launchd holds it loaded, whether or not it runs now.
+            public static func loaded(agent label: String) -> @Sendable () -> Bool {
+                let target = AppInstallation.launchdTarget(label: label, daemon: false)
+                return { AppInstallation.launchctl(["print", target]) == 0 }
+            }
+
             /// The job in launchd's own address: the person's domain for an
             /// agent, the system's for a daemon.
             var launchdTarget: String? {
