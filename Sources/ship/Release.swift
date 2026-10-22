@@ -94,8 +94,24 @@ let reserved: Set<String> =
 struct ApprovalRequest: Codable {
     /// What is asked ("Release Vigil?").
     let title: String
-    /// What the person reads: per tree, the commits since its last release.
+    /// What the person reads beyond the changes: a tree with nothing to
+    /// compare with, an app built again from the same commits.
     let lines: [String]
+    /// What changed since each app's last release, per tree: the approver
+    /// lays it out (an app's own tree first, the trees it shares after).
+    let changes: [Change]
+    struct Change: Codable {
+        let app: String
+        let tree: String
+        /// The app's own tree (its manifest's first); the others are shared
+        /// with other apps and change for reasons of their own.
+        let own: Bool
+        let count: Int
+        /// The last release's commit.
+        let since: String
+        /// `<short hash> <subject>`, newest first, at most 25.
+        let commits: [String]
+    }
     /// Secret name → opaque reference. The approver resolves each one only
     /// after the yes, and only into `run.stdin`, where `{name}` stands for it.
     let secrets: [String: String]
@@ -258,6 +274,7 @@ func release(_ manifests: [String]) -> Never {
         "appStoreKey": environment["SHIP_RELEASE_APPSTORE_KEY"]!,
     ]
     var lines: [String] = []
+    var changes: [ApprovalRequest.Change] = []
     var apps: [Plan.App] = []
     let began = Date()
     // This release's name: its folder under each app, kept for good.
@@ -305,9 +322,8 @@ func release(_ manifests: [String]) -> Never {
         let last =
             (try? JSONDecoder().decode(
                 Record.self, from: Data(contentsOf: recordFile(manifest.app))))?.sources ?? [:]
-        lines.append("\(manifest.app):")
         var changed = false
-        for tree in manifest.trees {
+        for (index, tree) in manifest.trees.enumerated() {
             let source = sources[tree.name]!
             let head = heads[tree.name]!
             guard last[tree.name] != head else { continue }
@@ -317,22 +333,23 @@ func release(_ manifests: [String]) -> Never {
                     .code == 0
             {
                 let count = Int(git(["rev-list", "--count", "\(was)..\(head)"], in: source)) ?? 0
-                lines.append(
-                    "  \(tree.name): \(count) commit\(count == 1 ? "" : "s") since the last release (\(was.prefix(12)))"
-                )
-                let log = git(
-                    ["log", "--format=%h %s (%an, %ar)", "-25", "\(was)..\(head)"], in: source)
-                lines += log.split(separator: "\n").map { "    \($0)" }
-                if count > 25 { lines.append("    and \(count - 25) more") }
+                let log = git(["log", "--format=%h %s", "-25", "\(was)..\(head)"], in: source)
+                changes.append(
+                    ApprovalRequest.Change(
+                        app: manifest.app, tree: tree.name, own: index == 0, count: count,
+                        since: String(was.prefix(12)),
+                        commits: log.split(separator: "\n").map(String.init)))
             } else {
                 lines.append(
                     last[tree.name] == nil
-                        ? "  \(tree.name) at \(head.prefix(12)): no release to compare with"
-                        : "  \(tree.name) at \(head.prefix(12)): not after the last release (\(last[tree.name]!.prefix(12))), its history was rewritten"
+                        ? "\(manifest.app): \(tree.name) at \(head.prefix(12)), no release to compare with"
+                        : "\(manifest.app): \(tree.name) at \(head.prefix(12)), not after the last release (\(last[tree.name]!.prefix(12))): its history was rewritten"
                 )
             }
         }
-        if !changed { lines.append("  the same commits as the last release, built again") }
+        if !changed {
+            lines.append("\(manifest.app): the same commits as the last release, built again")
+        }
 
         // The working folder: cloned once, laid out as the trees are
         // (relative paths still hold), moved to the approved commits at
@@ -410,7 +427,7 @@ func release(_ manifests: [String]) -> Never {
     let request = ApprovalRequest(
         title:
             "Release \(names.count == 1 ? names[0] : names.dropLast().joined(separator: ", ") + " and " + names.last!)?",
-        lines: lines, secrets: secrets,
+        lines: lines, changes: changes, secrets: secrets,
         run: .init(
             argv: [shipPath, "release-run", planPath, planSHA], env: env,
             stdin: stdin))

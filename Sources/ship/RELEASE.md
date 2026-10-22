@@ -15,7 +15,11 @@ That is the whole design, on purpose. It guards against forgetting (a build nobo
 ```json
 {
   "title": "Release Lore and Mach?",
-  "lines": ["Lore:", "  lore: 3 commits since the last release (5f4b9e4…)", "    …", "  builds with scripts/release (sha256 1a2b…)"],
+  "lines": ["Mach: mach at 9c1d2e3…, no release to compare with"],
+  "changes": [
+    {"app": "Lore", "tree": "lore", "own": true, "count": 3, "since": "5f4b9e4…", "commits": ["a1b2c3d feat: …", "…"]},
+    {"app": "Lore", "tree": "swift-utils", "own": false, "count": 2, "since": "77ab01…", "commits": ["…"]}
+  ],
   "secrets": {"identity": "<reference>", "identityPassword": "<reference>", "appStoreKey": "<reference>"},
   "run": {
     "argv": ["/…/ship", "release-run", "/…/Lore/2026-10-21T201500/plan.json", "<the plan's sha256>"],
@@ -27,7 +31,7 @@ That is the whole design, on purpose. It guards against forgetting (a build nobo
 
 The approver must:
 
-1. Show the person the title, the lines and the command (`run.argv`: the plan's SHA-256 is in it).
+1. Show the person the title, the lines, the changes and the command (`run.argv`: the plan's SHA-256 is in it). The changes are data so the card can be skimmed: per app its own tree's commits (`own`), and apart from them the shared trees' (a library another session works on ships inside the app too: they must never pass unseen). Commits are `<short hash> <subject>`, at most 25 per tree, `count` the whole number.
 2. Wait for their **verified** yes (a fingerprint, a face, a password: proof it is them).
 3. Only then resolve each secret by its reference (opaque to ship: whatever the approver's vault understands), fill `run.stdin` with them, run `run.argv` with `run.env` added to its environment, write `run.stdin` to its standard input as one JSON object and close it, and exit with its status. A secret never goes into the environment: on macOS any process of the same user can read another's.
 4. Refuse, or time out, as a no: a non-zero exit, and nothing runs.
