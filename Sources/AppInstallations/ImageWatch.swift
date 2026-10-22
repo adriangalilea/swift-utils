@@ -128,8 +128,9 @@
                         AppInstallation.repoint(links, to: bundle, bundleID: bundleID)
                     }
                     if arguments.contains(Job.staleArgument) {
-                        // Opened by a moved job's old process to register it
-                        // here: done before any window, then gone.
+                        // Run by a moved job's old process (a plain child,
+                        // never the app's instance) to register it here:
+                        // done before any window, then gone.
                         let done = DispatchSemaphore(value: 0)
                         Task.detached {
                             await Job.settle(in: bundle, own: jobs, arguments: arguments)
@@ -298,21 +299,29 @@
         /// This job's registration is stale (its app moved, or was replaced
         /// by a new bundle: launchd would respawn the old one, from the Trash
         /// or a vanished path), and this process is the witness. The copy
-        /// that is THE app now, opened headless, registers it afresh, which
-        /// stops this process too; returns if that did not happen within 20
-        /// seconds. A root daemon cannot open apps in the person's session:
-        /// it returns at once, and the app registers it at its next launch.
+        /// that is THE app now registers it afresh, which stops this process
+        /// too; returns if that did not happen. The copy's executable runs as
+        /// a plain child, never through LaunchServices: opened there it was
+        /// the app's running instance for the seconds it took, so an `open`
+        /// of the app in those seconds (an installer's last step) only
+        /// activated it and the app was gone with it. A root daemon cannot
+        /// run the app in the person's session: it returns at once, and the
+        /// app registers it at its next launch.
         static func handOver(_ target: String, _ handoff: String, to app: URL) {
             guard getuid() != 0 else { return }
-            installLog.info(
-                "asking the app's current copy to take this job", ["job": target, "to": app.path])
-            guard open(app, arguments: [Job.staleArgument, handoff], background: true) == 0 else {
+            guard let executable = Bundle(url: app)?.executableURL?.path else {
                 installLog.warn(
-                    "could not open the app's current copy", ["job": target, "app": app.path])
+                    "the app's current copy has no executable", ["job": target, "app": app.path])
                 return
             }
-            Thread.sleep(forTimeInterval: 20)
-            installLog.warn("still running after the hand-over", ["job": target])
+            installLog.info(
+                "asking the app's current copy to take this job", ["job": target, "to": app.path])
+            // The child is the app, not this job: launchd's name for the job
+            // in its environment would make it take itself for the job
+            // (`ownJob`). This process is leaving; its own was read at start.
+            unsetenv("XPC_SERVICE_NAME")
+            let status = run(executable, [Job.staleArgument, handoff]).status
+            installLog.warn("still running after the hand-over", ["job": target, "status": status])
         }
 
         /// A root job removes only what root created; the person's side of a
