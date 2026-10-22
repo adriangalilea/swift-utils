@@ -106,6 +106,9 @@ let package = Package(
         // rules and the lenient-decode law; without the flag, every chip
         // variant in a window on black.
         .executable(name: "mediaspec-example", targets: ["mediaspec-example"]),
+        // Keymap's which-key tips in a window, tipped controls along every
+        // edge; `--check` runs the completion and placement laws headless.
+        .executable(name: "keymap-example", targets: ["keymap-example"]),
     ],
     dependencies: [
         // Syntax's engine: highlight.js run in JavaScriptCore, packaged.
@@ -146,6 +149,7 @@ let package = Package(
         .executableTarget(name: "grant-example", dependencies: ["PermissionGrants", "Ink"]),
         .target(name: "Scores", dependencies: ["Ink"], resources: [.process("Resources")]),
         .executableTarget(name: "keymap-overlay", dependencies: ["Keymap", "Ink"]),
+        .executableTarget(name: "keymap-example", dependencies: ["Keymap", "Ink"]),
         .target(
             name: "MediaSpec",
             dependencies: ["Ink"],
