@@ -221,6 +221,8 @@
                 case bare(missing: String)
                 /// macOS refused the registration, with its reason.
                 case register(String)
+                /// The app's row is switched off in Login Items.
+                case switchedOff
                 /// Still held for approval when the wait ran out.
                 case awaitingApproval(needsAdmin: Bool)
                 /// Registered afresh and approved, and still not answering.
@@ -231,6 +233,7 @@
                     case .misplaced(let home, let needs): "running from \(home.words): \(needs)"
                     case .bare(let missing): "not part of this build (no \(missing))"
                     case .register(let why): "macOS refused the registration: \(why)"
+                    case .switchedOff: "switched off in \(Job.approvalPath). \(Job.approvalSteer)"
                     case .awaitingApproval(let needsAdmin):
                         "still awaiting approval in \(Job.approvalPath)"
                             + (needsAdmin ? "; approving it needs an admin" : "")
@@ -550,6 +553,15 @@
                         }
                         last = error
                     }
+                }
+                // Still "not permitted" once BTM settled: the app's row is
+                // switched off in Login Items (BTM's disposition "disabled"),
+                // which only the person can turn back on.
+                if let last = last as NSError?,
+                    last.code == Int(EPERM) || last.code == kSMErrorLaunchDeniedByUser
+                {
+                    Self.openApprovalSettings()
+                    throw Failure.switchedOff
                 }
                 throw Failure.register(last?.localizedDescription ?? "unknown")
             }
