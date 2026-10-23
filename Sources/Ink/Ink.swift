@@ -37,6 +37,10 @@ extension ShapeStyle where Self == Color {
     /// What floats over the work or a pane: a tray, a bar laid over a picture (#2C2C2E
     /// on black).
     public static var inkFloat: Color { .primary.opacity(0.17) }
+    /// A group of rows on a pane: a section of an inspector or of settings, a step off
+    /// the pane as a grouped form's cards are, so sections read as layers, never as
+    /// rows cut apart by lines.
+    public static var inkGroup: Color { .primary.opacity(0.06) }
 }
 
 extension View {
@@ -49,6 +53,15 @@ extension View {
             .frame(maxHeight: .infinity, alignment: .top)
             .background(.inkPane, in: RoundedRectangle(cornerRadius: .inkPanel, style: .continuous))
             .padding(.inkGap)
+    }
+
+    /// A group of rows on a pane (an inspector's section, a settings group): its own
+    /// surface a step off the pane, rounded as an inner surface, its rows inset by a lane.
+    public func inkGroup() -> some View {
+        padding(.inkLane)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                .inkGroup, in: RoundedRectangle(cornerRadius: .inkField, style: .continuous))
     }
 }
 
