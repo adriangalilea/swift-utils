@@ -129,7 +129,9 @@ if [ "${usage_ios:-false}" = true ]; then
   xcodebuild -project GitViewer.xcodeproj -scheme GitViewer -destination "platform=iOS Simulator,id=$phone" \
     -derivedDataPath build -quiet build
   xcrun simctl boot "$phone" 2>/dev/null || true
-  open -a Simulator
+  # The Simulator app is not on every Mac (Xcode 27 leaves it out): the
+  # simulator runs headless then, photographed with `xcrun simctl io`.
+  open -b com.apple.iphonesimulator 2>/dev/null || echo "git-example: no Simulator app here; running headless" >&2
   xcrun simctl install "$phone" build/Build/Products/Debug-iphonesimulator/GitViewer.app
   xcrun simctl launch "$phone" com.adriangalilea.swift-utils.GitViewer
 else
