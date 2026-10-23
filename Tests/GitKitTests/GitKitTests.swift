@@ -376,6 +376,31 @@ struct Sources {
     }
 }
 
+struct Commands {
+    /// Every read turns the fsmonitor hook off: a repository's config can name one, and
+    /// `git status` would run it for whoever reads, a remote viewer included.
+    @Test func noReadRunsTheRepositorysFsmonitor() {
+        let scopes: [Git.ChangeScope] = [
+            .unstaged, .staged, .uncommitted, .since("HEAD~3", touched: ["a.swift"]), .commit("abc1234"),
+            Git.ChangeScope(base: "main", target: .commit("abc1234")),
+            Git.ChangeScope(base: "HEAD", target: .index, paths: ["Sources/"]),
+        ]
+        let reads: [[String]] =
+            [
+                Git.Command.status(), Git.Command.log(limit: 10), Git.Command.log("a..b", limit: 10),
+                Git.Command.branches(), Git.Command.worktrees(), Git.Command.submodules(),
+                Git.Command.newFile("NOTES.md"),
+            ] + scopes.map(Git.Command.diff) + scopes.map(Git.Command.untracked)
+        for argv in reads {
+            let flag = argv.firstIndex(of: "core.fsmonitor=false")
+            #expect(flag.map { $0 > 0 && argv[$0 - 1] == "-c" } == true, "\(argv)")
+            // A `-c` counts only before the subcommand.
+            let subcommand = argv.firstIndex { !$0.hasPrefix("-") && !$0.contains("=") }
+            #expect(flag.flatMap { f in subcommand.map { f < $0 } } == true, "\(argv)")
+        }
+    }
+}
+
 struct Quotes {
     @Test func linesRangeAndMarkdown() throws {
         let file = Git.FileDiff(old: "a\nb\nc\n", new: "a\nB\nc\n", path: "Sources/x.swift")

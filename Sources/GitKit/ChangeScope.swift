@@ -74,9 +74,12 @@ extension Git {
     /// otherwise refresh the index), no external diff or textconv, paths unquoted, the
     /// `a/` `b/` prefixes forced whatever the user's config says.
     public enum Command {
+        /// `core.fsmonitor=false`: a repository's own config can name an fsmonitor hook,
+        /// and `git status` would run it. A read must never run code the repository
+        /// chose, least of all for a viewer on another machine.
         static let global = [
-            "--no-pager", "--no-optional-locks", "-c", "core.quotepath=off", "-c", "color.ui=never",
-            "-c", "log.showSignature=false",
+            "--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.quotepath=off",
+            "-c", "color.ui=never", "-c", "log.showSignature=false",
         ]
 
         static func diffFlags(context: Int) -> [String] {
