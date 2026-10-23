@@ -381,13 +381,15 @@ struct Commands {
     /// `git status` would run it for whoever reads, a remote viewer included.
     @Test func noReadRunsTheRepositorysFsmonitor() {
         let scopes: [Git.ChangeScope] = [
-            .unstaged, .staged, .uncommitted, .since("HEAD~3", touched: ["a.swift"]), .commit("abc1234"),
+            .unstaged, .staged, .uncommitted, .since("HEAD~3", touched: ["a.swift"]),
+            .commit("abc1234"),
             Git.ChangeScope(base: "main", target: .commit("abc1234")),
             Git.ChangeScope(base: "HEAD", target: .index, paths: ["Sources/"]),
         ]
         let reads: [[String]] =
             [
-                Git.Command.status(), Git.Command.log(limit: 10), Git.Command.log("a..b", limit: 10),
+                Git.Command.status(), Git.Command.log(limit: 10),
+                Git.Command.log("a..b", limit: 10),
                 Git.Command.branches(), Git.Command.worktrees(), Git.Command.submodules(),
                 Git.Command.newFile("NOTES.md"),
             ] + scopes.map(Git.Command.diff) + scopes.map(Git.Command.untracked)

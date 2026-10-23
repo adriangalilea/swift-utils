@@ -78,7 +78,8 @@ extension Git {
         /// and `git status` would run it. A read must never run code the repository
         /// chose, least of all for a viewer on another machine.
         static let global = [
-            "--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.quotepath=off",
+            "--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c",
+            "core.quotepath=off",
             "-c", "color.ui=never", "-c", "log.showSignature=false",
         ]
 
