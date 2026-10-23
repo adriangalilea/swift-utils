@@ -27,18 +27,22 @@ public struct GitStateView: View {
                     .foregroundStyle(.tertiary)
                 Text(title).font(.callout.weight(.medium)).foregroundStyle(.secondary)
                 if let message {
-                    Text(message).font(.footnote).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+                    Text(message).font(.footnote).foregroundStyle(.tertiary).multilineTextAlignment(
+                        .center)
                 }
             case .failed(let error, let retry):
                 Image(systemName: "exclamationmark.triangle")
                     .font(.title2)
                     .foregroundStyle(.orange.opacity(0.8))
-                Text("Couldn’t read this").font(.callout.weight(.medium)).foregroundStyle(.secondary)
+                Text("Couldn’t read this").font(.callout.weight(.medium)).foregroundStyle(
+                    .secondary)
                 Text(String(describing: error))
                     .font(.footnote.monospaced())
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
-                    .textSelection(.enabled)
+                    #if !os(tvOS)
+                        .textSelection(.enabled)
+                    #endif
                     .lineLimit(6)
                 if let retry {
                     Button("Try Again", action: retry).buttonStyle(.ink).padding(.top, .inkTight)

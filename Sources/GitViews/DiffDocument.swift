@@ -47,7 +47,9 @@ struct DiffInput: Sendable {
             }
             return [Git.FileDiff(snippet: text, path: path)]
         case .texts(let old, let new, let path, let start):
-            return [Git.FileDiff(old: old, new: new, path: path, context: context, startLine: start)]
+            return [
+                Git.FileDiff(old: old, new: new, path: path, context: context, startLine: start)
+            ]
         }
     }
 }
@@ -115,7 +117,8 @@ struct RenderedFile: Sendable, Identifiable {
                 }
                 lines.append(
                     Line(
-                        hunk: h, line: line, display: display, words: words[index] ?? [], oldIndex: oldIndex,
+                        hunk: h, line: line, display: display, words: words[index] ?? [],
+                        oldIndex: oldIndex,
                         newIndex: newIndex))
             }
         }
@@ -168,14 +171,18 @@ struct DiffDocument: Sendable {
 /// tint. Each side of the file is colored as one text, so a string or comment that spans
 /// lines keeps its color, in chunks under `Syntax.ceiling`.
 enum DiffPainter {
-    static func paint(_ file: RenderedFile, palette: DiffPalette, appearance: Syntax.Appearance, syntax: Bool)
+    static func paint(
+        _ file: RenderedFile, palette: DiffPalette, appearance: Syntax.Appearance, syntax: Bool
+    )
         -> [AttributedString]
     {
         var oldSide: [AttributedString]?
         var newSide: [AttributedString]?
         if syntax, let language = file.language {
-            oldSide = colored(file.lines.filter { $0.oldIndex != nil }.map(\.display), language, appearance)
-            newSide = colored(file.lines.filter { $0.newIndex != nil }.map(\.display), language, appearance)
+            oldSide = colored(
+                file.lines.filter { $0.oldIndex != nil }.map(\.display), language, appearance)
+            newSide = colored(
+                file.lines.filter { $0.newIndex != nil }.map(\.display), language, appearance)
         }
         return file.lines.map { line in
             var text: AttributedString
@@ -201,7 +208,8 @@ enum DiffPainter {
 
     /// `lines` highlighted as one text, chunked at line boundaries under the engine's
     /// ceiling, split back into lines. Nil when the grammar gave nothing usable.
-    static func colored(_ lines: [String], _ language: String, _ appearance: Syntax.Appearance) -> [AttributedString]?
+    static func colored(_ lines: [String], _ language: String, _ appearance: Syntax.Appearance)
+        -> [AttributedString]?
     {
         guard !lines.isEmpty else { return [] }
         var out: [AttributedString] = []
@@ -304,14 +312,21 @@ enum DiffLanguage {
     static let extensions: [String: String] = [
         "swift": "swift", "m": "objectivec", "mm": "objectivec", "h": "objectivec", "c": "c",
         "cc": "cpp", "cpp": "cpp", "cxx": "cpp", "hpp": "cpp", "hh": "cpp", "js": "javascript",
-        "mjs": "javascript", "cjs": "javascript", "jsx": "javascript", "ts": "typescript", "tsx": "typescript",
-        "mts": "typescript", "json": "json", "jsonc": "json", "md": "markdown", "markdown": "markdown",
-        "py": "python", "rb": "ruby", "go": "go", "rs": "rust", "java": "java", "kt": "kotlin", "kts": "kotlin",
+        "mjs": "javascript", "cjs": "javascript", "jsx": "javascript", "ts": "typescript",
+        "tsx": "typescript",
+        "mts": "typescript", "json": "json", "jsonc": "json", "md": "markdown",
+        "markdown": "markdown",
+        "py": "python", "rb": "ruby", "go": "go", "rs": "rust", "java": "java", "kt": "kotlin",
+        "kts": "kotlin",
         "sh": "bash", "bash": "bash", "zsh": "bash", "fish": "bash", "yml": "yaml", "yaml": "yaml",
-        "toml": "ini", "ini": "ini", "xml": "xml", "plist": "xml", "html": "xml", "htm": "xml", "svg": "xml",
-        "css": "css", "scss": "scss", "less": "less", "sql": "sql", "lua": "lua", "php": "php", "cs": "csharp",
-        "dart": "dart", "scala": "scala", "ex": "elixir", "exs": "elixir", "hs": "haskell", "vim": "vim",
-        "gradle": "gradle", "r": "r", "pl": "perl", "proto": "protobuf", "graphql": "graphql", "nix": "nix",
+        "toml": "ini", "ini": "ini", "xml": "xml", "plist": "xml", "html": "xml", "htm": "xml",
+        "svg": "xml",
+        "css": "css", "scss": "scss", "less": "less", "sql": "sql", "lua": "lua", "php": "php",
+        "cs": "csharp",
+        "dart": "dart", "scala": "scala", "ex": "elixir", "exs": "elixir", "hs": "haskell",
+        "vim": "vim",
+        "gradle": "gradle", "r": "r", "pl": "perl", "proto": "protobuf", "graphql": "graphql",
+        "nix": "nix",
         "cmake": "cmake",
     ]
 }

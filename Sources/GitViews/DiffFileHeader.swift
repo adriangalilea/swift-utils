@@ -32,8 +32,11 @@ public struct DiffFileHeader: View {
                 GitPathLabel(file.path)
                 if let old = change.oldPath, old != file.path {
                     HStack(spacing: 4) {
-                        Image(systemName: change.kind == .copied ? "doc.on.doc" : "arrow.turn.down.right")
-                            .imageScale(.small)
+                        Image(
+                            systemName: change.kind == .copied
+                                ? "doc.on.doc" : "arrow.turn.down.right"
+                        )
+                        .imageScale(.small)
                         Text(verbatim: "from " + Self.relative(old, to: file.path))
                             .lineLimit(1)
                             .truncationMode(.head)
@@ -105,13 +108,14 @@ public struct GitPathLabel: View {
     }
 }
 
-/// What happened to a file, as one letter on a tinted tile (lazygit's and `git status
-/// -s`' letters): A added, M modified, D deleted, R renamed, C copied, T type, ? untracked,
-/// U in conflict; a box for a submodule.
+/// What happened to a file, as one outlined square in the change's hue, GitHub's file
+/// marks drawn with SF Symbols: a plus added, a dot modified, a minus deleted, an arrow
+/// renamed, two squares copied, a swap for a type change, a dashed question untracked, an
+/// exclamation in conflict; a box for a submodule. A glyph, never a filled tile: a list of
+/// files is a column of them, and tiles turn it into a quilt.
 public struct GitStatusBadge: View {
     let kind: Git.FileChange.Kind
     let submodule: Bool
-    @ScaledMetric(relativeTo: .caption) private var side: CGFloat = 18
 
     public init(_ kind: Git.FileChange.Kind, submodule: Bool = false) {
         self.kind = kind
@@ -119,25 +123,29 @@ public struct GitStatusBadge: View {
     }
 
     public var body: some View {
-        let tint = kind.tint
-        ZStack {
-            RoundedRectangle(cornerRadius: side * 0.28, style: .continuous)
-                .fill(tint.opacity(0.16))
-            if submodule {
-                Image(systemName: "shippingbox.fill")
-                    .font(.system(size: side * 0.55, weight: .semibold))
-            } else {
-                Text(verbatim: kind.letter)
-                    .font(.system(size: side * 0.62, weight: .bold, design: .rounded))
-            }
-        }
-        .foregroundStyle(tint)
-        .frame(width: side, height: side)
-        .accessibilityLabel(kind.spoken)
+        Image(systemName: submodule ? "shippingbox" : kind.symbol)
+            .font(.body.weight(.medium))
+            .imageScale(.medium)
+            .foregroundStyle(kind.tint)
+            .frame(minWidth: 20)
+            .accessibilityLabel(submodule ? "submodule, \(kind.spoken)" : kind.spoken)
     }
 }
 
 extension Git.FileChange.Kind {
+    var symbol: String {
+        switch self {
+        case .added: "plus.square"
+        case .modified: "dot.square"
+        case .deleted: "minus.square"
+        case .renamed: "arrow.right.square"
+        case .copied: "plus.square.on.square"
+        case .typeChanged: "arrow.left.arrow.right.square"
+        case .untracked: "questionmark.square.dashed"
+        case .conflicted: "exclamationmark.square"
+        }
+    }
+
     var tint: Color {
         switch self {
         case .added: Color(red: 0.20, green: 0.66, blue: 0.36)
@@ -173,7 +181,8 @@ struct DiffStat: View {
     var body: some View {
         let total = additions + deletions
         let green = total == 0 ? 0 : Int((Double(additions) / Double(total) * 5).rounded())
-        let red = total == 0 ? 0 : min(5 - green, Int((Double(deletions) / Double(total) * 5).rounded()))
+        let red =
+            total == 0 ? 0 : min(5 - green, Int((Double(deletions) / Double(total) * 5).rounded()))
         HStack(spacing: 6) {
             if additions > 0 {
                 Text(verbatim: "+\(additions)").foregroundStyle(palette.added)
@@ -184,7 +193,11 @@ struct DiffStat: View {
             HStack(spacing: 1.5) {
                 ForEach(0..<5, id: \.self) { index in
                     RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                        .fill(index < green ? palette.added : index < green + red ? palette.removed : palette.hairline)
+                        .fill(
+                            index < green
+                                ? palette.added
+                                : index < green + red ? palette.removed : palette.hairline
+                        )
                         .frame(width: 7, height: 7)
                 }
             }

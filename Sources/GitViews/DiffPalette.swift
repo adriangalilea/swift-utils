@@ -49,7 +49,9 @@ struct DiffPalette: Sendable, Hashable {
         removed: Color(red: 0.98, green: 0.42, blue: 0.42),
         wash: (0.11, 0.17, 0.30), dark: true)
 
-    private init(added: Color, removed: Color, wash: (line: Double, gutter: Double, word: Double), dark: Bool) {
+    private init(
+        added: Color, removed: Color, wash: (line: Double, gutter: Double, word: Double), dark: Bool
+    ) {
         self.added = added
         self.removed = removed
         addedWash = added.opacity(wash.line)
@@ -122,7 +124,8 @@ struct DiffMetrics: Hashable, Sendable {
             let size =
                 explicit
                 ?? UIFont.preferredFont(
-                    forTextStyle: .footnote, compatibleWith: UITraitCollection(preferredContentSizeCategory: .init(typeSize))
+                    forTextStyle: .footnote,
+                    compatibleWith: UITraitCollection(preferredContentSizeCategory: .init(typeSize))
                 ).pointSize
             let font = UIFont.monospacedSystemFont(ofSize: size, weight: .regular)
         #else

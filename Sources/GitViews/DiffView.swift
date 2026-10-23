@@ -95,16 +95,20 @@ public struct DiffControls: View {
     public var body: some View {
         Menu {
             Picker(selection: $style) {
-                Label("Automatic", systemImage: "rectangle.split.2x1.slash").tag(DiffOptions.Style.auto)
+                Label("Automatic", systemImage: "rectangle.split.2x1.slash").tag(
+                    DiffOptions.Style.auto)
                 Label("Unified", systemImage: "rectangle").tag(DiffOptions.Style.unified)
-                Label("Side by Side", systemImage: "rectangle.split.2x1").tag(DiffOptions.Style.split)
+                Label("Side by Side", systemImage: "rectangle.split.2x1").tag(
+                    DiffOptions.Style.split)
             } label: {
                 Text("Layout")
             }
             .pickerStyle(.inline)
             Toggle(isOn: $wrap) { Label("Wrap Lines", systemImage: "text.word.spacing") }
         } label: {
-            Label("Diff Options", systemImage: style == .split ? "rectangle.split.2x1" : "text.alignleft")
+            Label(
+                "Diff Options",
+                systemImage: style == .split ? "rectangle.split.2x1" : "text.alignleft")
         }
         .accessibilityLabel("Diff options")
     }
@@ -180,12 +184,18 @@ struct DiffSurface: View {
                     .frame(maxWidth: .infinity, minHeight: page ? 240 : 64)
             }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .onGeometryChange(for: CGFloat.self) {
+            $0.size.width
+        } action: {
+            width = $0
+        }
         .task(id: documentKey) {
             guard DiffStore.shared.document(documentKey) == nil else { return }
             let input = input
             let context = options.context
-            let made = await Task.detached(priority: .userInitiated) { DiffDocument(input, context: context) }.value
+            let made = await Task.detached(priority: .userInitiated) {
+                DiffDocument(input, context: context)
+            }.value
             DiffStore.shared.remember(made)
             state.arrivals += 1
         }
@@ -205,7 +215,9 @@ struct DiffSurface: View {
 
     /// The files a preview shows, each with the lines it may still draw; the file where
     /// the budget runs out also counts the lines of every file after it.
-    private func previewed(_ document: DiffDocument) -> [(file: RenderedFile, budget: Int?, after: Int)] {
+    private func previewed(_ document: DiffDocument) -> [(
+        file: RenderedFile, budget: Int?, after: Int
+    )] {
         guard let limit = options.maxLines, !state.showAll else {
             return document.files.map { ($0, nil, 0) }
         }
@@ -224,12 +236,15 @@ struct DiffSurface: View {
     }
 
     @ViewBuilder
-    private func inlineBody(_ document: DiffDocument, _ metrics: DiffMetrics, _ palette: DiffPalette) -> some View {
+    private func inlineBody(
+        _ document: DiffDocument, _ metrics: DiffMetrics, _ palette: DiffPalette
+    ) -> some View {
         let layout = layout(metrics)
         VStack(alignment: .leading, spacing: .inkGap) {
             ForEach(previewed(document), id: \.file.id) { item in
                 DiffFileView(
-                    file: item.file, state: state, layout: layout.fitting(item.file), metrics: metrics, palette: palette,
+                    file: item.file, state: state, layout: layout.fitting(item.file),
+                    metrics: metrics, palette: palette,
                     budget: item.budget, after: item.after, scrollX: 0
                 )
                 .modifier(DiffWell(framed: options.framed, palette: palette))
@@ -237,22 +252,28 @@ struct DiffSurface: View {
         }
     }
 
-    private func pageBody(_ document: DiffDocument, _ metrics: DiffMetrics, _ palette: DiffPalette) -> some View {
+    private func pageBody(_ document: DiffDocument, _ metrics: DiffMetrics, _ palette: DiffPalette)
+        -> some View
+    {
         let layout = layout(metrics)
         let columns = document.files.map { $0.columns }.max() ?? 0
-        let content = layout.contentWidth(columns: columns, digits: document.files.map(\.digits).max() ?? 2, metrics)
+        let content = layout.contentWidth(
+            columns: columns, digits: document.files.map(\.digits).max() ?? 2, metrics)
         return ScrollView(layout.wrap ? .vertical : [.vertical, .horizontal]) {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                 ForEach(document.files) { file in
                     DiffFileView(
-                        file: file, state: state, layout: layout.fitting(file), metrics: metrics, palette: palette,
+                        file: file, state: state, layout: layout.fitting(file), metrics: metrics,
+                        palette: palette,
                         budget: nil, after: 0, scrollX: layout.wrap ? 0 : scrollX)
                 }
             }
             .frame(width: layout.wrap ? nil : max(content, width), alignment: .leading)
             .padding(.bottom, 24)
         }
-        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.x } action: { _, x in
+        .onScrollGeometryChange(for: CGFloat.self) {
+            $0.contentOffset.x
+        } action: { _, x in
             if !layout.wrap { scrollX = max(0, x) }
         }
     }
@@ -309,7 +330,8 @@ struct DiffWell: ViewModifier {
                 .background(palette.wash.opacity(0.6))
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(palette.hairline, lineWidth: 1))
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(
+                        palette.hairline, lineWidth: 1))
         } else {
             content
         }
@@ -379,7 +401,9 @@ struct DiffFileView: View {
                                     .frame(
                                         minWidth: max(
                                             layout.width,
-                                            layout.contentWidth(columns: file.columns, digits: file.digits, metrics)),
+                                            layout.contentWidth(
+                                                columns: file.columns, digits: file.digits, metrics)
+                                        ),
                                         alignment: .leading)
                             }
                             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
@@ -423,8 +447,14 @@ struct DiffFileView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             if layout.page {
-                Rectangle().fill(.bar)
-                    .overlay(alignment: .bottom) { Rectangle().fill(palette.hairline).frame(height: 1) }
+                Group {
+                    #if os(tvOS)
+                        Rectangle().fill(.regularMaterial)
+                    #else
+                        Rectangle().fill(.bar)
+                    #endif
+                }
+                .overlay(alignment: .bottom) { Rectangle().fill(palette.hairline).frame(height: 1) }
             } else {
                 palette.wash
             }
@@ -458,7 +488,8 @@ struct DiffFileView: View {
         let gutter = layout.gutterWidth(file, metrics)
         let content = ForEach(rows, id: \.self) { row in
             DiffRowView(
-                row: row, file: file, painted: painted, selected: selected, layout: layout, metrics: metrics,
+                row: row, file: file, painted: painted, selected: selected, layout: layout,
+                metrics: metrics,
                 palette: palette, gutter: gutter, state: state)
         }
         if layout.page || rows.count > 400 {
@@ -469,7 +500,8 @@ struct DiffFileView: View {
     }
 
     private func unified(_ file: Git.FileDiff) -> String {
-        file.hunks.map { ([$0.header] + $0.lines.map(\.unified)).joined(separator: "\n") }.joined(separator: "\n")
+        file.hunks.map { ([$0.header] + $0.lines.map(\.unified)).joined(separator: "\n") }.joined(
+            separator: "\n")
     }
 }
 
@@ -488,7 +520,9 @@ struct DiffMenuItems: View {
             Button(title, systemImage: "doc.on.doc") { DiffPasteboard.copy(value) }
         }
         if action == nil {
-            Button("Copy as Markdown", systemImage: "text.quote") { DiffPasteboard.copy(quote.markdown) }
+            Button("Copy as Markdown", systemImage: "text.quote") {
+                DiffPasteboard.copy(quote.markdown)
+            }
         }
     }
 }

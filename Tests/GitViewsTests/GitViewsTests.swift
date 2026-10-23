@@ -20,10 +20,12 @@ enum Inputs {
         let old = (1...lines).map { "    let value\($0) = compute(\($0), scale: 2) // step \($0)" }
         var new = old
         for index in stride(from: 5, to: lines, by: every) {
-            new[index] = "    let value\(index + 1) = compute(\(index + 1), scale: 3) // step \(index + 1)"
+            new[index] =
+                "    let value\(index + 1) = compute(\(index + 1), scale: 3) // step \(index + 1)"
         }
         return Git.FileDiff(
-            old: old.joined(separator: "\n") + "\n", new: new.joined(separator: "\n") + "\n", path: "Long.swift",
+            old: old.joined(separator: "\n") + "\n", new: new.joined(separator: "\n") + "\n",
+            path: "Long.swift",
             context: 3)
     }
 }
@@ -33,7 +35,8 @@ struct RowPlans {
     @Test func longContextFolds() throws {
         let file = Git.FileDiff(
             old: (1...30).map { "l\($0)" }.joined(separator: "\n") + "\n",
-            new: (1...30).map { $0 == 3 || $0 == 28 ? "L\($0)" : "l\($0)" }.joined(separator: "\n") + "\n",
+            new: (1...30).map { $0 == 3 || $0 == 28 ? "L\($0)" : "l\($0)" }.joined(separator: "\n")
+                + "\n",
             context: 20)
         let rendered = RenderedFile(file, salt: 0)
         let plan = DiffRowPlan(split: false, context: 3)
@@ -99,7 +102,8 @@ struct Performance {
         let read = Date().timeIntervalSince(started)
         let rows = DiffRowPlan(split: false, context: 3).rows(rendered).rows
         let planned = Date().timeIntervalSince(started) - read
-        let painted = DiffPainter.paint(rendered, palette: .light, appearance: .light, syntax: false)
+        let painted = DiffPainter.paint(
+            rendered, palette: .light, appearance: .light, syntax: false)
         let total = Date().timeIntervalSince(started)
         #expect(rendered.lines.count > 9_000)
         #expect(rows.count > 9_000)
@@ -144,12 +148,17 @@ struct Performance {
                 "edit",
                 AnyView(
                     DiffView(
-                        old: "func total(_ items: [Item]) -> Int {\n    items.reduce(0) { $0 + $1.count }\n}\n",
+                        old:
+                            "func total(_ items: [Item]) -> Int {\n    items.reduce(0) { $0 + $1.count }\n}\n",
                         new:
                             "func total(_ items: [Item]) -> Int {\n    // Only the visible ones count.\n    items.filter(\\.visible).reduce(0) { $0 + $1.count }\n}\n",
                         path: "Totals.swift"))
             ),
-            ("snippet", AnyView(DiffView(unified: "-let tail: Tail = 4\n+let tail: Tail = 6\n let head = 0"))),
+            (
+                "snippet",
+                AnyView(
+                    DiffView(unified: "-let tail: Tail = 4\n+let tail: Tail = 6\n let head = 0"))
+            ),
             ("split", AnyView(DiffView(swift).diffStyle(.split))),
             ("nowrap", AnyView(DiffView(swift).diffWrap(false))),
         ]
@@ -158,7 +167,9 @@ struct Performance {
                 for scheme in [ColorScheme.light, .dark] {
                     try write(
                         page(view, width: width, scheme: scheme),
-                        to: folder.appending(path: "\(name)-\(Int(width))-\(scheme == .dark ? "dark" : "light").png"))
+                        to: folder.appending(
+                            path: "\(name)-\(Int(width))-\(scheme == .dark ? "dark" : "light").png")
+                    )
                 }
             }
         }
@@ -181,7 +192,8 @@ struct Performance {
     func write(_ view: some View, to url: URL) throws {
         let image = try #require(Self.draw(view), "nothing drawn for \(url.lastPathComponent)")
         let destination = try #require(
-            CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil))
+            CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)
+        )
         CGImageDestinationAddImage(destination, image, nil)
         #expect(CGImageDestinationFinalize(destination), "\(url.path) not written")
     }
@@ -226,7 +238,9 @@ struct Performance {
             window.setContentSize(size)
             host.frame = CGRect(origin: .zero, size: size)
             host.layoutSubtreeIfNeeded()
-            guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return nil }
+            guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
+                return nil
+            }
             host.cacheDisplay(in: host.bounds, to: bitmap)
             return bitmap.cgImage
         }

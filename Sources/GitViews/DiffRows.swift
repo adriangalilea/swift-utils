@@ -68,7 +68,9 @@ struct DiffRowPlan: Sendable {
                     continue
                 }
                 rows.append(row)
-                if actions, let selection, contains(row, selection.upperBound) { rows.append(.actions) }
+                if actions, let selection, contains(row, selection.upperBound) {
+                    rows.append(.actions)
+                }
             }
         }
         hidden += after

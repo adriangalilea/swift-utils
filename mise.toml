@@ -45,6 +45,9 @@ Entitlement iOS tvOS
 Colophon iOS tvOS
 MediaSpec iOS tvOS
 MarkdownText iOS tvOS
+GitKit iOS tvOS
+GitLocal iOS tvOS
+GitViews iOS tvOS
 Scores iOS tvOS
 Biometrics iOS
 TABLE

@@ -37,7 +37,9 @@ public struct DiffOptions: Sendable {
 /// What a quote does is the host's: put it in a reply box, copy it, send it.
 public struct DiffQuoteAction: Sendable {
     let perform: @MainActor @Sendable (DiffQuote) -> Void
-    public init(_ perform: @escaping @MainActor @Sendable (DiffQuote) -> Void) { self.perform = perform }
+    public init(_ perform: @escaping @MainActor @Sendable (DiffQuote) -> Void) {
+        self.perform = perform
+    }
     @MainActor public func callAsFunction(_ quote: DiffQuote) { perform(quote) }
 }
 
@@ -102,14 +104,17 @@ extension View {
 
     /// What tapping a submodule's pointer change does.
     public func onOpenSubmodule(
-        perform action: @escaping @MainActor @Sendable (_ path: String, _ pointer: Git.FileDiff.Pointer) -> Void
+        perform action:
+            @escaping @MainActor @Sendable (_ path: String, _ pointer: Git.FileDiff.Pointer) -> Void
     ) -> some View {
         environment(\.diffOpenSubmodule, DiffSubmoduleAction(action))
     }
 
     /// What Quote does with a selection, a hunk or a file. Without it, a diff offers
     /// "Copy as Markdown" in its place.
-    public func onQuote(perform action: @escaping @MainActor @Sendable (DiffQuote) -> Void) -> some View {
+    public func onQuote(perform action: @escaping @MainActor @Sendable (DiffQuote) -> Void)
+        -> some View
+    {
         environment(\.diffQuote, DiffQuoteAction(action))
     }
 }

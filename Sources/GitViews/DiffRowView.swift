@@ -65,7 +65,10 @@ struct DiffRowView: View {
             .monospacedDigit()
             .foregroundStyle(palette.numberInk(kind))
             .lineLimit(1)
-            .frame(width: layout.numberWidth(file.digits, metrics) - metrics.advance, alignment: .trailing)
+            .frame(
+                width: layout.numberWidth(file.digits, metrics) - metrics.advance,
+                alignment: .trailing
+            )
             .padding(.trailing, metrics.advance)
     }
 
@@ -148,15 +151,19 @@ struct DiffRowView: View {
                     }
                     Text(verbatim: marker(kind))
                         .font(metrics.font)
-                        .foregroundStyle(kind == .context ? palette.marker : palette.numberInk(kind))
-                        .frame(width: metrics.advance * DiffLayout.markerColumns, alignment: .center)
+                        .foregroundStyle(
+                            kind == .context ? palette.marker : palette.numberInk(kind)
+                        )
+                        .frame(
+                            width: metrics.advance * DiffLayout.markerColumns, alignment: .center)
                     code(index)
                 }
                 .padding(.vertical, inset)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .background(alignment: .leading) {
                     HStack(spacing: 0) {
-                        palette.gutterWash(kind).frame(width: numbered ? layout.numberWidth(file.digits, metrics) : 0)
+                        palette.gutterWash(kind).frame(
+                            width: numbered ? layout.numberWidth(file.digits, metrics) : 0)
                         palette.lineWash(kind)
                     }
                 }
@@ -244,13 +251,17 @@ struct DiffRowView: View {
         let hunk = file.lines[index].hunk
         DiffMenuItems(
             copy: [
-                (count == 1 ? "Copy Line" : "Copy \(count) Lines", chosen.map(\.text).joined(separator: "\n"))
+                (
+                    count == 1 ? "Copy Line" : "Copy \(count) Lines",
+                    chosen.map(\.text).joined(separator: "\n")
+                )
             ],
             quote: DiffQuote(file: file.file, lines: chosen),
             quoteTitle: count == 1 ? "Quote Line" : "Quote \(count) Lines", action: quote)
         Divider()
         DiffMenuItems(
-            copy: [], quote: DiffQuote.hunk(file.file.hunks[hunk], of: file.file), quoteTitle: "Quote Hunk",
+            copy: [], quote: DiffQuote.hunk(file.file.hunks[hunk], of: file.file),
+            quoteTitle: "Quote Hunk",
             action: quote)
         Button("Copy Path", systemImage: "link") { DiffPasteboard.copy(file.file.path) }
     }
@@ -272,7 +283,9 @@ struct DiffRowView: View {
                     #endif
                 } label: {
                     #if os(macOS) || os(iOS)
-                        Label(state.copy.state == .copied ? "Copied" : "Copy", systemImage: state.copy.state == .copied ? "checkmark" : "doc.on.doc")
+                        Label(
+                            state.copy.state == .copied ? "Copied" : "Copy",
+                            systemImage: state.copy.state == .copied ? "checkmark" : "doc.on.doc")
                     #else
                         Label("Copy", systemImage: "doc.on.doc")
                     #endif
@@ -302,7 +315,10 @@ struct DiffRowView: View {
             .font(.callout)
             .padding(.horizontal, metrics.advance * 2)
             .padding(.vertical, 6)
-            .frame(maxWidth: layout.page && !layout.wrap ? layout.width : .infinity, alignment: .leading)
+            .frame(
+                maxWidth: layout.page && !layout.wrap ? layout.width : .infinity,
+                alignment: .leading
+            )
             .background(palette.selection.opacity(0.6))
             .overlay(alignment: .leading) { palette.selectionEdge.frame(width: 2) }
             .transition(.opacity)
@@ -315,13 +331,15 @@ struct DiffRowView: View {
         let hunk = file.file.hunks[h]
         let collapsed = state.collapsedHunks[file.id]?.contains(h) == true
         let previous = h > 0 ? file.file.hunks[h - 1] : nil
-        let skipped = previous.map { hunk.newStart - ($0.newStart + $0.newCount) } ?? (hunk.newStart - 1)
+        let skipped =
+            previous.map { hunk.newStart - ($0.newStart + $0.newCount) } ?? (hunk.newStart - 1)
         return HStack(alignment: .firstTextBaseline, spacing: metrics.advance) {
             Image(systemName: "chevron.down")
                 .font(.system(size: metrics.size * 0.7, weight: .semibold))
                 .foregroundStyle(palette.quiet)
                 .rotationEffect(.degrees(collapsed ? -90 : 0))
-                .frame(width: max(gutter - metrics.advance, metrics.advance * 2), alignment: .trailing)
+                .frame(
+                    width: max(gutter - metrics.advance, metrics.advance * 2), alignment: .trailing)
             if file.hasNumbers {
                 Text(verbatim: rangeLabel(hunk))
                     .font(metrics.smallFont)
@@ -343,9 +361,13 @@ struct DiffRowView: View {
             }
         }
         .padding(.vertical, 5)
-        .frame(maxWidth: layout.page && !layout.wrap ? layout.width : .infinity, alignment: .leading)
+        .frame(
+            maxWidth: layout.page && !layout.wrap ? layout.width : .infinity, alignment: .leading
+        )
         .background(palette.wash)
-        .overlay(alignment: .top) { Rectangle().fill(palette.hairline).frame(height: h == 0 ? 0 : 1) }
+        .overlay(alignment: .top) {
+            Rectangle().fill(palette.hairline).frame(height: h == 0 ? 0 : 1)
+        }
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.inkSettle) {
@@ -356,11 +378,18 @@ struct DiffRowView: View {
         }
         .contextMenu {
             DiffMenuItems(
-                copy: [("Copy Hunk", ([hunk.header] + hunk.lines.map(\.unified)).joined(separator: "\n"))],
+                copy: [
+                    (
+                        "Copy Hunk",
+                        ([hunk.header] + hunk.lines.map(\.unified)).joined(separator: "\n")
+                    )
+                ],
                 quote: DiffQuote.hunk(hunk, of: file.file), quoteTitle: "Quote Hunk", action: quote)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Hunk at line \(hunk.newStart)\(hunk.section.isEmpty ? "" : ", \(hunk.section)")")
+        .accessibilityLabel(
+            "Hunk at line \(hunk.newStart)\(hunk.section.isEmpty ? "" : ", \(hunk.section)")"
+        )
         .accessibilityHint(collapsed ? "Shows its lines" : "Hides its lines")
         .accessibilityAddTraits(.isButton)
     }
@@ -372,7 +401,10 @@ struct DiffRowView: View {
     }
 
     private func fold(_ range: Range<Int>) -> some View {
-        quietRow(symbol: "arrow.up.and.down", text: range.count == 1 ? "1 unchanged line" : "\(range.count) unchanged lines") {
+        quietRow(
+            symbol: "arrow.up.and.down",
+            text: range.count == 1 ? "1 unchanged line" : "\(range.count) unchanged lines"
+        ) {
             var set = state.expandedFolds[file.id] ?? []
             set.insert(range.lowerBound)
             state.expandedFolds[file.id] = set
@@ -380,7 +412,10 @@ struct DiffRowView: View {
     }
 
     private func more(_ hidden: Int) -> some View {
-        quietRow(symbol: "chevron.down", text: hidden == 1 ? "Show 1 more line" : "Show \(hidden) more lines") {
+        quietRow(
+            symbol: "chevron.down",
+            text: hidden == 1 ? "Show 1 more line" : "Show \(hidden) more lines"
+        ) {
             state.showAll = true
         }
     }
@@ -392,14 +427,19 @@ struct DiffRowView: View {
             HStack(spacing: metrics.advance) {
                 Image(systemName: symbol)
                     .font(.system(size: metrics.size * 0.75, weight: .semibold))
-                    .frame(width: max(gutter - metrics.advance, metrics.advance * 2), alignment: .trailing)
+                    .frame(
+                        width: max(gutter - metrics.advance, metrics.advance * 2),
+                        alignment: .trailing)
                 Text(verbatim: text)
                     .font(.system(size: metrics.size * 0.9))
                 Spacer(minLength: 0)
             }
             .foregroundStyle(palette.quiet)
             .padding(.vertical, 5)
-            .frame(maxWidth: layout.page && !layout.wrap ? layout.width : .infinity, alignment: .leading)
+            .frame(
+                maxWidth: layout.page && !layout.wrap ? layout.width : .infinity,
+                alignment: .leading
+            )
             .background(palette.wash)
             .contentShape(Rectangle())
         }
@@ -412,9 +452,12 @@ struct DiffRowView: View {
             if let pointer = f.submodule {
                 Image(systemName: "shippingbox")
                 Text(verbatim: "Submodule")
-                Text(verbatim: short(pointer.old) + " → " + short(pointer.new) + (pointer.dirty ? " (dirty)" : ""))
-                    .font(metrics.smallFont)
-                    .foregroundStyle(palette.text)
+                Text(
+                    verbatim: short(pointer.old) + " → " + short(pointer.new)
+                        + (pointer.dirty ? " (dirty)" : "")
+                )
+                .font(metrics.smallFont)
+                .foregroundStyle(palette.text)
                 Spacer(minLength: 0)
                 if let openSubmodule, pointer.old != pointer.new {
                     Button("Open") { openSubmodule.perform(f.path, pointer) }
@@ -422,7 +465,9 @@ struct DiffRowView: View {
                         .controlSize(.small)
                 }
             } else {
-                Image(systemName: f.isBinary ? "doc.zipper" : f.modeChanged ? "lock.open" : "arrow.right")
+                Image(
+                    systemName: f.isBinary
+                        ? "doc.zipper" : f.modeChanged ? "lock.open" : "arrow.right")
                 Text(verbatim: noticeText(f))
                 Spacer(minLength: 0)
             }
@@ -431,7 +476,8 @@ struct DiffRowView: View {
         .foregroundStyle(palette.quiet)
         .padding(.horizontal, metrics.advance * 2)
         .padding(.vertical, 10)
-        .frame(maxWidth: layout.page && !layout.wrap ? layout.width : .infinity, alignment: .leading)
+        .frame(
+            maxWidth: layout.page && !layout.wrap ? layout.width : .infinity, alignment: .leading)
     }
 
     private func short(_ hash: String?) -> String { hash.map { String($0.prefix(7)) } ?? "none" }
