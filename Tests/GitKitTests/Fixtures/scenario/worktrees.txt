@@ -1,0 +1,8 @@
+worktree /private/tmp/gitkit-scenario/app
+HEAD 2f07b97fcf010d664d04b17365ac75f17c7bf5b2
+branch refs/heads/main
+
+worktree /private/tmp/gitkit-scenario/app-review
+HEAD 5d30fe3d7aab58677d9f66862c4cf702d7754140
+branch refs/heads/review
+

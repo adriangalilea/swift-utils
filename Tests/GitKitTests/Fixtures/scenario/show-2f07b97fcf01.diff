@@ -1,0 +1,41 @@
+diff --git a/Sources/Ink/HUDGlass.swift b/Sources/Ink/HUDGlass.swift
+deleted file mode 100644
+index 59fda78..0000000
+--- a/Sources/Ink/HUDGlass.swift
++++ /dev/null
+@@ -1,16 +0,0 @@
+-import SwiftUI
+-
+-// The floating-HUD chrome, designed once: Liquid Glass (the native
+-// macOS 26 register - never a material approximation) on a continuous
+-// rounded rect that HUGS its content. Hosts float it in a transparent
+-// click-through panel; embedded consumers apply it inline. Every senses
+-// surface (live captions, the ask prompt) wears exactly this.
+-
+-extension View {
+-    public func hudGlass() -> some View {
+-        self
+-            .padding(.horizontal, 18)
+-            .padding(.vertical, 13)
+-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+-    }
+-}
+diff --git a/Sources/Ink/Scrim.swift b/Sources/Ink/InkScrim.swift
+similarity index 94%
+rename from Sources/Ink/Scrim.swift
+rename to Sources/Ink/InkScrim.swift
+index 541344d..596a898 100644
+--- a/Sources/Ink/Scrim.swift
++++ b/Sources/Ink/InkScrim.swift
+@@ -8,7 +8,7 @@ import SwiftUI
+ // elevate or recede in the page's depth story.
+ 
+ extension View {
+-    /// Fade this view's rendered content at its vertical scroll edges.
++    /// Fade this view's content at its vertical scroll edges, `top` and `bottom` points deep.
+     public func inkEdgeFade(top: CGFloat = 0, bottom: CGFloat = 0) -> some View {
+         mask(
+             VStack(spacing: 0) {
+diff --git a/scripts/grant-example-app.sh b/scripts/grant-example-app.sh
+old mode 100644
+new mode 100755

@@ -1,0 +1,31 @@
+diff --git a/Sources/MarkdownText/MarkdownView.swift b/Sources/MarkdownText/MarkdownView.swift
+index 15b4d80..716c9d0 100644
+--- a/Sources/MarkdownText/MarkdownView.swift
++++ b/Sources/MarkdownText/MarkdownView.swift
+@@ -308,14 +308,22 @@ public struct MarkdownView: View {
+ 
+     /// The whole text as one run, cut at `lines`: each block on its line, headings in
+     /// the words' size, code in its face, links as their words (a preview is tapped as a
+-    /// whole).
++    /// whole). Blocks are set apart by a half-height empty line, the paragraph gap a
++    /// single run can carry; a block's own lines (list items, table rows) sit together.
+     func preview(_ document: MarkdownDocument, lines: Int) -> some View {
+         var words = Run(size: metrics.em, color: ink.words)
+         words.links = false
++        var gap = AttributedString("\n")
++        gap.font = .system(size: metrics.em * 0.5)
+         var out = AttributedString()
+-        for line in previewLines(document.blocks, words) {
+-            if !out.characters.isEmpty { out += AttributedString("\n") }
+-            out += line
++        for block in document.blocks {
++            let blockLines = previewLines([block], words)
++            guard !blockLines.isEmpty else { continue }
++            if !out.characters.isEmpty { out += AttributedString("\n") + gap }
++            for (index, line) in blockLines.enumerated() {
++                if index > 0 { out += AttributedString("\n") }
++                out += line
++            }
+         }
+         return Text(out)
+             .lineLimit(lines)

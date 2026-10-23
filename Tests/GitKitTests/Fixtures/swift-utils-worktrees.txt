@@ -1,0 +1,8 @@
+worktree /Users/adrian/Developer/swift-utils
+HEAD b3922ae08ea4bd88b8a76501ef34e9dc39715323
+branch refs/heads/main
+
+worktree /Users/adrian/Developer/swift-utils-gitkit
+HEAD b3922ae08ea4bd88b8a76501ef34e9dc39715323
+branch refs/heads/feat/gitkit
+

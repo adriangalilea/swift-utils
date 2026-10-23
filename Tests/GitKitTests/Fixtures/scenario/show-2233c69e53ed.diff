@@ -1,0 +1,16 @@
+diff --git a/.gitmodules b/.gitmodules
+new file mode 100644
+index 0000000..d0c782b
+--- /dev/null
++++ b/.gitmodules
+@@ -0,0 +1,3 @@
++[submodule "Vendor/cmark"]
++	path = Vendor/cmark
++	url = /tmp/gitkit-scenario/cmark
+diff --git a/Vendor/cmark b/Vendor/cmark
+new file mode 160000
+index 0000000..924936d
+--- /dev/null
++++ b/Vendor/cmark
+@@ -0,0 +1 @@
++Subproject commit 924936d0427cb25a61169739a7660230bffa6ea6

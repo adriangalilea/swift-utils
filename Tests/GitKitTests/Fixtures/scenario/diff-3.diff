@@ -1,0 +1,172 @@
+diff --git a/README.md b/README.md
+index 6892ad4..548bb93 100644
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,6 @@
+ # swift-utils
+ 
+-Swift utilities for mac apps. The sibling of [ts-utils](https://github.com/adriangalilea/ts-utils), py-utils, and go-utils: one repo, multiple products, each module links only if imported.
++Swift utilities for Mac and iPhone apps. The sibling of [ts-utils](https://github.com/adriangalilea/ts-utils), py-utils, and go-utils: one repo, many products, each module linked only when imported.
+ 
+ **A module never takes a common word at top level.** Whatever it makes public lands in every importer's namespace, where apps have their own `Answer`, `Claim`, `Grant`, `Permission`, `Session`, `State`: a module exports one compound name and nests everything else in it (`PermissionGrant.Standing`, `PermissionGrant.Claim`). The module is never named like its type: `Module.Type` is the escape hatch when two imports clash, and a type named like its module hides the module (`PermissionGrants.PermissionGrant` works, `Grant.Grant` did not). A top-level `Answer` in 0.30.6 broke Authz's build, whose voice card has its own.
+ 
+diff --git a/Sources/Ink/HUDGlass.swift b/Sources/Ink/HUDGlass.swift
+deleted file mode 100644
+index 59fda78..0000000
+--- a/Sources/Ink/HUDGlass.swift
++++ /dev/null
+@@ -1,16 +0,0 @@
+-import SwiftUI
+-
+-// The floating-HUD chrome, designed once: Liquid Glass (the native
+-// macOS 26 register - never a material approximation) on a continuous
+-// rounded rect that HUGS its content. Hosts float it in a transparent
+-// click-through panel; embedded consumers apply it inline. Every senses
+-// surface (live captions, the ask prompt) wears exactly this.
+-
+-extension View {
+-    public func hudGlass() -> some View {
+-        self
+-            .padding(.horizontal, 18)
+-            .padding(.vertical, 13)
+-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+-    }
+-}
+diff --git a/Sources/Ink/InkBadge.swift b/Sources/Ink/InkBadge.swift
+new file mode 100644
+index 0000000..ba55570
+--- /dev/null
++++ b/Sources/Ink/InkBadge.swift
+@@ -0,0 +1,16 @@
++import SwiftUI
++
++/// A count on a quiet capsule: how many things wait behind a row.
++public struct InkBadge: View {
++    let count: Int
++
++    public init(_ count: Int) { self.count = count }
++
++    public var body: some View {
++        Text(verbatim: "\(count)")
++            .font(.caption2.weight(.semibold).monospacedDigit())
++            .padding(.horizontal, .inkTight)
++            .frame(minWidth: 18, minHeight: 18)
++            .background(.inkRaised, in: Capsule())
++    }
++}
+diff --git a/Sources/Ink/Scrim.swift b/Sources/Ink/InkScrim.swift
+similarity index 94%
+rename from Sources/Ink/Scrim.swift
+rename to Sources/Ink/InkScrim.swift
+index 541344d..596a898 100644
+--- a/Sources/Ink/Scrim.swift
++++ b/Sources/Ink/InkScrim.swift
+@@ -8,7 +8,7 @@ import SwiftUI
+ // elevate or recede in the page's depth story.
+ 
+ extension View {
+-    /// Fade this view's rendered content at its vertical scroll edges.
++    /// Fade this view's content at its vertical scroll edges, `top` and `bottom` points deep.
+     public func inkEdgeFade(top: CGFloat = 0, bottom: CGFloat = 0) -> some View {
+         mask(
+             VStack(spacing: 0) {
+diff --git a/Sources/Ink/MiddleTruncate.swift b/Sources/Ink/MiddleTruncate.swift
+index f1da1a5..f49e861 100644
+--- a/Sources/Ink/MiddleTruncate.swift
++++ b/Sources/Ink/MiddleTruncate.swift
+@@ -6,7 +6,7 @@ import SwiftUI
+ /// `.truncationMode(.middle)` cuts at the exact centre, so how much of the end
+ /// survives depends on the width.
+ ///
+-/// `tail` says what stays whole: a count of characters (`tail: 6` for a hash), or a
++/// `tail` says what stays whole: a count of characters (`tail: 6`, the default: a short hash), or a
+ /// separator, everything from its last occurrence (`tail: "/"` keeps a path's file,
+ /// `"."` an extension). A separator the text does not hold guarantees no tail: the
+ /// text cuts at its end. The tail is a promise: wider than the room, it overflows.
+@@ -32,7 +32,7 @@ public struct MiddleTruncate: View {
+     let text: String
+     let tail: Tail
+ 
+-    public init(_ text: String, tail: Tail = 4) {
++    public init(_ text: String, tail: Tail = 6) {
+         self.text = text
+         self.tail = tail
+     }
+diff --git a/Sources/Ink/Resources/badge.png b/Sources/Ink/Resources/badge.png
+new file mode 100644
+index 0000000..2e52c86
+Binary files /dev/null and b/Sources/Ink/Resources/badge.png differ
+diff --git a/Sources/Syntax/Syntax.swift b/Sources/Syntax/Syntax.swift
+index 317b025..6609133 100644
+--- a/Sources/Syntax/Syntax.swift
++++ b/Sources/Syntax/Syntax.swift
+@@ -24,11 +24,13 @@ public enum Syntax {
+ 
+     /// Above this the grammar pass is skipped outright: JSC on hundreds of
+     /// kilobytes stalls the render for something nobody reads colored.
+-    public static let ceiling = 32 * 1024
++    public static let ceiling = 48 * 1024
+ 
+     public static func highlight(_ text: String, as format: CodeFormat, on appearance: Appearance)
+         -> AttributedString
+     {
++        // Nothing to color: skip the engine and the cache.
++        if text.isEmpty { return AttributedString() }
+         switch format {
+         case .diff: return SyntaxLines.diff(text)
+         case .plain: return AttributedString(text)
+diff --git a/TODO.md b/TODO.md
+index a9436d7..faf71aa 100644
+--- a/TODO.md
++++ b/TODO.md
+@@ -1,4 +1,4 @@
+-# TODO
++# TODO (Adrian)
+ 
+ - [ ] **`AppInstallations`: the pieces chill and awake still hold.** `home`/`moveHome`, `Job` and `ImageWatch` exist (README). Lift the rest when the first of the two moves onto the module, from its copy:
+   - `Forget`: state to the Trash and the defaults domain dropped, for `onGone`; the root half takes exact file names and removes directories only when empty, asserting each sits in the app's own named directory (chill's `forgetFiles`).
+diff --git a/Vendor/cmark b/Vendor/cmark
+index 924936d..5698f9f 160000
+--- a/Vendor/cmark
++++ b/Vendor/cmark
+@@ -1 +1 @@
+-Subproject commit 924936d0427cb25a61169739a7660230bffa6ea6
++Subproject commit 5698f9ff2cd2b4c0cf7d37e43440831d507a1aaa
+diff --git a/scripts/grant-example-app.sh b/scripts/grant-example-app.sh
+old mode 100644
+new mode 100755
+diff --git a/NOTES.md b/NOTES.md
+new file mode 100644
+index 0000000..d9dca2d
+--- /dev/null
++++ b/NOTES.md
+@@ -0,0 +1,4 @@
++# Badge
++
++- count on a capsule
++- caption2, monospaced digits
+diff --git a/Sources/Ink/Resources/ABOUT.txt b/Sources/Ink/Resources/ABOUT.txt
+new file mode 100644
+index 0000000..348b08a
+--- /dev/null
++++ b/Sources/Ink/Resources/ABOUT.txt
+@@ -0,0 +1,3 @@
++swift-utils
++
++The sibling of ts-utils, py-utils and go-utils.
+\ No newline at end of file
+diff --git a/Tests/InkTests/InkBadgeTests.swift b/Tests/InkTests/InkBadgeTests.swift
+new file mode 100644
+index 0000000..7f48131
+--- /dev/null
++++ b/Tests/InkTests/InkBadgeTests.swift
+@@ -0,0 +1,9 @@
++import Testing
++
++@testable import Ink
++
++struct InkBadgeTests {
++    @Test func holdsItsCount() {
++        #expect(InkBadge(3).count == 3)
++    }
++}

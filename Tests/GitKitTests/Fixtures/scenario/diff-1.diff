@@ -1,0 +1,38 @@
+diff --git a/README.md b/README.md
+index 6892ad4..2d47afe 100644
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,6 @@
+ # swift-utils
+ 
+-Swift utilities for mac apps. The sibling of [ts-utils](https://github.com/adriangalilea/ts-utils), py-utils, and go-utils: one repo, multiple products, each module links only if imported.
++Swift utilities for Mac and iPhone apps. The sibling of [ts-utils](https://github.com/adriangalilea/ts-utils), py-utils, and go-utils: one repo, multiple products, each module links only if imported.
+ 
+ **A module never takes a common word at top level.** Whatever it makes public lands in every importer's namespace, where apps have their own `Answer`, `Claim`, `Grant`, `Permission`, `Session`, `State`: a module exports one compound name and nests everything else in it (`PermissionGrant.Standing`, `PermissionGrant.Claim`). The module is never named like its type: `Module.Type` is the escape hatch when two imports clash, and a type named like its module hides the module (`PermissionGrants.PermissionGrant` works, `Grant.Grant` did not). A top-level `Answer` in 0.30.6 broke Authz's build, whose voice card has its own.
+ 
+diff --git a/Sources/Ink/InkBadge.swift b/Sources/Ink/InkBadge.swift
+new file mode 100644
+index 0000000..ba55570
+--- /dev/null
++++ b/Sources/Ink/InkBadge.swift
+@@ -0,0 +1,16 @@
++import SwiftUI
++
++/// A count on a quiet capsule: how many things wait behind a row.
++public struct InkBadge: View {
++    let count: Int
++
++    public init(_ count: Int) { self.count = count }
++
++    public var body: some View {
++        Text(verbatim: "\(count)")
++            .font(.caption2.weight(.semibold).monospacedDigit())
++            .padding(.horizontal, .inkTight)
++            .frame(minWidth: 18, minHeight: 18)
++            .background(.inkRaised, in: Capsule())
++    }
++}
+diff --git a/Sources/Ink/Resources/badge.png b/Sources/Ink/Resources/badge.png
+new file mode 100644
+index 0000000..2e52c86
+Binary files /dev/null and b/Sources/Ink/Resources/badge.png differ

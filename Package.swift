@@ -31,6 +31,14 @@ let package = Package(
         // source position, and one SwiftUI page drawn from it. Its own
         // product so only consumers that import it link the parser.
         .library(name: "MarkdownText", targets: ["MarkdownText"]),
+        // A repository as values, read from git's own machine output: unified
+        // diffs, porcelain v2 status, a log, refs, worktrees, submodules, the
+        // words that changed inside a line, a line diff of two texts. No UI,
+        // no process: a host brings the bytes (`Git.Source`).
+        .library(name: "GitKit", targets: ["GitKit"]),
+        // The Mac's own repositories through /usr/bin/git, a fixed argv and
+        // never a shell: `Git.LocalSource`. Read-only by construction.
+        .library(name: "GitLocal", targets: ["GitLocal"]),
         .library(name: "Keymap", targets: ["Keymap"]),
         // Command-line output: the semantic palette (TTY + NO_COLOR /
         // FORCE_COLOR gated), ANSI-aware width/clip/pad, table/kv/tree.
@@ -114,6 +122,9 @@ let package = Package(
         // Keymap's which-key tips in a window, tipped controls along every
         // edge; `--check` runs the completion and placement laws headless.
         .executable(name: "keymap-example", targets: ["keymap-example"]),
+        // A repository's state written to a folder, every file named for the
+        // command that made it: what `Git.FixtureSource` reads back.
+        .executable(name: "gitkit-capture", targets: ["gitkit-capture"]),
     ],
     dependencies: [
         // Syntax's engine: highlight.js run in JavaScriptCore, packaged.
@@ -135,6 +146,12 @@ let package = Package(
             name: "Syntax",
             dependencies: ["SyntaxLines", .product(name: "Highlightr", package: "Highlightr")]),
         .testTarget(name: "SyntaxTests", dependencies: ["Syntax"]),
+        .target(name: "GitKit"),
+        // Real output of real repositories (git's own bytes, NULs included).
+        .testTarget(
+            name: "GitKitTests", dependencies: ["GitKit"], resources: [.copy("Fixtures")]),
+        .target(name: "GitLocal", dependencies: ["GitKit"]),
+        .executableTarget(name: "gitkit-capture", dependencies: ["GitLocal"]),
         .target(
             name: "MarkdownText",
             dependencies: [

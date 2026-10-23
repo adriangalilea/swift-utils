@@ -1,0 +1,156 @@
+{
+  "agent" : {
+    "base" : "2233c69e53ed557526d88fac86c88585df826983",
+    "touched" : [
+      "Sources/Ink/MiddleTruncate.swift",
+      "Sources/Syntax/Syntax.swift",
+      "Sources/Ink/InkScrim.swift",
+      "Sources/Ink/Scrim.swift",
+      "Sources/Ink/HUDGlass.swift",
+      "scripts/grant-example-app.sh",
+      "Sources/Ink/InkBadge.swift",
+      "README.md",
+      "Sources/Ink/Resources/badge.png",
+      "Sources/Ink/Resources/ABOUT.txt",
+      "Vendor/cmark",
+      "NOTES.md",
+      "Tests/InkTests/InkBadgeTests.swift"
+    ]
+  },
+  "branches" : "branches.txt",
+  "diffs" : [
+    {
+      "file" : "diff-0.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "worktree" : {
+
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "diff-1.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "index" : {
+
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "diff-2.diff",
+      "key" : {
+        "base" : "HEAD",
+        "context" : 3,
+        "target" : {
+          "worktree" : {
+
+          }
+        },
+        "untracked" : true
+      }
+    },
+    {
+      "file" : "diff-3.diff",
+      "key" : {
+        "base" : "2233c69e53ed557526d88fac86c88585df826983",
+        "context" : 3,
+        "target" : {
+          "worktree" : {
+
+          }
+        },
+        "untracked" : true
+      }
+    },
+    {
+      "file" : "show-2f07b97fcf01.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "commit" : {
+            "_0" : "2f07b97fcf010d664d04b17365ac75f17c7bf5b2"
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "show-5d30fe3d7aab.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "commit" : {
+            "_0" : "5d30fe3d7aab58677d9f66862c4cf702d7754140"
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "show-2233c69e53ed.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "commit" : {
+            "_0" : "2233c69e53ed557526d88fac86c88585df826983"
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "show-b3922ae08ea4.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "commit" : {
+            "_0" : "b3922ae08ea4bd88b8a76501ef34e9dc39715323"
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "show-c7a53c2fd3cc.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "commit" : {
+            "_0" : "c7a53c2fd3cc38b1a4447175a1bc051707ed7cd3"
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "show-dac57d22f1b3.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "commit" : {
+            "_0" : "dac57d22f1b383ae76be70ced62d6d5fff863424"
+          }
+        },
+        "untracked" : false
+      }
+    }
+  ],
+  "log" : "log.txt",
+  "logs" : [
+
+  ],
+  "name" : "app",
+  "nested" : {
+    "Vendor/cmark" : "submodules/Vendor_cmark"
+  },
+  "status" : "status.z",
+  "submodules" : "submodules.txt",
+  "worktrees" : "worktrees.txt"
+}

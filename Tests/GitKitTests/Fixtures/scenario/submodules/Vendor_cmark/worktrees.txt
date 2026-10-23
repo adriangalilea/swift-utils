@@ -1,0 +1,4 @@
+worktree /private/tmp/gitkit-scenario/app/.git/modules/Vendor/cmark
+HEAD 5698f9ff2cd2b4c0cf7d37e43440831d507a1aaa
+detached
+

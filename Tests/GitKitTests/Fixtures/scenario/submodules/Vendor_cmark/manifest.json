@@ -1,0 +1,83 @@
+{
+  "branches" : "branches.txt",
+  "diffs" : [
+    {
+      "file" : "diff-0.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "worktree" : {
+
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "diff-1.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "index" : {
+
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "diff-2.diff",
+      "key" : {
+        "base" : "HEAD",
+        "context" : 3,
+        "target" : {
+          "worktree" : {
+
+          }
+        },
+        "untracked" : true
+      }
+    },
+    {
+      "file" : "show-5698f9ff2cd2.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "commit" : {
+            "_0" : "5698f9ff2cd2b4c0cf7d37e43440831d507a1aaa"
+          }
+        },
+        "untracked" : false
+      }
+    },
+    {
+      "file" : "show-5a94b0de42bf.diff",
+      "key" : {
+        "context" : 3,
+        "target" : {
+          "commit" : {
+            "_0" : "5a94b0de42bf13ea42a574e4e5b266a11252098d"
+          }
+        },
+        "untracked" : false
+      }
+    }
+  ],
+  "log" : "log.txt",
+  "logs" : [
+    {
+      "file" : "log-range.txt",
+      "key" : {
+        "limit" : 50,
+        "revision" : "924936d0427cb25a61169739a7660230bffa6ea6..5698f9ff2cd2b4c0cf7d37e43440831d507a1aaa"
+      }
+    }
+  ],
+  "name" : "cmark",
+  "nested" : {
+
+  },
+  "status" : "status.z",
+  "submodules" : "submodules.txt",
+  "worktrees" : "worktrees.txt"
+}

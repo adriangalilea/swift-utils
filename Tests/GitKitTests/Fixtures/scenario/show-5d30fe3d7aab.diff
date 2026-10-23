@@ -1,0 +1,35 @@
+diff --git a/Sources/Ink/MiddleTruncate.swift b/Sources/Ink/MiddleTruncate.swift
+index f1da1a5..f49e861 100644
+--- a/Sources/Ink/MiddleTruncate.swift
++++ b/Sources/Ink/MiddleTruncate.swift
+@@ -6,7 +6,7 @@ import SwiftUI
+ /// `.truncationMode(.middle)` cuts at the exact centre, so how much of the end
+ /// survives depends on the width.
+ ///
+-/// `tail` says what stays whole: a count of characters (`tail: 6` for a hash), or a
++/// `tail` says what stays whole: a count of characters (`tail: 6`, the default: a short hash), or a
+ /// separator, everything from its last occurrence (`tail: "/"` keeps a path's file,
+ /// `"."` an extension). A separator the text does not hold guarantees no tail: the
+ /// text cuts at its end. The tail is a promise: wider than the room, it overflows.
+@@ -32,7 +32,7 @@ public struct MiddleTruncate: View {
+     let text: String
+     let tail: Tail
+ 
+-    public init(_ text: String, tail: Tail = 4) {
++    public init(_ text: String, tail: Tail = 6) {
+         self.text = text
+         self.tail = tail
+     }
+diff --git a/Sources/Syntax/Syntax.swift b/Sources/Syntax/Syntax.swift
+index 317b025..e3a62ad 100644
+--- a/Sources/Syntax/Syntax.swift
++++ b/Sources/Syntax/Syntax.swift
+@@ -24,7 +24,7 @@ public enum Syntax {
+ 
+     /// Above this the grammar pass is skipped outright: JSC on hundreds of
+     /// kilobytes stalls the render for something nobody reads colored.
+-    public static let ceiling = 32 * 1024
++    public static let ceiling = 48 * 1024
+ 
+     public static func highlight(_ text: String, as format: CodeFormat, on appearance: Appearance)
+         -> AttributedString
