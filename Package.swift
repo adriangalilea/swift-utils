@@ -39,6 +39,10 @@ let package = Package(
         // The Mac's own repositories through /usr/bin/git, a fixed argv and
         // never a shell: `Git.LocalSource`. Read-only by construction.
         .library(name: "GitLocal", targets: ["GitLocal"]),
+        // GitKit drawn: `DiffView` (one line of code anywhere: a markdown
+        // fence, a card, a page), the file list, commits, refs, worktrees,
+        // submodules, a status header; selection hands the host a `DiffQuote`.
+        .library(name: "GitViews", targets: ["GitViews"]),
         .library(name: "Keymap", targets: ["Keymap"]),
         // Command-line output: the semantic palette (TTY + NO_COLOR /
         // FORCE_COLOR gated), ANSI-aware width/clip/pad, table/kv/tree.
@@ -152,10 +156,13 @@ let package = Package(
             name: "GitKitTests", dependencies: ["GitKit"], resources: [.copy("Fixtures")]),
         .target(name: "GitLocal", dependencies: ["GitKit"]),
         .executableTarget(name: "gitkit-capture", dependencies: ["GitLocal"]),
+        .target(name: "GitViews", dependencies: ["GitKit", "Ink", "Syntax"]),
+        .testTarget(name: "GitViewsTests", dependencies: ["GitViews"], resources: [.copy("Fixtures")]),
+        // A fence named `diff` (or `patch`) is drawn by GitViews' DiffView.
         .target(
             name: "MarkdownText",
             dependencies: [
-                "Ink", "Syntax",
+                "Ink", "Syntax", "GitViews",
                 .product(name: "cmark-gfm", package: "swift-cmark"),
                 .product(name: "cmark-gfm-extensions", package: "swift-cmark"),
             ]),
