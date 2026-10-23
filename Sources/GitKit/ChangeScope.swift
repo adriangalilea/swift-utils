@@ -44,7 +44,8 @@ extension Git {
         /// Staged changes: the index against HEAD (`git diff --cached`).
         public static let staged = ChangeScope(target: .index)
         /// Everything not committed, untracked files included (`git diff HEAD`).
-        public static let uncommitted = ChangeScope(base: "HEAD", target: .worktree, untracked: true)
+        public static let uncommitted = ChangeScope(
+            base: "HEAD", target: .worktree, untracked: true)
 
         /// An agent's work: everything from `base` to the working tree (commits it made,
         /// staged and unstaged edits, new files), kept to `touched` when given.
@@ -90,7 +91,8 @@ extension Git {
         }
 
         public static func log(_ revision: String? = nil, limit: Int) -> [String] {
-            global + ["log", "--format=\(Commit.format)", "-n", "\(limit)"] + (revision.map { [$0] } ?? [])
+            global + ["log", "--format=\(Commit.format)", "-n", "\(limit)"]
+                + (revision.map { [$0] } ?? [])
                 + ["--"]
         }
 
@@ -114,24 +116,29 @@ extension Git {
             case .worktree:
                 return global + ["diff"] + flags + (scope.base.map { [$0] } ?? []) + paths
             case .index:
-                return global + ["diff", "--cached"] + flags + (scope.base.map { [$0] } ?? []) + paths
+                return global + ["diff", "--cached"] + flags + (scope.base.map { [$0] } ?? [])
+                    + paths
             case .commit(let hash):
                 if let base = scope.base {
                     return global + ["diff"] + flags + [base, hash] + paths
                 }
-                return global + ["show", "--format=", "--diff-merges=first-parent"] + flags + [hash] + paths
+                return global + ["show", "--format=", "--diff-merges=first-parent"] + flags + [hash]
+                    + paths
             }
         }
 
         /// Untracked paths of a scope, NUL-separated.
         public static func untracked(_ scope: ChangeScope) -> [String] {
-            global + ["ls-files", "--others", "--exclude-standard", "-z", "--"] + (scope.paths ?? [])
+            global + ["ls-files", "--others", "--exclude-standard", "-z", "--"]
+                + (scope.paths ?? [])
         }
 
         /// An untracked file as an added one. Exits 1 when it has content: that is the
         /// answer, not a failure.
         public static func newFile(_ path: String, context: Int = 3) -> [String] {
-            global + ["diff", "--no-index"] + diffFlags(context: context) + ["--", "/dev/null", path]
+            global + ["diff", "--no-index"] + diffFlags(context: context) + [
+                "--", "/dev/null", path,
+            ]
         }
     }
 }

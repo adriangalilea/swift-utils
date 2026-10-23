@@ -11,7 +11,9 @@ enum Fixture {
     static let folder = Bundle.module.url(forResource: "Fixtures", withExtension: nil)!
     static func data(_ name: String) -> Data { try! Data(contentsOf: folder.appending(path: name)) }
     static func text(_ name: String) -> String { String(decoding: data(name), as: UTF8.self) }
-    static var scenario: Git.FixtureSource { try! Git.FixtureSource(folder: folder.appending(path: "scenario")) }
+    static var scenario: Git.FixtureSource {
+        try! Git.FixtureSource(folder: folder.appending(path: "scenario"))
+    }
 }
 
 struct DiffParsing {
@@ -22,7 +24,9 @@ struct DiffParsing {
         let agent = try #require(manifest.agent)
         let file = try #require(manifest.diffs.first { $0.key == .since(agent.base) }?.file)
         let diff = try Git.Diff(parsing: Fixture.data("scenario/\(file)"))
-        func find(_ path: String) throws -> Git.FileDiff { try #require(diff.files.first { $0.path == path }) }
+        func find(_ path: String) throws -> Git.FileDiff {
+            try #require(diff.files.first { $0.path == path })
+        }
 
         let rename = try find("Sources/Ink/InkScrim.swift")
         #expect(rename.change == .renamed)
@@ -39,7 +43,9 @@ struct DiffParsing {
         #expect(added.hunks.first?.newStart == 1 && added.deletions == 0)
 
         let mode = try find("scripts/grant-example-app.sh")
-        #expect(mode.modeChanged && mode.oldMode == "100644" && mode.newMode == "100755" && mode.hunks.isEmpty)
+        #expect(
+            mode.modeChanged && mode.oldMode == "100644" && mode.newMode == "100755"
+                && mode.hunks.isEmpty)
 
         let binary = try find("Sources/Ink/Resources/badge.png")
         #expect(binary.isBinary && binary.change == .added && binary.hunks.isEmpty)
@@ -78,7 +84,9 @@ struct DiffParsing {
         let elapsed = Date().timeIntervalSince(start)
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         #expect(diff.files.count == lines.filter { $0.hasPrefix("diff --git ") }.count)
-        #expect(diff.files.filter { $0.change == .renamed }.count == lines.filter { $0.hasPrefix("rename from ") }.count)
+        #expect(
+            diff.files.filter { $0.change == .renamed }.count
+                == lines.filter { $0.hasPrefix("rename from ") }.count)
         let plus = lines.filter { $0.hasPrefix("+") && !$0.hasPrefix("+++ ") }.count
         let minus = lines.filter { $0.hasPrefix("-") && !$0.hasPrefix("--- ") }.count
         #expect(diff.additions == plus)
@@ -102,7 +110,8 @@ struct DiffParsing {
             }
         }
         #expect(elapsed < 1, "parsing 4,690 lines took \(elapsed)s")
-        let pure = try #require(diff.files.first { $0.path == "Sources/PermissionGrants/CLAUDE.md" })
+        let pure = try #require(
+            diff.files.first { $0.path == "Sources/PermissionGrants/CLAUDE.md" })
         #expect(pure.change == .renamed && pure.similarity == 100 && pure.hunks.isEmpty)
     }
 
@@ -177,7 +186,9 @@ struct Snippets {
     /// A pasted patch: its path from `+++`, its numbers from `@@`, wrong counts ignored.
     @Test func pastedPatch() {
         let file = Git.FileDiff(
-            snippet: "--- a/Sources/x.swift\n+++ b/Sources/x.swift\n@@ -10,9 +10,9 @@ func f()\n a\n-b\n+c\n")
+            snippet:
+                "--- a/Sources/x.swift\n+++ b/Sources/x.swift\n@@ -10,9 +10,9 @@ func f()\n a\n-b\n+c\n"
+        )
         #expect(file.path == "Sources/x.swift")
         #expect(file.hunks[0].section == "func f()")
         #expect(file.hunks[0].lines.map(\.new) == [10, nil, 11])
@@ -218,7 +229,9 @@ struct LineDiffs {
         var lines = Git.FileDiff.split(old).map { (String($0.text), $0.noNewline) }
         for hunk in file.hunks.reversed() {
             let start = hunk.oldCount == 0 ? hunk.oldStart : hunk.oldStart - 1
-            let replacement = hunk.lines.filter { $0.kind != .removed }.map { ($0.text, $0.noNewline) }
+            let replacement = hunk.lines.filter { $0.kind != .removed }.map {
+                ($0.text, $0.noNewline)
+            }
             lines.replaceSubrange(start..<(start + hunk.oldCount), with: replacement)
         }
         return lines.map { $0.0 + ($0.1 ? "" : "\n") }.joined()
@@ -227,13 +240,17 @@ struct LineDiffs {
 
 struct IntralineWords {
     @Test func renamedVariable() throws {
-        let found = try #require(Git.Intraline.ranges(old: "let count = items.count", new: "let total = items.count"))
+        let found = try #require(
+            Git.Intraline.ranges(old: "let count = items.count", new: "let total = items.count"))
         #expect(found.old == [4..<9])
         #expect(found.new == [4..<9])
     }
 
     @Test func neighbouringChangesJoinAcrossSpaces() throws {
-        let found = try #require(Git.Intraline.ranges(old: "public init(_ text: String, tail: Tail = 4)", new: "public init(_ text: String, tail: Tail = 6)"))
+        let found = try #require(
+            Git.Intraline.ranges(
+                old: "public init(_ text: String, tail: Tail = 4)",
+                new: "public init(_ text: String, tail: Tail = 6)"))
         #expect(found.new == [41..<42])
         let joined = try #require(Git.Intraline.ranges(old: "let a b = c", new: "var x y = c"))
         #expect(joined.new == [0..<7])
@@ -244,7 +261,8 @@ struct IntralineWords {
     }
 
     @Test func pairsInAHunk() throws {
-        let file = Git.FileDiff(old: "a\nlet x = 1\nlet y = 2\nb\n", new: "a\nlet x = 10\nlet y = 20\nb\n")
+        let file = Git.FileDiff(
+            old: "a\nlet x = 1\nlet y = 2\nb\n", new: "a\nlet x = 10\nlet y = 20\nb\n")
         let pairs = Git.Intraline.pairs(in: try #require(file.hunks.first))
         #expect(pairs.count == 4)
     }
@@ -257,10 +275,16 @@ struct StatusParsing {
         #expect(status.branch.upstream == "origin/main")
         #expect(status.branch.ahead == 3 && status.branch.behind == 0)
         let readme = try #require(status.entries.first { $0.path == "README.md" })
-        #expect(readme.isStaged && readme.isUnstaged && readme.index == .modified && readme.worktree == .modified)
+        #expect(
+            readme.isStaged && readme.isUnstaged && readme.index == .modified
+                && readme.worktree == .modified)
         let cmark = try #require(status.entries.first { $0.path == "Vendor/cmark" })
-        #expect(cmark.submodule?.commitChanged == true && cmark.modes == ["160000", "160000", "160000"])
-        #expect(status.untracked.map(\.path).sorted() == ["NOTES.md", "Sources/Ink/Resources/ABOUT.txt", "Tests/InkTests/InkBadgeTests.swift"])
+        #expect(
+            cmark.submodule?.commitChanged == true && cmark.modes == ["160000", "160000", "160000"])
+        #expect(
+            status.untracked.map(\.path).sorted() == [
+                "NOTES.md", "Sources/Ink/Resources/ABOUT.txt", "Tests/InkTests/InkBadgeTests.swift",
+            ])
         #expect(status.staged.count == 3 && status.unstaged.count == 4)
         #expect(status.groups.map(\.group) == [.staged, .unstaged, .untracked])
     }
@@ -268,17 +292,21 @@ struct StatusParsing {
     @Test func mergeInConflict() throws {
         let status = try Git.Status(parsing: Fixture.data("conflict-status.z"))
         let entry = try #require(status.conflicted.first)
-        #expect(entry.path == "README.md" && entry.index == .unmerged && entry.worktree == .unmerged)
+        #expect(
+            entry.path == "README.md" && entry.index == .unmerged && entry.worktree == .unmerged)
         #expect(status.groups.first?.group == .conflicted)
     }
 
     @Test func renameRecordsCarryTheirOrigin() throws {
-        let raw = "# branch.oid (initial)\0# branch.head (detached)\0"
+        let raw =
+            "# branch.oid (initial)\0# branch.head (detached)\0"
             + "2 R. N... 100644 100644 100644 aaaa bbbb R87 new name.swift\0old.swift\0"
         let status = try Git.Status(parsing: Data(raw.utf8))
         #expect(status.branch.oid == nil && status.branch.head == nil)
         let entry = try #require(status.entries.first)
-        #expect(entry.kind == .renamed && entry.score == 87 && entry.path == "new name.swift" && entry.origPath == "old.swift")
+        #expect(
+            entry.kind == .renamed && entry.score == 87 && entry.path == "new name.swift"
+                && entry.origPath == "old.swift")
     }
 }
 
@@ -287,17 +315,23 @@ struct RefsAndHistory {
         let commits = try Git.Commit.parse(Fixture.data("swift-utils-log.txt"))
         #expect(commits.count == 40)
         #expect(commits.allSatisfy { $0.hash.count == 40 && !$0.subject.isEmpty })
-        #expect(zip(commits, commits.dropFirst()).allSatisfy { $0.parents.contains($1.hash) || $0.isMerge })
+        #expect(
+            zip(commits, commits.dropFirst()).allSatisfy {
+                $0.parents.contains($1.hash) || $0.isMerge
+            })
         #expect(commits[0].refs.contains { $0.contains("main") })
         let scenario = try Git.Commit.parse(Fixture.data("scenario/log.txt"))
-        #expect(scenario[0].subject == "refactor(ink): the scrim is named for its module; the HUD glass goes")
+        #expect(
+            scenario[0].subject
+                == "refactor(ink): the scrim is named for its module; the HUD glass goes")
         #expect(scenario[0].author.date == (try Date("2026-10-23T08:31:00Z", strategy: .iso8601)))
     }
 
     @Test func branches() throws {
         let branches = try Git.Branch.parse(Fixture.data("scenario/branches.txt"))
         let main = try #require(branches.first { $0.name == "main" })
-        #expect(main.isCurrent && main.upstream == "origin/main" && main.ahead == 3 && main.behind == 0)
+        #expect(
+            main.isCurrent && main.upstream == "origin/main" && main.ahead == 3 && main.behind == 0)
         #expect(!branches.contains { $0.ref.hasSuffix("/HEAD") })
         #expect(branches.first { $0.name == "review" }?.worktree?.hasSuffix("app-review") == true)
         let local = try Git.Branch.parse(Fixture.data("swift-utils-branches.txt"))
@@ -332,7 +366,9 @@ struct Sources {
         let shown = try await source.show(snapshot.commits[0].hash)
         #expect(shown.files.contains { $0.change == .renamed })
         let nested = try #require(source.submodule("Vendor/cmark"))
-        let moved = try await nested.log("924936d0427cb25a61169739a7660230bffa6ea6..5698f9ff2cd2b4c0cf7d37e43440831d507a1aaa", limit: 50)
+        let moved = try await nested.log(
+            "924936d0427cb25a61169739a7660230bffa6ea6..5698f9ff2cd2b4c0cf7d37e43440831d507a1aaa",
+            limit: 50)
         #expect(!moved.isEmpty)
         let diff = try await nested.show(moved[0].hash)
         #expect(!diff.files.isEmpty)

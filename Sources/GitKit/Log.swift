@@ -25,7 +25,8 @@ extension Git {
         public var body: String
 
         public init(
-            hash: String, parents: [String], author: Signature, committer: Signature, refs: [String] = [],
+            hash: String, parents: [String], author: Signature, committer: Signature,
+            refs: [String] = [],
             subject: String, body: String = ""
         ) {
             self.hash = hash
@@ -43,7 +44,8 @@ extension Git {
 
         /// `git log --format=<this>`: the fields NUL-separated, each record ended by RS
         /// (0x1E), so a subject or body can hold anything but those two bytes.
-        public static let format = "%H%x00%P%x00%an%x00%ae%x00%aI%x00%cn%x00%ce%x00%cI%x00%D%x00%s%x00%b%x1E"
+        public static let format =
+            "%H%x00%P%x00%an%x00%ae%x00%aI%x00%cn%x00%ce%x00%cI%x00%D%x00%s%x00%b%x1E"
 
         /// Records as `format` writes them.
         public static func parse(_ data: Data) throws -> [Commit] {
@@ -55,16 +57,21 @@ extension Git {
                 guard fields.count >= 11,
                     let authored = date(fields[4]), let committed = date(fields[7])
                 else {
-                    throw ParseError.record(kind: "log", line: index + 1, text: String(trimmed.prefix(120)))
+                    throw ParseError.record(
+                        kind: "log", line: index + 1, text: String(trimmed.prefix(120)))
                 }
                 out.append(
                     Commit(
-                        hash: String(fields[0]), parents: fields[1].split(separator: " ").map(String.init),
-                        author: Signature(name: String(fields[2]), email: String(fields[3]), date: authored),
-                        committer: Signature(name: String(fields[5]), email: String(fields[6]), date: committed),
+                        hash: String(fields[0]),
+                        parents: fields[1].split(separator: " ").map(String.init),
+                        author: Signature(
+                            name: String(fields[2]), email: String(fields[3]), date: authored),
+                        committer: Signature(
+                            name: String(fields[5]), email: String(fields[6]), date: committed),
                         refs: fields[8].isEmpty ? [] : fields[8].components(separatedBy: ", "),
                         subject: String(fields[9]),
-                        body: fields[10...].joined(separator: "\0").trimmingCharacters(in: .whitespacesAndNewlines)))
+                        body: fields[10...].joined(separator: "\0").trimmingCharacters(
+                            in: .whitespacesAndNewlines)))
             }
             return out
         }

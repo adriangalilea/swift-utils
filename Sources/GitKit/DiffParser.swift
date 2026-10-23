@@ -73,9 +73,10 @@ extension Git.FileDiff {
                     if named == nil { named = target }
                     continue
                 }
-                if ["index ", "similarity ", "rename ", "new file mode", "deleted file mode",
-                    "old mode", "new mode"].contains(where: { line.hasPrefix($0) })
-                {
+                if [
+                    "index ", "similarity ", "rename ", "new file mode", "deleted file mode",
+                    "old mode", "new mode",
+                ].contains(where: { line.hasPrefix($0) }) {
                     continue
                 }
             }
@@ -170,7 +171,9 @@ struct DiffParser {
                 let first = line.first
                 if first == " " || (line.isEmpty && open.oldLeft > 0 && open.newLeft > 0) {
                     open.hunk.lines.append(
-                        Git.Line(kind: .context, old: open.old, new: open.new, text: String(line.dropFirst())))
+                        Git.Line(
+                            kind: .context, old: open.old, new: open.new,
+                            text: String(line.dropFirst())))
                     open.old += 1
                     open.new += 1
                     open.oldLeft -= 1
@@ -180,7 +183,9 @@ struct DiffParser {
                 }
                 if first == "-", open.oldLeft > 0 {
                     open.hunk.lines.append(
-                        Git.Line(kind: .removed, old: open.old, new: nil, text: String(line.dropFirst())))
+                        Git.Line(
+                            kind: .removed, old: open.old, new: nil, text: String(line.dropFirst()))
+                    )
                     open.old += 1
                     open.oldLeft -= 1
                     hunk = open
@@ -188,7 +193,8 @@ struct DiffParser {
                 }
                 if first == "+", open.newLeft > 0 {
                     open.hunk.lines.append(
-                        Git.Line(kind: .added, old: nil, new: open.new, text: String(line.dropFirst())))
+                        Git.Line(
+                            kind: .added, old: nil, new: open.new, text: String(line.dropFirst())))
                     open.new += 1
                     open.newLeft -= 1
                     hunk = open
@@ -201,7 +207,8 @@ struct DiffParser {
         if line.hasPrefix("diff --git ") {
             closeFile()
             var opened = File()
-            (opened.headerOld, opened.headerNew) = Self.headerPaths(line.dropFirst("diff --git ".count))
+            (opened.headerOld, opened.headerNew) = Self.headerPaths(
+                line.dropFirst("diff --git ".count))
             file = opened
             return
         }
@@ -300,8 +307,12 @@ struct DiffParser {
             ? .added
             : current.deleted
                 ? .deleted : current.renamed ? .renamed : current.copied ? .copied : .modified
-        var oldPath = current.minusSeen || current.renamed || current.copied ? current.oldPath : current.headerOld
-        var newPath = current.plusSeen || current.renamed || current.copied ? current.newPath : current.headerNew
+        var oldPath =
+            current.minusSeen || current.renamed || current.copied
+            ? current.oldPath : current.headerOld
+        var newPath =
+            current.plusSeen || current.renamed || current.copied
+            ? current.newPath : current.headerNew
         if change == .added { oldPath = nil }
         if change == .deleted { newPath = nil }
         if change == .added, newPath == nil { newPath = current.headerNew }
@@ -360,7 +371,8 @@ struct DiffParser {
             let half = count / 2
             let left = rest.prefix(half)
             let right = rest.suffix(half)
-            if left.dropFirst(2) == right.dropFirst(2), left.hasPrefix("a/"), right.hasPrefix("b/") {
+            if left.dropFirst(2) == right.dropFirst(2), left.hasPrefix("a/"), right.hasPrefix("b/")
+            {
                 return (String(left.dropFirst(2)), String(right.dropFirst(2)))
             }
         }

@@ -37,8 +37,10 @@ extension Git {
         public var isBinary: Bool
 
         public init(
-            path: String, oldPath: String? = nil, kind: Kind, group: Group = .changed, additions: Int? = nil,
-            deletions: Int? = nil, similarity: Int? = nil, isSubmodule: Bool = false, isBinary: Bool = false
+            path: String, oldPath: String? = nil, kind: Kind, group: Group = .changed,
+            additions: Int? = nil,
+            deletions: Int? = nil, similarity: Int? = nil, isSubmodule: Bool = false,
+            isBinary: Bool = false
         ) {
             self.path = path
             self.oldPath = oldPath
@@ -69,7 +71,8 @@ extension Git {
                 case .modified: .modified
                 }
             self.init(
-                path: file.path, oldPath: file.change == .renamed || file.change == .copied ? file.oldPath : nil,
+                path: file.path,
+                oldPath: file.change == .renamed || file.change == .copied ? file.oldPath : nil,
                 kind: kind, additions: file.isBinary ? nil : file.additions,
                 deletions: file.isBinary ? nil : file.deletions, similarity: file.similarity,
                 isSubmodule: file.submodule != nil, isBinary: file.isBinary)
@@ -95,7 +98,8 @@ extension Git {
                     }
                 }
             self.init(
-                path: entry.path, oldPath: group == .staged ? entry.origPath : nil, kind: kind, group: group,
+                path: entry.path, oldPath: group == .staged ? entry.origPath : nil, kind: kind,
+                group: group,
                 similarity: group == .staged ? entry.score : nil,
                 isSubmodule: entry.submodule != nil || entry.modes.contains("160000"))
         }

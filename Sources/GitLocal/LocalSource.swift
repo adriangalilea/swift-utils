@@ -32,7 +32,9 @@ import GitKit
                 }.value
             }
 
-            static func run(_ arguments: [String], in folder: URL, allowing: Set<Int32>) throws -> Data {
+            static func run(_ arguments: [String], in folder: URL, allowing: Set<Int32>) throws
+                -> Data
+            {
                 let process = Process()
                 process.executableURL = URL(filePath: "/usr/bin/git")
                 process.arguments = arguments
@@ -87,10 +89,13 @@ import GitKit
             public func diff(_ scope: ChangeScope) async throws -> Diff {
                 var diff = try Diff(parsing: await run(Command.diff(scope)))
                 guard scope.untracked, scope.target == .worktree else { return diff }
-                let listed = Git.records(try await run(Command.untracked(scope))).filter { !$0.isEmpty }
+                let listed = Git.records(try await run(Command.untracked(scope))).filter {
+                    !$0.isEmpty
+                }
                 for path in listed.prefix(untrackedLimit) {
                     let added = try Diff(
-                        parsing: await run(Command.newFile(path, context: scope.context), allowing: [1]))
+                        parsing: await run(
+                            Command.newFile(path, context: scope.context), allowing: [1]))
                     diff.files += added.files
                 }
                 return diff
@@ -102,8 +107,10 @@ import GitKit
 
             public func submodule(_ path: String) -> (any Source)? {
                 let folder = repository.appending(path: path)
-                guard FileManager.default.fileExists(atPath: folder.appending(path: ".git").path) else { return nil }
-                return LocalSource(repository: folder, logLimit: logLimit, untrackedLimit: untrackedLimit)
+                guard FileManager.default.fileExists(atPath: folder.appending(path: ".git").path)
+                else { return nil }
+                return LocalSource(
+                    repository: folder, logLimit: logLimit, untrackedLimit: untrackedLimit)
             }
         }
     }

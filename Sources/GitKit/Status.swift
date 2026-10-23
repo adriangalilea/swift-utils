@@ -77,7 +77,8 @@ extension Git {
             }
             /// Something is not staged: the working tree differs from the index.
             public var isUnstaged: Bool {
-                (kind == .ordinary || kind == .renamed || kind == .copied) && worktree != .unmodified
+                (kind == .ordinary || kind == .renamed || kind == .copied)
+                    && worktree != .unmodified
             }
         }
 
@@ -131,10 +132,12 @@ extension Git.Status {
             switch tag {
             case "1", "2":
                 // 1 XY sub mH mI mW hH hI path / 2 XY sub mH mI mW hH hI Xscore path\0orig
-                let fields = record.split(separator: " ", maxSplits: tag == "1" ? 8 : 9, omittingEmptySubsequences: false)
+                let fields = record.split(
+                    separator: " ", maxSplits: tag == "1" ? 8 : 9, omittingEmptySubsequences: false)
                 guard fields.count == (tag == "1" ? 9 : 10) else { throw fail("entry", record) }
                 var entry = try Self.entry(
-                    kind: .ordinary, xy: fields[1], sub: fields[2], modes: fields[3...5], record: record, number: number)
+                    kind: .ordinary, xy: fields[1], sub: fields[2], modes: fields[3...5],
+                    record: record, number: number)
                 if tag == "2" {
                     let score = fields[8]
                     entry.kind = score.first == "C" ? .copied : .renamed
@@ -149,10 +152,12 @@ extension Git.Status {
                 entries.append(entry)
             case "u":
                 // u XY sub m1 m2 m3 mW h1 h2 h3 path
-                let fields = record.split(separator: " ", maxSplits: 10, omittingEmptySubsequences: false)
+                let fields = record.split(
+                    separator: " ", maxSplits: 10, omittingEmptySubsequences: false)
                 guard fields.count == 11 else { throw fail("unmerged", record) }
                 var entry = try Self.entry(
-                    kind: .unmerged, xy: fields[1], sub: fields[2], modes: fields[3...6], record: record,
+                    kind: .unmerged, xy: fields[1], sub: fields[2], modes: fields[3...6],
+                    record: record,
                     number: number)
                 entry.path = String(fields[10])
                 entries.append(entry)
@@ -171,7 +176,8 @@ extension Git.Status {
     }
 
     private static func entry(
-        kind: Entry.Kind, xy: Substring, sub: Substring, modes: ArraySlice<Substring>, record: String,
+        kind: Entry.Kind, xy: Substring, sub: Substring, modes: ArraySlice<Substring>,
+        record: String,
         number: Int
     ) throws -> Entry {
         let codes = Array(xy)
@@ -182,10 +188,12 @@ extension Git.Status {
         let flags = Array(sub)
         if flags.count == 4, flags[0] == "S" {
             submodule = SubmoduleState(
-                commitChanged: flags[1] == "C", modified: flags[2] == "M", untracked: flags[3] == "U")
+                commitChanged: flags[1] == "C", modified: flags[2] == "M",
+                untracked: flags[3] == "U")
         }
         return Entry(
-            kind: kind, path: "", origPath: nil, index: x, worktree: y, score: nil, submodule: submodule,
+            kind: kind, path: "", origPath: nil, index: x, worktree: y, score: nil,
+            submodule: submodule,
             modes: modes.map(String.init))
     }
 }

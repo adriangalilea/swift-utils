@@ -6,14 +6,18 @@ extension Git.FileDiff {
     /// lines around each change as `git diff -U<context>` keeps them. Line numbers count
     /// from `startLine` on both sides, for a fragment that sits further down its file. A
     /// last line without a newline is marked as git marks it.
-    public init(old: String, new: String, path: String? = nil, context: Int = 3, startLine: Int = 1) {
+    public init(old: String, new: String, path: String? = nil, context: Int = 3, startLine: Int = 1)
+    {
         let a = Self.split(old)
         let b = Self.split(new)
         let ops = LineDiff.ops(a.map(\.key), b.map(\.key))
         let hunks = LineDiff.hunks(ops, a, b, context: max(0, context), startLine: startLine)
-        let change: Change = old.isEmpty && !new.isEmpty ? .added : !old.isEmpty && new.isEmpty ? .deleted : .modified
+        let change: Change =
+            old.isEmpty && !new.isEmpty
+            ? .added : !old.isEmpty && new.isEmpty ? .deleted : .modified
         self.init(
-            oldPath: change == .added ? nil : path ?? "", newPath: change == .deleted ? nil : path ?? "",
+            oldPath: change == .added ? nil : path ?? "",
+            newPath: change == .deleted ? nil : path ?? "",
             change: change, hunks: hunks)
     }
 
@@ -160,13 +164,19 @@ enum LineDiff {
                 switch ops[index] {
                 case .equal(let x, _):
                     lines.append(
-                        Git.Line(kind: .context, old: old, new: new, text: String(a[x].text), noNewline: a[x].noNewline))
+                        Git.Line(
+                            kind: .context, old: old, new: new, text: String(a[x].text),
+                            noNewline: a[x].noNewline))
                 case .delete(let x):
                     lines.append(
-                        Git.Line(kind: .removed, old: old, new: nil, text: String(a[x].text), noNewline: a[x].noNewline))
+                        Git.Line(
+                            kind: .removed, old: old, new: nil, text: String(a[x].text),
+                            noNewline: a[x].noNewline))
                 case .insert(let y):
                     lines.append(
-                        Git.Line(kind: .added, old: nil, new: new, text: String(b[y].text), noNewline: b[y].noNewline))
+                        Git.Line(
+                            kind: .added, old: nil, new: new, text: String(b[y].text),
+                            noNewline: b[y].noNewline))
                 }
             }
             let oldCount = lines.filter { $0.kind != .added }.count
@@ -175,7 +185,8 @@ enum LineDiff {
             let oldStart = startLine + oldAt[from] - (oldCount == 0 ? 1 : 0)
             let newStart = startLine + newAt[from] - (newCount == 0 ? 1 : 0)
             return Git.Hunk(
-                oldStart: oldStart, oldCount: oldCount, newStart: newStart, newCount: newCount, lines: lines)
+                oldStart: oldStart, oldCount: oldCount, newStart: newStart, newCount: newCount,
+                lines: lines)
         }
     }
 

@@ -81,7 +81,8 @@ extension Git {
             case UInt8(ascii: "0")...UInt8(ascii: "7"):
                 var value = Int(next - UInt8(ascii: "0"))
                 for _ in 0..<2 {
-                    guard let digit = chars.first, (UInt8(ascii: "0")...UInt8(ascii: "7")).contains(digit)
+                    guard let digit = chars.first,
+                        (UInt8(ascii: "0")...UInt8(ascii: "7")).contains(digit)
                     else { break }
                     chars.removeFirst()
                     value = value * 8 + Int(digit - UInt8(ascii: "0"))

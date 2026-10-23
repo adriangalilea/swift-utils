@@ -15,7 +15,9 @@ extension Git {
             let a = tokens(old)
             let b = tokens(new)
             var prefix = 0
-            while prefix < a.count, prefix < b.count, a[prefix].text == b[prefix].text { prefix += 1 }
+            while prefix < a.count, prefix < b.count, a[prefix].text == b[prefix].text {
+                prefix += 1
+            }
             var suffix = 0
             while suffix < a.count - prefix, suffix < b.count - prefix,
                 a[a.count - 1 - suffix].text == b[b.count - 1 - suffix].text
@@ -32,7 +34,8 @@ extension Git {
                 (keptA, keptB) = common(midA.map(\.text), midB.map(\.text))
             }
             let unchanged =
-                a.prefix(prefix).reduce(0) { $0 + $1.length } + a.suffix(suffix).reduce(0) { $0 + $1.length }
+                a.prefix(prefix).reduce(0) { $0 + $1.length }
+                + a.suffix(suffix).reduce(0) { $0 + $1.length }
                 + keptA.reduce(0) { $0 + midA[$1].length }
             let longest = max(old.count, new.count)
             guard longest > 0, Double(unchanged) / Double(longest) >= similarity else { return nil }
@@ -60,7 +63,8 @@ extension Git {
                     let old = removedStart + offset
                     let new = addedStart + offset
                     guard lines[old].text.count <= 2_000, lines[new].text.count <= 2_000,
-                        let found = ranges(old: lines[old].text, new: lines[new].text, similarity: similarity)
+                        let found = ranges(
+                            old: lines[old].text, new: lines[new].text, similarity: similarity)
                     else { continue }
                     out[old] = found.old
                     out[new] = found.new
@@ -95,7 +99,10 @@ extension Git {
                         length += 1
                     }
                 }
-                out.append(Token(text: line[index..<end], start: offset, length: length, isSpace: first == 1))
+                out.append(
+                    Token(
+                        text: line[index..<end], start: offset, length: length, isSpace: first == 1)
+                )
                 offset += length
                 index = end
             }
@@ -142,7 +149,9 @@ extension Git {
             for (index, token) in tokens.enumerated() {
                 let range = token.start..<(token.start + token.length)
                 if token.isSpace {
-                    if let last = out.last, last.upperBound == range.lowerBound { pendingSpace = range }
+                    if let last = out.last, last.upperBound == range.lowerBound {
+                        pendingSpace = range
+                    }
                     continue
                 }
                 if kept.contains(index) {
@@ -151,7 +160,9 @@ extension Git {
                 }
                 if let last = out.last, last.upperBound == range.lowerBound {
                     out[out.count - 1] = last.lowerBound..<range.upperBound
-                } else if let space = pendingSpace, let last = out.last, space.upperBound == range.lowerBound {
+                } else if let space = pendingSpace, let last = out.last,
+                    space.upperBound == range.lowerBound
+                {
                     out[out.count - 1] = last.lowerBound..<range.upperBound
                 } else {
                     out.append(range)

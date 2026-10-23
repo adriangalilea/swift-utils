@@ -45,7 +45,8 @@ import GitLocal
     }
 
     func capture(
-        _ source: Git.LocalSource, into folder: URL, agentBase: String?, touched: [String]?, shows: Int,
+        _ source: Git.LocalSource, into folder: URL, agentBase: String?, touched: [String]?,
+        shows: Int,
         logLimit: Int, depth: Int
     ) async throws {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -79,16 +80,20 @@ import GitLocal
             // `--no-index` output, so the file parses exactly like a live read.
             var bytes = try await source.run(Git.Command.diff(scope))
             if scope.untracked, scope.target == .worktree {
-                let listed = Git.records(try await source.run(Git.Command.untracked(scope))).filter { !$0.isEmpty }
+                let listed = Git.records(try await source.run(Git.Command.untracked(scope))).filter
+                { !$0.isEmpty }
                 for path in listed.prefix(source.untrackedLimit) {
-                    bytes += try await source.run(Git.Command.newFile(path, context: scope.context), allowing: [1])
+                    bytes += try await source.run(
+                        Git.Command.newFile(path, context: scope.context), allowing: [1])
                 }
             }
             try write(bytes, name)
             manifest.diffs.append(.init(key: scope, file: name))
             if case .commit = scope.target { continue }
             for file in diff.files {
-                if let pointer = file.submodule, pointer.old != pointer.new { pointers[file.path] = pointer }
+                if let pointer = file.submodule, pointer.old != pointer.new {
+                    pointers[file.path] = pointer
+                }
             }
         }
         if let agentBase {
@@ -104,17 +109,21 @@ import GitLocal
             guard let nested = source.submodule(path) as? Git.LocalSource else { continue }
             let relative = "submodules/" + path.replacingOccurrences(of: "/", with: "_")
             try await capture(
-                nested, into: folder.appending(path: relative), agentBase: nil, touched: nil, shows: 0,
+                nested, into: folder.appending(path: relative), agentBase: nil, touched: nil,
+                shows: 0,
                 logLimit: logLimit, depth: depth + 1)
             // The move itself: the commits between the two pointers and each one's diff.
             var nestedManifest = try JSONDecoder().decode(
                 Git.FixtureSource.Manifest.self,
-                from: Data(contentsOf: folder.appending(path: relative).appending(path: "manifest.json")))
+                from: Data(
+                    contentsOf: folder.appending(path: relative).appending(path: "manifest.json")))
             if let old = pointer.old, let new = pointer.new {
                 let range = "\(old)..\(new)"
                 let moved = try await nested.run(Git.Command.log(range, limit: 50))
-                try moved.write(to: folder.appending(path: relative).appending(path: "log-range.txt"))
-                nestedManifest.logs.append(.init(key: .init(revision: range, limit: 50), file: "log-range.txt"))
+                try moved.write(
+                    to: folder.appending(path: relative).appending(path: "log-range.txt"))
+                nestedManifest.logs.append(
+                    .init(key: .init(revision: range, limit: 50), file: "log-range.txt"))
                 for commit in try Git.Commit.parse(moved).prefix(10) {
                     let name = "show-\(commit.hash.prefix(12)).diff"
                     let scope = Git.ChangeScope.commit(commit.hash)
@@ -141,7 +150,8 @@ import GitLocal
     let options = Options(Array(CommandLine.arguments.dropFirst()))
     do {
         try await capture(
-            Git.LocalSource(repository: options.repository), into: options.folder, agentBase: options.agentBase,
+            Git.LocalSource(repository: options.repository), into: options.folder,
+            agentBase: options.agentBase,
             touched: options.touched, shows: options.shows, logLimit: options.logLimit, depth: 0)
         print("gitkit-capture: \(options.folder.path)")
     } catch {

@@ -55,7 +55,8 @@ public struct DiffQuote: Codable, Sendable, Hashable {
         quote.reference = file.path
         let what: String
         if let pointer = file.submodule {
-            what = "submodule \(pointer.old.map { String($0.prefix(7)) } ?? "none") → \(pointer.new.map { String($0.prefix(7)) } ?? "none")"
+            what =
+                "submodule \(pointer.old.map { String($0.prefix(7)) } ?? "none") → \(pointer.new.map { String($0.prefix(7)) } ?? "none")"
         } else if file.isBinary {
             what = "binary file, \(file.change.rawValue)"
         } else if file.hunks.isEmpty, file.modeChanged {
@@ -67,10 +68,13 @@ public struct DiffQuote: Codable, Sendable, Hashable {
         if file.change == .renamed || file.change == .copied, let old = file.oldPath {
             title = "`\(old)` → `\(file.path)`"
         }
-        let body = file.hunks.map { ([$0.header] + $0.lines.map(\.unified)).joined(separator: "\n") }
+        let body = file.hunks.map {
+            ([$0.header] + $0.lines.map(\.unified)).joined(separator: "\n")
+        }
         quote.markdown =
             "\(title) (\(what))"
-            + (body.isEmpty || file.submodule != nil ? "" : "\n\n" + fence(body.joined(separator: "\n")))
+            + (body.isEmpty || file.submodule != nil
+                ? "" : "\n\n" + fence(body.joined(separator: "\n")))
         return quote
     }
 

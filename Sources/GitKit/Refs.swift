@@ -55,7 +55,8 @@ extension Git {
                 }
                 return Branch(
                     ref: String(fields[0]), commit: String(fields[1]),
-                    upstream: fields[2].isEmpty ? nil : String(fields[2]), ahead: ahead, behind: behind,
+                    upstream: fields[2].isEmpty ? nil : String(fields[2]), ahead: ahead,
+                    behind: behind,
                     upstreamGone: fields[3] == "gone", isCurrent: fields[4] == "*",
                     date: Commit.date(fields[5]), subject: fields[7...].joined(separator: "\0"),
                     worktree: fields[6].isEmpty ? nil : String(fields[6]))
@@ -78,7 +79,9 @@ extension Git {
         public var isMain: Bool
 
         public var id: String { path }
-        public var branchName: String? { branch.map { $0.after("refs/heads/").map(String.init) ?? $0 } }
+        public var branchName: String? {
+            branch.map { $0.after("refs/heads/").map(String.init) ?? $0 }
+        }
 
         public static func parse(_ data: Data) -> [Worktree] {
             var out: [Worktree] = []
@@ -98,7 +101,8 @@ extension Git {
                 if key == "worktree" {
                     close()
                     current = Worktree(
-                        path: value, head: nil, branch: nil, isBare: false, isDetached: false, locked: nil,
+                        path: value, head: nil, branch: nil, isBare: false, isDetached: false,
+                        locked: nil,
                         prunable: nil, isMain: out.isEmpty)
                     continue
                 }
@@ -157,7 +161,8 @@ extension Git {
                     describe = String(path[open.upperBound...].dropLast())
                     path = path[..<open.lowerBound]
                 }
-                return Submodule(path: String(path), commit: String(commit), state: state, describe: describe)
+                return Submodule(
+                    path: String(path), commit: String(commit), state: state, describe: describe)
             }
         }
 
@@ -165,7 +170,9 @@ extension Git {
         /// `submodule status` cannot run (no checkout, a bare capture).
         public static func parseStage(_ data: Data) -> [Submodule] {
             Git.lines(data).compactMap { line in
-                guard line.hasPrefix("160000 "), let tab = line.firstIndex(of: "\t") else { return nil }
+                guard line.hasPrefix("160000 "), let tab = line.firstIndex(of: "\t") else {
+                    return nil
+                }
                 let fields = line[..<tab].split(separator: " ")
                 guard fields.count == 3 else { return nil }
                 return Submodule(

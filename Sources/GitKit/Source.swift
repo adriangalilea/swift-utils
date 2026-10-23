@@ -47,8 +47,10 @@ extension Git {
         public var description: String {
             switch self {
             case .git(let arguments, let status, let message):
-                let command = arguments.drop { $0.hasPrefix("-") || $0.contains("=") }.prefix(2).joined(separator: " ")
-                return "git \(command) failed (\(status)): \(message.trimmingCharacters(in: .whitespacesAndNewlines))"
+                let command = arguments.drop { $0.hasPrefix("-") || $0.contains("=") }.prefix(2)
+                    .joined(separator: " ")
+                return
+                    "git \(command) failed (\(status)): \(message.trimmingCharacters(in: .whitespacesAndNewlines))"
             case .notCaptured(let what): return "Not in this capture: \(what)"
             }
         }
@@ -69,7 +71,8 @@ extension Git {
     /// filter is answered from its unfiltered capture.
     public struct FixtureSource: Source {
         public struct Manifest: Codable, Sendable, Hashable {
-            public struct Captured<Key: Codable & Sendable & Hashable>: Codable, Sendable, Hashable {
+            public struct Captured<Key: Codable & Sendable & Hashable>: Codable, Sendable, Hashable
+            {
                 public var key: Key
                 public var file: String
                 public init(key: Key, file: String) {
