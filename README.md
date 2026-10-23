@@ -113,7 +113,42 @@ MarkdownView(reply).markdownStyle(.body.preview(lines: 3))     // a row's previe
 MarkdownView(partial, streaming: true)                         // text still arriving
 ```
 
+A fence named `diff` or `patch` is drawn by GitViews' `DiffView` (below) at the page's code size, so an agent's answer shows its edit as a diff, not as red and green text; the host's `.onQuote` decides what quoting a line of it does.
+
 `streaming` settles what a cut left open at the end (an unclosed `**` or backtick, a link without its `)`, a table whose delimiter row has not arrived) so raw syntax never flashes. Every measure is in the reader's unit, read from the font at the reader's Dynamic Type size: line height 1.45 times the size, spacing and indents in ems, the measure in characters (`MarkdownStyle.measure`, 72). Colors are the primary ink at Ink's opacity tiers, so light and dark both hold. The parser is its own product's dependency (swift-cmark, pinned exact): only an app that imports MarkdownText links it. `swift run markdown-example` shows the fixtures (`Tests/MarkdownTextTests/Fixtures`: real agent answers and the edge cases); `mise run markdown-snapshots [dir]` writes each one light and dark as PNGs, the Mac's and the iPhone simulator's.
+
+## GitKit
+
+A repository as values, read from git's own machine output, never from text meant for a person. Everything is nested in one name, `Git`, and is `Codable`, `Sendable` and `Hashable`, so it crosses a network or an actor as it is. Read-only by design: nothing here stages, commits or checks out.
+
+- `Git.Diff(parsing:)` reads `git diff` / `git show`: every file, renames and copies with their similarity, mode changes, new and deleted files, binary files, `\ No newline at end of file`, submodule pointers (`FileDiff.submodule`). A combined diff (`diff --cc`, a merge against all its parents) throws `Git.ParseError.combinedDiff`; ask for one parent instead. `FileDiff(snippet:path:)` reads a diff someone wrote (an agent's answer, a pasted patch) leniently, and `FileDiff(old:new:path:)` computes one from two texts (Myers, git's default).
+- `Git.Status(parsing:)` reads `git status --porcelain=v2 --branch -z` (branch, upstream, ahead/behind, stash, every entry with both sides' codes and its submodule state); `status.groups` lists it as lazygit does. `Git.Commit.parse` reads the log format `Commit.format` defines (NUL between fields, RS between records), `Git.Branch.parse` the refs `Branch.format` asks `for-each-ref` for, `Git.Worktree.parse` `worktree list --porcelain`, `Git.Submodule.parseStatus` / `parseStage` `submodule status` and `ls-files --stage`'s gitlinks.
+- `Git.Intraline` finds the words that changed inside a changed line (an LCS over tokens, joined across spaces, nil when two lines share too little to say).
+- `Git.ChangeScope` is what a diff shows, as a value: a base, what it is compared to (the working tree, the index, a commit) and the paths. `.since(base, touched:)` is an agent's work: everything from the commit it started at to the files on disk, untracked included, kept to what it touched.
+- `Git.Command` is the argv of every read, decided once: no pager, no color, no optional locks, no external diff or textconv, prefixes forced. `Git.Source` is the seam a host plugs its transport into (`snapshot()`, `diff(_:)`, `log(_:limit:)`, `show(_:)`, `submodule(_:)`); `Git.FixtureSource` reads a folder `gitkit-capture` wrote.
+- `DiffQuote` is a file, a hunk or a range of lines handed to someone else: `path:L10-L24` and a Markdown snippet with the lines in a fenced `diff` block.
+
+**GitLocal** is `Git.LocalSource`, a repository on this Mac read by `/usr/bin/git`: `Git.Command`'s argv as a process, never through a shell. `swift run gitkit-capture <repository> <folder> [--agent-base REV] [--touched a,b]` writes what `FixtureSource` reads back, submodules whose pointer moved included. The tests read real captures: `scripts/gitkit-scenario.sh` builds a repository in every state git has from public sources (`mise run gitkit-fixtures` rebuilds and recaptures it).
+
+## GitViews
+
+GitKit drawn. The centerpiece is `DiffView`, one line of code anywhere, with no model, no source and no async when given text:
+
+```swift
+DiffView(unified: patch)                            // git's output or a fragment
+DiffView(old: before, new: after, path: "a.swift")  // computed here
+DiffView(file)                                      // a Git.FileDiff
+DiffView(diff)                                      // every file of a Git.Diff
+DiffPage(diff)                                      // the same as a whole screen
+```
+
+`DiffView` sizes itself like a code block, so it sits in a markdown page, a tool call's row, a card or a list; `DiffPage` owns its scroll view, lazy at any length, file headers pinned, long lines scrolled sideways together, and puts the layout and wrap switches in the toolbar (`DiffControls` for a host that keeps them itself). Everything else rides the environment, set once by a parent: `.diffStyle(.auto | .unified | .split)` (auto splits when two columns of code fit; a file only added or only removed stays unified), `.diffWrap(_:)`, `.diffContext(lines:)`, `.diffMaxLines(_:)` (a preview with "Show N more lines"), `.diffLineNumbers(_:)`, `.diffHeader(_:)`, `.diffFontSize(_:)`, `.diffSyntaxHighlighting(_:)`, `.diffCollapsed()`, `.diffFramed(_:)`, `.onQuote { DiffQuote in }`, `.onOpenSubmodule { path, pointer in }`.
+
+Lines wear a quiet green or red wash, a step stronger in the gutter, and a clear tint on the words that changed; everything else is the primary ink at Ink's tiers, right on a light ground and a dark one. Code is colored by Syntax in the file's language, each side of a file as one text so a string spanning lines keeps its color, in chunks under `Syntax.ceiling`: a small file in the frame that shows it, a big one off the main thread, both cached. Wrapped code hangs at its own indentation. Long unchanged runs fold behind "N unchanged lines", hunks and files fold to their headers. A tap selects a line and a second tap extends to another (shift-click on a Mac); Copy and Quote sit right under the selection, and a long press or right click offers them for a line, its hunk or its file. Without `.onQuote`, Quote becomes "Copy as Markdown". VoiceOver reads "added line 42: …". A 10,000-line diff reads, lays out and paints in about a third of a second.
+
+Around it: `DiffFileHeader` (status, the path with its folder quiet and cut from the front, a rename's origin, `+12 −3` and GitHub's five squares), `GitStatusBadge` (GitHub's outlined file marks in SF Symbols), `GitPathLabel`, `GitFileRow` and `GitFileList` (grouped as lazygit groups a status, optionally by folder), `GitCommitRow`, `GitRefChip`, `GitBranchRow`, `GitAheadBehind`, `GitWorktreeRow`, `GitSubmoduleRow`, `GitStatusSummary`, and `GitStateView` for reading, empty and failed. `mise run diff-snapshots [dir]` draws the diff light and dark on the Mac and in the iPhone simulator.
+
+`Examples/GitViewer` composes them into a lazygit for a phone and a Mac (xcodegen, one target for both): on a Mac it reads a real repository (`mise run git-example [repository]`, default `~/Developer/vigil`, a folder picker to change it) in three columns that always have something open; on the iPhone (`mise run git-example --ios`) it reads the bundled capture of the scenario repository in five tabs: the agent's work since its base, the working tree, commits, branches with worktrees and submodules, and the three embeddings of `DiffView` (a markdown answer, tool call cards, a 10,000-line page). Quote shows the Markdown an agent would receive.
 
 ## Log
 

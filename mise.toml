@@ -84,6 +84,62 @@ TEST_RUNNER_MARKDOWN_SNAPSHOTS="$dir" xcodebuild test -scheme MarkdownTextTests 
 echo "markdown-snapshots: $dir/mac and $dir/iphone"
 '''
 
+[tasks.diff-snapshots]
+description = "GitViews' DiffView drawn light and dark as PNGs into [dir] (default /tmp/diff-snapshots): mac/ at a Mac's widths, iphone/ in the iPhone simulator"
+usage = 'arg "[dir]" help="where the PNGs go"'
+run = '''
+set -euo pipefail
+dir="${usage_dir:-/tmp/diff-snapshots}"
+GITVIEWS_SNAPSHOTS="$dir" swift test --filter 'GitViewsTests.Snapshots'
+phone=$(xcrun simctl list devices available -j \
+  | jq -r '[.devices[][] | select(.name == "iPhone 17 Pro")][0].udid')
+[ "$phone" != null ] || { echo "diff-snapshots: no iPhone 17 Pro simulator" >&2; exit 1; }
+TEST_RUNNER_GITVIEWS_SNAPSHOTS="$dir" xcodebuild test -scheme GitViewsTests \
+  -destination "platform=iOS Simulator,id=$phone" \
+  -derivedDataPath .build/diff-snapshots -quiet
+echo "diff-snapshots: $dir/mac and $dir/iphone"
+'''
+
+[tasks.gitkit-fixtures]
+description = "rebuild the scenario repository (scripts/gitkit-scenario.sh) and recapture Tests/GitKitTests/Fixtures/scenario, which GitKit's tests and the example's iPhone build read"
+run = '''
+set -euo pipefail
+scripts/gitkit-scenario.sh /tmp/gitkit-scenario
+base=$(git -C /tmp/gitkit-scenario/app rev-parse HEAD~2)
+touched=Sources/Ink/MiddleTruncate.swift,Sources/Syntax/Syntax.swift,Sources/Ink/InkScrim.swift,Sources/Ink/Scrim.swift,Sources/Ink/HUDGlass.swift,scripts/grant-example-app.sh,Sources/Ink/InkBadge.swift,README.md,Sources/Ink/Resources/badge.png,Sources/Ink/Resources/ABOUT.txt,Vendor/cmark,NOTES.md,Tests/InkTests/InkBadgeTests.swift
+out=Tests/GitKitTests/Fixtures/scenario
+if [ -e "$out" ]; then trash "$out"; fi
+swift run gitkit-capture /tmp/gitkit-scenario/app "$out" --agent-base "$base" --touched "$touched" --shows 6 --log 40
+'''
+
+[tasks.git-example]
+description = "GitViewer, the git viewer example: on this Mac over [repository] (default ~/Developer/vigil), or with --ios in the iPhone simulator over the bundled capture"
+usage = '''
+arg "[repository]" help="a repository on this Mac"
+flag "--ios" help="build and run in the iPhone 17 Pro simulator"
+'''
+dir = "Examples/GitViewer"
+run = '''
+set -euo pipefail
+xcodegen generate --quiet
+if [ "${usage_ios:-false}" = true ]; then
+  phone=$(xcrun simctl list devices available -j \
+    | jq -r '[.devices[][] | select(.name == "iPhone 17 Pro")][0].udid')
+  [ "$phone" != null ] || { echo "git-example: no iPhone 17 Pro simulator" >&2; exit 1; }
+  xcodebuild -project GitViewer.xcodeproj -scheme GitViewer -destination "platform=iOS Simulator,id=$phone" \
+    -derivedDataPath build -quiet build
+  xcrun simctl boot "$phone" 2>/dev/null || true
+  open -a Simulator
+  xcrun simctl install "$phone" build/Build/Products/Debug-iphonesimulator/GitViewer.app
+  xcrun simctl launch "$phone" com.adriangalilea.swift-utils.GitViewer
+else
+  xcodebuild -project GitViewer.xcodeproj -scheme GitViewer -destination 'platform=macOS' \
+    -derivedDataPath build -quiet build
+  repo="${usage_repository:-$HOME/Developer/vigil}"
+  open -n build/Build/Products/Debug/GitViewer.app --args -repo "$repo"
+fi
+'''
+
 [tasks.overlay]
 description = "Run the keymap overlay example"
 run = "swift run keymap-overlay"

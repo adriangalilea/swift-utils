@@ -1,0 +1,50 @@
+# GitKit + GitViews as one app on the Mac and the iPhone: `mise run git-example
+# [repository]` (Mac) or `mise run git-example --ios` (the simulator). The project is
+# generated from this file; GitViewer.xcodeproj is never committed.
+name: GitViewer
+options:
+  bundleIdPrefix: com.adriangalilea.swift-utils
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+packages:
+  swift-utils:
+    path: ../..
+targets:
+  GitViewer:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: Sources
+      # The capture the iPhone reads (the scenario repository, an agent session in
+      # every state), shared with GitKit's tests: one copy.
+      - path: ../../Tests/GitKitTests/Fixtures/scenario
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: swift-utils
+        product: GitKit
+      - package: swift-utils
+        product: GitLocal
+      - package: swift-utils
+        product: GitViews
+      - package: swift-utils
+        product: MarkdownText
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.adriangalilea.swift-utils.GitViewer
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Git Viewer
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+        # The Mac build runs /usr/bin/git on any folder: no sandbox.
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        ENABLE_USER_SELECTED_FILES: readonly
