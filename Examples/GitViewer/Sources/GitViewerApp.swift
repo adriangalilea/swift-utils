@@ -1,22 +1,24 @@
 import GitKit
 import GitViews
+import MarkdownText
 import SwiftUI
+
+#if os(macOS)
+    import GitLocal
+#endif
 
 // Launch arguments, for a screenshot or a demo:
 //   -repo PATH        the repository on a Mac (default ~/Developer/vigil)
 //   -panel NAME       agent, working, commits, repo, embeds
-//   -open N           open the panel's Nth row (0 the first); -open all opens "All files"
+//   -open N           open the panel's Nth row (0 the first); "all" every file; "submodule"
 //   -embed NAME       markdown, cards, page (with -panel embeds)
 //   -appearance NAME  light or dark
 
 @main
 struct GitViewerApp: App {
-    @State private var model = RepoModel.launch()
-
     var body: some Scene {
         WindowGroup {
-            Root(model: model)
-                .task { await model.load() }
+            Viewer()
         }
         #if os(macOS)
             .defaultSize(width: 1360, height: 860)
@@ -24,169 +26,182 @@ struct GitViewerApp: App {
     }
 }
 
-struct Root: View {
-    let model: RepoModel
-    @Environment(\.horizontalSizeClass) private var size
+/// The host: picks the source (a repository on this Mac, the bundled capture on a phone),
+/// owns what a quote does (a sheet standing in for "send to agent") and the reload, and
+/// adds the embeddings as a panel of its own.
+struct Viewer: View {
+    #if os(macOS)
+        @State private var repository = URL(
+            filePath: NSString(string: UserDefaults.standard.string(forKey: "repo") ?? "~/Developer/vigil")
+                .expandingTildeInPath)
+        @State private var picking = false
+    #endif
+    @State private var reload = 0
+    @State private var quote: QuoteItem?
 
     var body: some View {
-        Group {
-            if size == .compact {
-                Tabs(model: model)
-            } else {
-                Columns(model: model)
-            }
-        }
-        .onQuote { quote in model.quote = QuoteItem(quote: quote) }
-        .preferredColorScheme(Launch.appearance)
-        .sheet(item: Bindable(model).quote) { QuoteSheet(item: $0) }
+        browser
+            .onQuote { quote = QuoteItem(quote: $0) }
+            .sheet(item: $quote) { QuoteSheet(item: $0) }
+            .preferredColorScheme(Launch.appearance)
+            #if os(macOS)
+                .id(repository)
+                .toolbar {
+                    ToolbarItem {
+                        Button("Open Repository…", systemImage: "folder") { picking = true }
+                    }
+                    ToolbarItem {
+                        Button("Reload", systemImage: "arrow.clockwise") { reload += 1 }
+                    }
+                }
+                .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
+                    if case .success(let folder) = result { repository = folder }
+                }
+            #endif
+    }
+
+    var browser: GitBrowser {
+        #if os(macOS)
+            // A live repository has no agent on record: its session is simulated as the
+            // last three commits and whatever is on disk since.
+            let source = Git.LocalSource(repository: repository)
+            let agent = GitBrowser.Agent(base: "HEAD~3", name: "Agent")
+        #else
+            let source = try! Git.FixtureSource(folder: Bundle.main.url(forResource: "scenario", withExtension: nil)!)
+            let agent = source.manifest.agent.map { GitBrowser.Agent(base: $0.base, touched: $0.touched, name: "Agent") }
+        #endif
+        return GitBrowser(source: source, agent: agent, opening: Launch.opening, reloadToken: reload)
+            .panel("Embeds", systemImage: "rectangle.on.rectangle.angled") { Embeds() }
     }
 }
 
 enum Launch {
-    static var panel: Panel { Panel(rawValue: UserDefaults.standard.string(forKey: "panel") ?? "") ?? .agent }
-    static var open: String? { UserDefaults.standard.string(forKey: "open") }
-    static var embed: Embed? { Embed(rawValue: UserDefaults.standard.string(forKey: "embed") ?? "") }
+    static var defaults: UserDefaults { .standard }
+
+    static var opening: GitBrowser.Opening? {
+        let panel: GitBrowser.Panel? =
+            switch defaults.string(forKey: "panel") {
+            case "agent": .agent
+            case "working": .workingTree
+            case "commits": .commits
+            case "repo": .repository
+            case "embeds": .extra(0)
+            default: nil
+            }
+        guard let panel else { return nil }
+        let row: GitBrowser.Opening.Row? =
+            switch defaults.string(forKey: "open") {
+            case nil: nil
+            case "all": .allFiles
+            case "submodule": .submodule
+            case let index?: Int(index).map { .index($0) }
+            }
+        return GitBrowser.Opening(panel, row: row)
+    }
+
+    static var embed: Embed? { Embed(rawValue: defaults.string(forKey: "embed") ?? "") }
+
     static var appearance: ColorScheme? {
-        switch UserDefaults.standard.string(forKey: "appearance") {
+        switch defaults.string(forKey: "appearance") {
         case "light": .light
         case "dark": .dark
         default: nil
         }
     }
+}
 
-    /// The row `open` names in a panel, once the panel has what it lists: a launch's
-    /// `-open`, or the first row, which a column layout always opens (Mail and lazygit
-    /// never leave the reading pane empty).
-    @MainActor static func target(_ panel: Panel, _ model: RepoModel, open: String?) async -> Target? {
-        if panel == .embeds { return (embed ?? (open == nil ? nil : .markdown)).map(Target.embed) }
-        guard let open, let snapshot = model.snapshot else { return nil }
-        let index = Int(open) ?? 0
-        switch panel {
-        case .agent:
-            guard let scope = model.agentScope, let diff = try? await model.diff(scope) else { return nil }
-            if open == "all" { return .files(scope, title: "Since agent") }
-            return diff.files.indices.contains(index) ? .file(scope, path: diff.files[index].path) : nil
-        case .working:
-            let files = snapshot.status.groups.flatMap { group in group.files.map { (group.group, $0) } }
-            guard files.indices.contains(index) else { return nil }
-            let (group, change) = files[index]
-            let scope: Git.ChangeScope = group == .staged ? .staged : group == .untracked ? .uncommitted : .unstaged
-            return .file(scope, path: change.path)
-        case .commits:
-            guard snapshot.commits.indices.contains(index) else { return nil }
-            let commit = snapshot.commits[index]
-            return .commit(hash: commit.hash, subject: commit.subject, repository: nil)
-        case .repo:
-            guard open == "submodule" else {
-                return snapshot.branches.first(where: \.isCurrent).map(PanelList.target)
-            }
-            guard let submodule = snapshot.submodules.first,
-                let pointer = try? await model.diff(.uncommitted).files.first(where: { $0.path == submodule.path })?
-                    .submodule,
-                let old = pointer.old, let new = pointer.new
-            else { return nil }
-            return .submodule(path: submodule.path, old: old, new: new)
-        case .embeds:
-            return nil
+enum Embed: String, Hashable, CaseIterable {
+    case markdown, cards, page
+
+    var title: String {
+        switch self {
+        case .markdown: "In a markdown answer"
+        case .cards: "In a tool call's card"
+        case .page: "Full screen, 10,000 lines"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .markdown: "text.bubble"
+        case .cards: "rectangle.stack"
+        case .page: "rectangle.portrait"
         }
     }
 }
 
-/// iPhone: a tab per panel, each a stack that drills into its diffs.
-struct Tabs: View {
-    let model: RepoModel
-    @State private var panel = Launch.panel
-    @State private var paths: [Panel: [Target]] = [:]
+/// The example's own panel: `DiffView` in the three places a host puts it.
+struct Embeds: View {
+    @State private var path: [Embed] = Launch.embed.map { [$0] } ?? []
 
     var body: some View {
-        TabView(selection: $panel) {
-            ForEach(Panel.allCases) { panel in
-                Tab(panel.title, systemImage: panel.symbol, value: panel) {
-                    NavigationStack(path: Binding(get: { paths[panel] ?? [] }, set: { paths[panel] = $0 })) {
-                        PanelList(panel: panel, model: model)
-                            .navigationDestination(for: Target.self) { Detail(target: $0, model: model) }
-                    }
-                }
-            }
-        }
-        #if os(iOS)
-            .tabBarMinimizeBehavior(.onScrollDown)
-        #endif
-        .task(id: model.snapshot?.status) {
-            if let target = await Launch.target(panel, model, open: Launch.open), paths[panel, default: []].isEmpty {
-                paths[panel] = [target]
-            }
-        }
-    }
-}
-
-struct Opening: Hashable {
-    let panel: Panel?
-    let status: Git.Status?
-}
-
-/// Mac and iPad: panels, their list, and the diff, side by side.
-struct Columns: View {
-    let model: RepoModel
-    @State private var panel: Panel? = Launch.panel
-    @State private var selection: Target?
-    #if os(macOS)
-        @State private var picking = false
-    #endif
-
-    var body: some View {
-        NavigationSplitView {
-            List(selection: $panel) {
+        NavigationStack(path: $path) {
+            List {
                 Section {
-                    ForEach(Panel.allCases) { panel in
-                        Label(panel.title, systemImage: panel.symbol).tag(Optional(panel))
+                    ForEach(Embed.allCases, id: \.self) { embed in
+                        NavigationLink(value: embed) { Label(embed.title, systemImage: embed.symbol) }
                     }
-                }
-                if let status = model.snapshot?.status {
-                    Section(model.source.name) {
-                        GitStatusSummary(status).padding(.vertical, 4)
-                    }
+                } footer: {
+                    Text(
+                        "DiffView is one line anywhere: a fence in a markdown answer, a card in a conversation, a whole screen."
+                    )
                 }
             }
-            .navigationSplitViewColumnWidth(min: 200, ideal: 240)
-            .navigationTitle(model.source.name)
-        } content: {
-            if let panel {
-                PanelList(panel: panel, model: model, selection: $selection)
-                    .navigationSplitViewColumnWidth(min: 280, ideal: 360)
-            }
-        } detail: {
-            NavigationStack {
-                Group {
-                    if let selection {
-                        Detail(target: selection, model: model)
-                    } else {
-                        GitStateView(.empty(title: "Pick a file or a commit", message: nil, symbol: "doc.text.magnifyingglass"))
-                    }
-                }
-                .navigationDestination(for: Target.self) { Detail(target: $0, model: model) }
-            }
-            .id(selection)
+            .navigationTitle("Embeds")
+            .navigationDestination(for: Embed.self) { EmbedDetail(embed: $0) }
         }
-        // The reading pane is never empty: a panel opens on its first row (or the one a
-        // launch named), and so does a repository read again.
-        .task(id: Opening(panel: panel, status: model.snapshot?.status)) {
-            selection = nil
-            guard let panel else { return }
-            selection = await Launch.target(panel, model, open: Launch.open ?? "0")
+    }
+}
+
+struct QuoteItem: Identifiable {
+    let quote: DiffQuote
+    let id = UUID()
+}
+
+/// The quote a reader made, as an agent would receive it: the Markdown, drawn and as text.
+struct QuoteSheet: View {
+    let item: QuoteItem
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Send to the agent").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    MarkdownView(item.quote.markdown)
+                    Text("Markdown").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Text(verbatim: item.quote.markdown)
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
+                }
+                .padding(20)
+            }
+            .navigationTitle(item.quote.reference)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Copy") {
+                        #if os(macOS)
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(item.quote.markdown, forType: .string)
+                        #else
+                            UIPasteboard.general.string = item.quote.markdown
+                        #endif
+                        dismiss()
+                    }
+                }
+            }
         }
         #if os(macOS)
-            .toolbar {
-                ToolbarItem {
-                    Button("Open Repository…", systemImage: "folder") { picking = true }
-                }
-                ToolbarItem {
-                    Button("Reload", systemImage: "arrow.clockwise") { Task { await model.reload() } }
-                }
-            }
-            .fileImporter(isPresented: $picking, allowedContentTypes: [.folder]) { result in
-                if case .success(let folder) = result { model.open(folder) }
-            }
+            .frame(minWidth: 560, minHeight: 480)
         #endif
     }
 }
