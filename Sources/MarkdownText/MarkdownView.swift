@@ -1,3 +1,4 @@
+import GitViews
 import Ink
 import SwiftUI
 import Syntax
@@ -124,7 +125,11 @@ public struct MarkdownView: View {
         case .list(let list):
             self.list(list, depth: depth)
         case .code(let language, _, let text):
-            code(text, language: language)
+            if let language, ["diff", "patch"].contains(language.lowercased()) {
+                diff(text)
+            } else {
+                code(text, language: language)
+            }
         case .html(let text):
             code(text, language: "html")
         case .table(let table):
@@ -190,6 +195,15 @@ public struct MarkdownView: View {
     }
 
     // MARK: - code
+
+    /// A fence named `diff` or `patch` is a diff, drawn as one (`DiffView`): lines
+    /// washed green and red, the words that changed tinted, colored by the file's
+    /// language when the diff names a file, at the page's code size. A selection or a
+    /// long press offers Copy and Quote; the host's `.onQuote` decides what Quote does.
+    func diff(_ text: String) -> some View {
+        DiffView(unified: text)
+            .diffFontSize(metrics.em(Rhythm.codeSize))
+    }
 
     func code(_ text: String, language: String?) -> some View {
         let size = metrics.em(Rhythm.codeSize)
