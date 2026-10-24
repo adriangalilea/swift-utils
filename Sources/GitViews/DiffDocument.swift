@@ -155,15 +155,25 @@ struct RenderedFile: Sendable, Identifiable {
 
 struct DiffDocument: Sendable {
     let key: Int
+    /// The input's key: a document of the same diff, whatever was opened in it.
+    let input: Int
     let files: [RenderedFile]
 
-    init(_ input: DiffInput, context: Int) {
+    /// `widened`: files a reader opened lines of (`Git.FileDiff.revealing`), by id, drawn
+    /// in place of the input's.
+    init(_ input: DiffInput, context: Int, widened: [String: Git.FileDiff] = [:]) {
+        key = Self.key(input, context: context, widened: widened)
+        self.input = input.key
+        let salt = key
+        files = input.files(context: context).map { RenderedFile(widened[$0.id] ?? $0, salt: salt) }
+    }
+
+    static func key(_ input: DiffInput, context: Int, widened: [String: Git.FileDiff]) -> Int {
         var hasher = Hasher()
         hasher.combine(input.key)
         hasher.combine(context)
-        key = hasher.finalize()
-        let salt = key
-        files = input.files(context: context).map { RenderedFile($0, salt: salt) }
+        hasher.combine(widened)
+        return hasher.finalize()
     }
 }
 

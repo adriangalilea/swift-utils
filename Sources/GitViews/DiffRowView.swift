@@ -17,6 +17,10 @@ struct DiffRowView: View {
     @Environment(\.diffQuote) private var quote
     @Environment(\.diffOpenSubmodule) private var openSubmodule
     @Environment(\.diffOptions) private var options
+    @Environment(\.diffContents) private var contents
+
+    /// Lines a tap opens above a hunk, the nearest first.
+    static let revealStep = 50
 
     var body: some View {
         switch row {
@@ -353,11 +357,27 @@ struct DiffRowView: View {
             }
             Spacer(minLength: 0)
             if file.hasNumbers, skipped > 0 {
-                Text(verbatim: skipped == 1 ? "1 line above" : "\(skipped) lines above")
-                    .font(.system(size: metrics.size * 0.85))
-                    .foregroundStyle(palette.number)
-                    .lineLimit(1)
-                    .padding(.trailing, metrics.advance * 2)
+                let above = skipped == 1 ? "1 line above" : "\(skipped) lines above"
+                Group {
+                    if let contents, !state.unread.contains(file.id) {
+                        Button {
+                            reveal(above: h, contents)
+                        } label: {
+                            Label(
+                                skipped > Self.revealStep
+                                    ? "Show \(Self.revealStep) of \(skipped) lines above"
+                                    : "Show \(above)",
+                                systemImage: "arrow.up.to.line")
+                        }
+                        .buttonStyle(.borderless)
+                    } else {
+                        Text(verbatim: state.unread.contains(file.id) ? "\(above), unread" : above)
+                            .foregroundStyle(palette.number)
+                    }
+                }
+                .font(.system(size: metrics.size * 0.85))
+                .lineLimit(1)
+                .padding(.trailing, metrics.advance * 2)
             }
         }
         .padding(.vertical, 5)
@@ -392,6 +412,38 @@ struct DiffRowView: View {
         )
         .accessibilityHint(collapsed ? "Shows its lines" : "Hides its lines")
         .accessibilityAddTraits(.isButton)
+    }
+
+    /// Opens up to `revealStep` lines above hunk `h` from the file's new side, read once
+    /// per file. The opened lines join the hunk unfolded; a text that is not the one the
+    /// diff was made against (the file changed since) leaves the count, said unread.
+    private func reveal(above h: Int, _ contents: DiffContentsAction) {
+        let id = file.id
+        let current = file.file
+        let state = state
+        Task { @MainActor in
+            let text: String
+            if let known = state.texts[id] {
+                text = known
+            } else if let read = try? await contents.read(current) {
+                state.texts[id] = read
+                text = read
+            } else {
+                state.unread.insert(id)
+                return
+            }
+            guard let wider = current.revealing(above: h, in: text, limit: Self.revealStep) else {
+                state.unread.insert(id)
+                return
+            }
+            withAnimation(.inkSettle) {
+                // Line indices moved: the opened lines start hunk h, kept open.
+                let start = current.hunks[..<h].reduce(0) { $0 + $1.lines.count }
+                state.expandedFolds[id] = [start]
+                state.selection = nil
+                state.widened[id] = wider
+            }
+        }
     }
 
     private func rangeLabel(_ hunk: Git.Hunk) -> String {

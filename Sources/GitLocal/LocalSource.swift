@@ -77,13 +77,19 @@ import GitKit
                 async let branches = run(Command.branches())
                 async let worktrees = run(Command.worktrees())
                 async let submodules = run(Command.submodules())
-                async let log = run(Command.log(limit: logLimit))
+                async let log = log(nil, limit: logLimit)
                 return Snapshot(
                     status: try Status(parsing: await status),
                     branches: try Branch.parse(await branches),
                     worktrees: Worktree.parse(try await worktrees),
                     submodules: Submodule.parseStatus(try await submodules),
-                    commits: try Commit.parse(await log))
+                    commits: try await log)
+            }
+
+            /// HEAD has a commit: a repository just made has none, and git's log of it
+            /// fails where its history is simply empty.
+            func born() async throws -> Bool {
+                try await !run(Command.head(), allowing: [1]).isEmpty
             }
 
             public func diff(_ scope: ChangeScope) async throws -> Diff {
@@ -102,7 +108,23 @@ import GitKit
             }
 
             public func log(_ revision: String?, limit: Int) async throws -> [Commit] {
-                try Commit.parse(await run(Command.log(revision, limit: limit)))
+                if revision == nil, try await !born() { return [] }
+                return try Commit.parse(await run(Command.log(revision, limit: limit)))
+            }
+
+            public func contents(_ path: String, in target: ChangeScope.Target) async throws
+                -> String
+            {
+                guard !path.hasPrefix("/"), !path.split(separator: "/").contains("..") else {
+                    throw SourceError.git(
+                        arguments: ["show", path], status: -1,
+                        message: "not a path inside the repository")
+                }
+                guard let arguments = Command.contents(path, in: target) else {
+                    return try String(
+                        contentsOf: repository.appending(path: path), encoding: .utf8)
+                }
+                return String(decoding: try await run(arguments), as: UTF8.self)
             }
 
             public func submodule(_ path: String) -> (any Source)? {

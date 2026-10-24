@@ -35,6 +35,9 @@ extension Git {
         func log(_ revision: String?, limit: Int) async throws -> [Commit]
         /// The repository checked out at a submodule's path, to drill into.
         func submodule(_ path: String) -> (any Source)?
+        /// A file's text as `target` has it (the side a diff of that target shows as
+        /// new): the lines a diff folded away between its hunks come from here.
+        func contents(_ path: String, in target: ChangeScope.Target) async throws -> String
     }
 
     /// A read a source could not answer.
@@ -162,6 +165,11 @@ extension Git {
         public func submodule(_ path: String) -> (any Source)? {
             guard let relative = manifest.nested[path] else { return nil }
             return try? FixtureSource(folder: folder.appending(path: relative))
+        }
+
+        /// A capture keeps diffs, not files.
+        public func contents(_ path: String, in target: ChangeScope.Target) async throws -> String {
+            throw SourceError.notCaptured("the text of \(path)")
         }
     }
 }

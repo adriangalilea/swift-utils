@@ -321,6 +321,7 @@ struct BrowserDetail: View {
             BrowserLoading(id: target, load: { try await model.diff(scope) }) { diff in
                 DiffPage(diff).diffCollapsed(diff.files.count > 12)
             }
+            .diffContents(model.contents(scope.target))
             .navigationTitle(title)
         case .file(let scope, let path):
             BrowserLoading(id: target, load: { try await model.diff(scope) }) { diff in
@@ -330,6 +331,7 @@ struct BrowserDetail: View {
                     GitStateView(.empty(title: "No changes", message: path))
                 }
             }
+            .diffContents(model.contents(scope.target))
             .navigationTitle((path as NSString).lastPathComponent)
         case .commit(let hash, let subject, let repository):
             BrowserLoading(
@@ -339,6 +341,7 @@ struct BrowserDetail: View {
                     .diffCollapsed(diff.files.count > 12)
                     .safeAreaInset(edge: .top, spacing: 0) { header(hash, subject, diff) }
             }
+            .diffContents(model.contents(.commit(hash), in: repository))
             .navigationTitle(String(hash.prefix(7)))
         case .branch(let name, let revision):
             BrowserLoading(id: target, load: { try await model.log(revision) }) { commits in

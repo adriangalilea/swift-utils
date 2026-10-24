@@ -43,6 +43,15 @@ public struct DiffQuoteAction: Sendable {
     @MainActor public func callAsFunction(_ quote: DiffQuote) { perform(quote) }
 }
 
+/// A file's text as the diff's new side has it, for the lines a diff left out between
+/// its hunks: set by a host that can read it (`GitBrowser` from its source).
+public struct DiffContentsAction: Sendable {
+    let read: @Sendable (Git.FileDiff) async throws -> String
+    public init(_ read: @escaping @Sendable (Git.FileDiff) async throws -> String) {
+        self.read = read
+    }
+}
+
 /// What opening a submodule's pointer change does (a host drills into its repository).
 public struct DiffSubmoduleAction: Sendable {
     let perform: @MainActor @Sendable (_ path: String, _ pointer: Git.FileDiff.Pointer) -> Void
@@ -56,6 +65,8 @@ extension EnvironmentValues {
     /// Set by `.onQuote`; without it a diff offers "Copy as Markdown" in its place.
     @Entry public var diffQuote: DiffQuoteAction? = nil
     @Entry public var diffOpenSubmodule: DiffSubmoduleAction? = nil
+    /// Set by `.diffContents`; without it, the lines between hunks stay a count.
+    @Entry public var diffContents: DiffContentsAction? = nil
 }
 
 extension View {
@@ -100,6 +111,14 @@ extension View {
     /// Whether an inline diff draws its own well; off when a card around it is the frame.
     public func diffFramed(_ framed: Bool) -> some View {
         transformEnvironment(\.diffOptions) { $0.framed = framed }
+    }
+
+    /// Where a file's text comes from, so a hunk's `N lines above` opens on a tap: the
+    /// file as the diff's new side has it.
+    public func diffContents(
+        _ read: @escaping @Sendable (_ file: Git.FileDiff) async throws -> String
+    ) -> some View {
+        environment(\.diffContents, DiffContentsAction(read))
     }
 
     /// What tapping a submodule's pointer change does.

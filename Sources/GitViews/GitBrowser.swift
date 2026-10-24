@@ -150,6 +150,14 @@ public struct GitBrowser: View {
         return read
     }
 
+    /// A file's text as `target` has it, for a diff page's lines between hunks.
+    func contents(_ target: Git.ChangeScope.Target, in repository: String? = nil)
+        -> @Sendable (Git.FileDiff) async throws -> String
+    {
+        let from = repository.flatMap { source.submodule($0) } ?? source
+        return { file in try await from.contents(file.path, in: target) }
+    }
+
     func log(_ revision: String?, in repository: String? = nil) async throws -> [Git.Commit] {
         guard let repository else { return try await source.log(revision, limit: 200) }
         guard let nested = source.submodule(repository) else {

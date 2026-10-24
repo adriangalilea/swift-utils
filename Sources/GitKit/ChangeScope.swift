@@ -100,6 +100,11 @@ extension Git {
                 + ["--"]
         }
 
+        /// HEAD's commit; exits 1, printing nothing, before the first commit.
+        public static func head() -> [String] {
+            global + ["rev-parse", "--verify", "--quiet", "HEAD"]
+        }
+
         public static func branches() -> [String] {
             global + ["for-each-ref", "--format=\(Branch.format)", "refs/heads", "refs/remotes"]
         }
@@ -128,6 +133,16 @@ extension Git {
                 }
                 return global + ["show", "--format=", "--diff-merges=first-parent"] + flags + [hash]
                     + paths
+            }
+        }
+
+        /// A file as the index or a commit holds it (`git show :path`, `hash:path`); the
+        /// working tree's is the file itself.
+        public static func contents(_ path: String, in target: ChangeScope.Target) -> [String]? {
+            switch target {
+            case .worktree: nil
+            case .index: global + ["show", ":" + path]
+            case .commit(let hash): global + ["show", hash + ":" + path]
             }
         }
 

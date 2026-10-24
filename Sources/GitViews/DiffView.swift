@@ -122,6 +122,13 @@ public struct DiffControls: View {
     var toggledFiles: Set<String> = []
     var collapsedHunks: [String: Set<Int>] = [:]
     var expandedFolds: [String: Set<Int>] = [:]
+    /// Files with lines opened between their hunks, by id (`DiffDocument`'s `widened`).
+    var widened: [String: Git.FileDiff] = [:]
+    /// Each file's new-side text once read, and the files it could not be read for.
+    var texts: [String: String] = [:]
+    var unread: Set<String> = []
+    /// The document last drawn, kept outside observation: drawing it is no change.
+    @ObservationIgnored var drawn: DiffDocument?
     var showAll = false
     var selection: DiffSelection?
     /// Bumped when work finished off the main thread lands in the store.
@@ -149,20 +156,24 @@ struct DiffSurface: View {
     @State private var scrollX: CGFloat = 0
 
     private var documentKey: Int {
-        var hasher = Hasher()
-        hasher.combine(input.key)
-        hasher.combine(options.context)
-        return hasher.finalize()
+        DiffDocument.key(input, context: options.context, widened: state.widened)
     }
 
     /// Read now when small (the frame that shows it has it), else nil until `.task` has
     /// read it off the main thread.
     private var document: DiffDocument? {
         _ = state.arrivals
-        if let known = DiffStore.shared.document(documentKey) { return known }
-        guard input.size <= 1_500 else { return nil }
-        let made = DiffDocument(input, context: options.context)
+        if let known = DiffStore.shared.document(documentKey) {
+            state.drawn = known
+            return known
+        }
+        // Lines opened in a big diff: the page stays as it was until the wider one is read.
+        guard input.size <= 1_500 else {
+            return state.drawn?.input == input.key ? state.drawn : nil
+        }
+        let made = DiffDocument(input, context: options.context, widened: state.widened)
         DiffStore.shared.remember(made)
+        state.drawn = made
         return made
     }
 
@@ -193,8 +204,9 @@ struct DiffSurface: View {
             guard DiffStore.shared.document(documentKey) == nil else { return }
             let input = input
             let context = options.context
+            let widened = state.widened
             let made = await Task.detached(priority: .userInitiated) {
-                DiffDocument(input, context: context)
+                DiffDocument(input, context: context, widened: widened)
             }.value
             DiffStore.shared.remember(made)
             state.arrivals += 1

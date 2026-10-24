@@ -225,6 +225,32 @@ struct LineDiffs {
         #expect(joined.hunks.count == 1)
     }
 
+    /// The lines between two hunks, revealed from the new text, join the lower hunk with
+    /// both sides' numbers, a limit taking the nearest; the diff still turns old into new.
+    @Test func linesAboveAHunkRevealed() throws {
+        let old = (1...30).map { "line \($0)" }.joined(separator: "\n") + "\n"
+        let new = old.replacingOccurrences(of: "line 3\n", with: "line 3\nadded\n")
+            .replacingOccurrences(of: "line 25\n", with: "line twenty-five\n")
+        let file = Git.FileDiff(old: old, new: new, context: 3)
+        #expect(file.hunks.count == 2)
+        let gap = try #require(file.gap(above: 1))
+        #expect(gap == 8...22)
+        let some = try #require(file.revealing(above: 1, in: new, limit: 5))
+        #expect(some.gap(above: 1) == 8...17)
+        #expect(
+            some.hunks[1].lines.first.map { ($0.old, $0.new, $0.text) } ?? (nil, nil, "") == (
+                17, 18, "line 17"
+            ))
+        #expect(apply(some, to: old) == new)
+        let all = try #require(file.revealing(above: 1, in: new))
+        #expect(all.gap(above: 1) == nil && apply(all, to: old) == new)
+        #expect(all.additions == file.additions && all.deletions == file.deletions)
+        // Another text than the diff's new side is refused.
+        #expect(
+            file.revealing(above: 1, in: old.replacingOccurrences(of: "line 23", with: "x")) == nil)
+        #expect(file.revealing(above: 0, in: new)?.gap(above: 0) == nil)
+    }
+
     func apply(_ file: Git.FileDiff, to old: String) -> String {
         var lines = Git.FileDiff.split(old).map { (String($0.text), $0.noNewline) }
         for hunk in file.hunks.reversed() {

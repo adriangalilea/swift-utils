@@ -52,6 +52,26 @@ struct RowPlans {
         #expect(open.rows(rendered).rows.count == rendered.lines.count + 0)
     }
 
+    /// Lines opened above a hunk draw as its unchanged lines, not folded again: the fold
+    /// the opening records starts where the hunk's lines start.
+    @Test func openedLinesStayOpen() throws {
+        let old = (1...60).map { "l\($0)" }.joined(separator: "\n") + "\n"
+        let new = old.replacingOccurrences(of: "l5\n", with: "L5\n")
+            .replacingOccurrences(of: "l50\n", with: "L50\n")
+        let file = Git.FileDiff(old: old, new: new, context: 3)
+        let wider = try #require(file.revealing(above: 1, in: new, limit: 20))
+        let rendered = RenderedFile(wider, salt: 0)
+        var plan = DiffRowPlan(split: false, context: 3)
+        let folded = plan.rows(rendered).rows.filter { if case .fold = $0 { true } else { false } }
+        #expect(folded.count == 1)
+        plan.expandedFolds = [rendered.range(of: 1).lowerBound]
+        let rows = plan.rows(rendered).rows
+        #expect(!rows.contains { if case .fold = $0 { true } else { false } })
+        #expect(
+            rows.filter { if case .line = $0 { true } else { false } }.count == rendered.lines.count
+        )
+    }
+
     /// Split rows put a removed run beside the added run after it.
     @Test func splitPairs() {
         let file = Git.FileDiff(old: "a\nb\nc\nd\n", new: "a\nB\nC\nX\nd\n")
