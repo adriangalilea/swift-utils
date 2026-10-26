@@ -1,23 +1,9 @@
-// since: what changed in a SwiftPM dependency for the code that uses it.
-//
-// Run inside an app: it reads the version the app's Package.resolved holds,
-// finds the modules the app imports from the package (and the targets they
-// build on, read from the package's own manifest), and prints, per module,
-// every commit between that version and the latest release that touched it:
-// the breaks first with what to write instead (the commit body's
-// `BREAKING CHANGE:`), then features and fixes. Nothing is cut: the commits it
-// does not list are the ones that touched none of the modules the app uses.
-//
-//   since [dir]                  the app in dir (default: here)
-//   since --all <dir>            every app under dir, one line each
-//   --package <identity>         the dependency (default: swift-utils)
-//   --json                       the answer as data
-//
-// The package's history comes from a bare clone cached under
-// ~/Library/Caches/since, fetched on every run. Commits are read as
-// conventional (`type(scope)!: subject`); one that is not is listed as other.
+// since: what changed in a SwiftPM dependency for the code that uses it. What
+// it does, its flags and its words are the program's description below
+// (`since --help`, `since help --json`), said once.
 import Foundation
 import Terminal
+import TerminalPrograms
 
 setvbuf(stdout, nil, _IOLBF, 0)
 
@@ -52,39 +38,45 @@ setvbuf(stdout, nil, _IOLBF, 0)
     return String(decoding: data, as: UTF8.self)
 }
 
-// MARK: - the arguments
+// MARK: - the program
 
-var arguments = Array(CommandLine.arguments.dropFirst())
-@MainActor func flag(_ name: String) -> Bool {
-    guard let i = arguments.firstIndex(of: name) else { return false }
-    arguments.remove(at: i)
-    return true
-}
-@MainActor func option(_ name: String) -> String? {
-    guard let i = arguments.firstIndex(of: name) else { return nil }
-    guard i + 1 < arguments.count else { die("\(name) takes a value") }
-    let value = arguments[i + 1]
-    arguments.removeSubrange(i...(i + 1))
-    return value
+enum Since: TerminalProgram.Commands {
+    case app
+
+    static let dir = TerminalProgram.Arg.optional("dir")
+    static let all = TerminalProgram.Flag.on("all", says: "every app under dir, one line each")
+    static let package = TerminalProgram.Flag.value(
+        "package", value: "<identity>", says: "the dependency (default: swift-utils)")
+
+    var command: TerminalProgram.Command {
+        switch self {
+        case .app:
+            .init(
+                "app", args: [Since.dir], flags: [Since.all, Since.package],
+                says: "what changed in the dependency for the app in dir (default: here)",
+                more: """
+                    It reads the version the app's Package.resolved holds, finds the modules the app imports from the package (and the targets they build on, read from the package's own manifest), and prints, per module, every commit between that version and the latest release that touched it: the breaks first with what to write instead (the commit body's `BREAKING CHANGE:`), then features and fixes. Nothing is cut: the commits it does not list are the ones that touched none of the modules the app uses.
+
+                    The package's history comes from a bare clone cached under ~/Library/Caches/since, fetched on every run. Commits are read as conventional (`type(scope)!: subject`); one that is not is listed as other.
+                    """,
+                examples: [
+                    "since", "since ~/Developer/untitled/apps/awake", "since --all ~/Developer",
+                ],
+                json:
+                    "per app: the resolved and latest release, and per module its changes (with --all, every app and the path dependencies)"
+            )
+        }
+    }
 }
 
-if flag("--help") || flag("-h") {
-    print(
-        """
-        since: what changed in a SwiftPM dependency for the code that uses it
-
-          since [dir]               the app in dir (default: here)
-          since --all <dir>         every app under dir, one line each
-          --package <identity>      the dependency (default: swift-utils)
-          --json                    the answer as data
-        """)
-    exit(0)
-}
-let json = flag("--json")
-let all = flag("--all")
-let identity = option("--package") ?? "swift-utils"
-guard arguments.count <= 1 else { die("one directory at most, got \(arguments)") }
-let root = URL(filePath: arguments.first ?? ".").standardizedFileURL
+let since = TerminalProgram.Program<Since>(
+    name: "since", says: "what changed in a SwiftPM dependency for the code that uses it",
+    bare: .app, default: .init(.app, claims: { _ in true }), json: true)
+let call = since.read()
+let json = call.json
+let all = call[Since.all]
+let identity = call[Since.package] ?? "swift-utils"
+let root = URL(filePath: call[Since.dir] ?? ".").standardizedFileURL
 
 // MARK: - what an app holds
 

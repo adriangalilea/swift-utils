@@ -218,7 +218,7 @@ let package = Package(
         .executableTarget(name: "brandgen"),
         .executableTarget(name: "ship", exclude: ["RELEASE.md"]),
         .executableTarget(name: "mark"),
-        .executableTarget(name: "since", dependencies: ["Terminal"]),
+        .executableTarget(name: "since", dependencies: ["Terminal", "TerminalPrograms"]),
         .executableTarget(name: "grant-cli", dependencies: ["PermissionGrants"]),
         .testTarget(name: "KeymapTests", dependencies: ["Keymap"]),
         .testTarget(name: "InkTests", dependencies: ["Ink"]),
