@@ -86,6 +86,45 @@
             return Records(removed: removed, extensions: seen)
         }
 
+        /// The running app, when it is the installed copy (an Applications
+        /// folder), makes itself the only record of its bundles, in the
+        /// background: at every launch, so an install by any means (an
+        /// installer, a kit, a Sparkle update, a drag) and the records Spotlight
+        /// and Xcode keep adding between launches end with this copy the one that
+        /// extensions, login items and URL schemes resolve to. A build run from
+        /// its folder claims nothing. `ImageWatch.start` calls it; an app without
+        /// one calls it at launch.
+        public static func claimRecords() {
+            guard case .installed = home, let bundle else { return }
+            claim([bundle])
+        }
+
+        /// `apps`, each the installed copy, made the only record of their
+        /// bundles in the background: what a program that installs or serves
+        /// other apps calls for them (vigil-agent for Vigil and vigild).
+        public static func claim(_ apps: [URL]) {
+            DispatchQueue.global(qos: .utility).async {
+                for app in apps {
+                    do throws(RecordsError) {
+                        let records = try onlyRecord(installed: app)
+                        for removed in records.removed {
+                            installLog.info(
+                                "record removed", ["app": app.path, "record": removed.path])
+                        }
+                        installLog.info(
+                            "the only record",
+                            [
+                                "app": app.path, "removed": records.removed.count,
+                                "extensions": records.extensions,
+                            ])
+                    } catch {
+                        installLog.warn(
+                            "records not claimed", ["app": app.path, "err": error.description])
+                    }
+                }
+            }
+        }
+
         /// Every app under `folder` (and the extensions inside each) taken out
         /// of LaunchServices: a build's output or a release artifact, never an
         /// install. Returns the apps it unregistered.

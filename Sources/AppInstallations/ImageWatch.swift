@@ -103,6 +103,7 @@
                     bundleID: bundleID, bundle: bundle, keeps: keeps, links: links,
                     goneAfter: goneAfter, beforeLeaving: beforeLeaving)
                 installLog.info("watching the image", ["path": path, "as": watch.job ?? "the app"])
+                AppInstallation.claimRecords()
                 if watch.job == nil {
                     let arguments = CommandLine.arguments
                     if let flag = arguments.firstIndex(of: Job.forgetArgument),
