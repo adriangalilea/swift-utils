@@ -48,6 +48,12 @@ let package = Package(
         // FORCE_COLOR gated), ANSI-aware width/clip/pad, table/kv/tree.
         // ts-utils `cli` and py-utils `cli` by the same names.
         .library(name: "Terminal", targets: ["Terminal"]),
+        // A command-line program described once (an enum of its commands,
+        // typed flags and arguments, guides, exits), and everything a person
+        // or an agent meets read from it: the parse and its refusals,
+        // `--help`, `help <command|guide>`, `help --json` and the Claude
+        // Code skill. ts-utils `cli`'s `program`, with skills.
+        .library(name: "TerminalPrograms", targets: ["TerminalPrograms"]),
         // The logging and tracing contract of github.com/adriangalilea/utils
         // (go-utils, ts-utils, py-utils by the same verbs and the same
         // bytes): one stream of events, spans as start/end, W3C traceparent
@@ -218,6 +224,8 @@ let package = Package(
         .testTarget(name: "InkTests", dependencies: ["Ink"]),
         .testTarget(name: "PermissionGrantsTests", dependencies: ["PermissionGrants"]),
         .target(name: "Terminal"),
+        .target(name: "TerminalPrograms", dependencies: ["Terminal"]),
+        .testTarget(name: "TerminalProgramsTests", dependencies: ["TerminalPrograms"]),
         .testTarget(name: "TerminalTests", dependencies: ["Terminal"]),
         // Terminal's `ANSI.colorAsked`: the one colour rule its `ui` keeps too.
         .target(name: "Log", dependencies: ["Terminal"]),

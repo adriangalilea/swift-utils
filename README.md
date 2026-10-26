@@ -96,6 +96,54 @@ The raw values are the wire spellings, shared with the React `media-spec` item. 
 
 Command-line output, by the same names as ts-utils `cli` and py-utils `cli`, so a tool reads the same in every language. `ui` is the semantic palette (`head`, `accent`, `muted`, `ok`, `warn`, `bad`, `ref`), decided once per process by the one colour rule every library keeps, `ANSI.colorAsked` (utils' README, "Rendering": FORCE_COLOR not empty decides, `0` or `false` off; then NO_COLOR not empty or TERM=dumb is off), and when the environment leaves it to the terminals, only when stdout and stderr are both terminals. `Log` calls the same function for its human lines. `ANSI` is the always-on vocabulary underneath. `width` counts terminal cells (escapes free, wide and emoji clusters two), `clip` truncates without breaking styles or wide characters, `padEnd`/`padStart` align on visible width, and `table`, `kv`, `indent`, `tree` lay out blocks that stay aligned whether colored or plain.
 
+## TerminalPrograms
+
+A command-line program described once, and everything a person or an agent meets read from that one description: the parse and its refusals, `--help`, `help <command>`, `help <guide>`, `help --json` and the Claude Code skill. An agent needs nothing a person does not, and a person nothing an agent does not: the help and the skill are two renderings of the same words, so neither can say what the other does not (the module's tests check it). ts-utils `cli`'s `program`, whose parse, refusals and help layout it keeps.
+
+```swift
+import TerminalPrograms
+
+enum F {
+    static let secret = TerminalProgram.Flag.on("secret", short: "s", says: "hidden, never shown again")
+    static let minutes = TerminalProgram.Flag.number("minutes", says: "how long it waits")
+    static let link = TerminalProgram.Flag.list("link", value: "<label=url>", says: "where to go for it") { try Link($0) }
+}
+enum A { static let title = TerminalProgram.Arg.optional("title") }
+
+enum Authz: TerminalProgram.Commands {
+    case ask, notify
+    var command: TerminalProgram.Command {
+        switch self {
+        case .ask: .init("ask", args: [A.title], flags: [F.secret, F.minutes], passthrough: "command [args…]",
+                         says: "one typed answer, printed on stdout", exits: [.denied])
+        case .notify: …
+        }
+    }
+}
+
+let authz = TerminalProgram.Program<Authz>(
+    name: "authz", says: "Reach the human: ask them something, or tell them something.", json: true,
+    exits: [.denied], guides: [.init("waiting", title: "Waiting", says: "a question can take minutes", body: "…")],
+    skill: .init(useWhen: ["a yes before something irreversible"], never: ["ask in the terminal"]))
+
+await authz.main { call in
+    switch call.command {                       // exhaustive: a command described is a command handled
+    case .ask: return try await ask(call[A.title], secret: call[F.secret], minutes: call[F.minutes] ?? 5)
+    case .notify: …
+    }
+}
+```
+
+- **Commands are an enum** (`TerminalProgram.Commands`): each case is described by `command` and handled by a `switch`, so the compiler refuses a command described and not handled. Case order is the overview's order; `section` groups them.
+- **Flags and arguments are typed by their declaration** and read back by the same value: `Flag.on` is a `Bool`, `value`/`integer`/`number`/`choice` a `T?`, `.required()` a `T`, `list` a `[T]` (repeatable, each value read on its own, never split on commas), `oneOf` several switches that are one value (`--quiet|--active|--interrupt`). `Arg.needed`, `optional`, `rest`, `choice`. `call[flag]` never throws: the parse refused anything it could not be. Absent is the type's absence, never a default.
+- **The parse is ts-utils'**: `-wo` groups, `--dir=x`, a lone `-`, `--limit -5`, one letter one flag across the program, longest command spelling first, aliases as input only, a `default` command for a first word it claims, every refusal saying what to type instead (`--wach is no flag of eid inbox: --watch?`). Beyond it: what follows `--` is a command's `passthrough` (handed over untouched, help and `--json` in it never read), `excludes` and `requires` between flags, `stdin` documents refused at a terminal, `hidden` commands, a `bare` command for the program alone.
+- **Exits are part of the description**: a misuse is 64 everywhere; a program declares its own (`exits`), a command lists the ones it ends with, the help and the skill say them all. A handler returns an `Exit`; a `Refusal` carries one.
+- **Guides** are the program's prose a person reads on request (`help <guide>`, listed in the overview) and the skill inlines. `more` is a command's. Both are Markdown of a small subset: paragraphs, `- ` bullets, inline code, fenced blocks.
+- **The skill** (`skill:`, the program offering itself to agents): `skill` says where it is installed and whether it is current, `skill show` prints it, `skill install` puts it in Claude Code's and Codex's base skill folders (every profile links into them), `skill remove` takes it out. An app's skill is rendered into its bundle at build time (`Contents/Resources/skill/SKILL.md`, from `skill show`) and installed as a link to it, so the app's update is the skill's; a program run from a folder writes a copy, and `skill` says when that copy is not this program's. Nothing installs it unasked. Its `description` is `says`, then `useWhen`, then `never`; the overview shows the same lists.
+- **Two entry points**: `main { call in … }` for a program with handlers, `read()` for one written as a script (the help, the version, the skill and refusals answered there; a call returned). `parse(argv)` is the pure reading under both.
+
+Not yet here (ts-utils has them): prompts, live regions, the watch contract, argv[0] names.
+
 ## Syntax
 
 Code colored for a person to read before they say yes to it, by what its sender SAID it is (`CodeFormat`: `shell`, `diff`, `text`; anything else is plain, never an error). `Syntax.highlight(text, as:)` runs real grammars (highlight.js in JavaScriptCore, through Highlightr, the repo's one third-party dependency), with the language detected where the format does not pin one; a diff is colored by line prefix. Coloring never changes a character: what is approved is what was shown. `SyntaxText` draws it; `Syntax.theme` picks the inks; above `Syntax.ceiling` the text stays plain.
