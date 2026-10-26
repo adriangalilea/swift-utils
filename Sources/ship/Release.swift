@@ -28,6 +28,7 @@
 // reuse what they built. What a release signed is observed instead of a
 // cache being refused: its record names the commits and every artifact's
 // digest.
+import AppInstallations
 import CryptoKit
 import Foundation
 import Security
@@ -487,6 +488,23 @@ func release(_ manifests: [String]) -> Never {
             print(
                 "ship: released \(app.app): \(destination) (\(result.artifacts[app.app]?[artifact]?.prefix(16) ?? "?"))"
             )
+        }
+        // A build's output and a release artifact are never an install: their
+        // apps out of LaunchServices, or the newest copy of an identifier (this
+        // one) is what an extension, a login item or a URL scheme resolves to
+        // (hollow's FSKit mount, 2026-10-26). Installers make the installed copy
+        // the only record (`ship installed`).
+        // Spotlight never indexes the working folders, so never registers
+        // what it would find there.
+        FileManager.default.createFile(
+            atPath: releases.appending(path: ".metadata_never_index").path, contents: nil)
+        AppInstallation.unregister(appsUnder: releases.appending(path: "\(app.app)/work")) { _ in }
+        for artifact in app.artifacts where artifact.hasSuffix(".app") {
+            AppInstallation.unregister(
+                appsUnder: URL(filePath: app.repo + "/" + artifact).deletingLastPathComponent()
+            ) {
+                print("ship: \($0)")
+            }
         }
         let record = Record(
             sources: app.trees.mapValues(\.head), at: Date().timeIntervalSince1970,

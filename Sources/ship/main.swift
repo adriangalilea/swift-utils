@@ -23,6 +23,10 @@
 //   ship publish               from the checkout, once a release made the
 //                              dmg of exactly its commits: the tag pushed
 //                              with its branch, then the channels
+//   ship installed <X.app>     after an install: the installed copy is the only
+//                              LaunchServices record of every bundle it carries
+//                              (AppInstallation.onlyRecord), each other copy's
+//                              record removed and said
 //   ship released              whether the last release of the manifest here
 //                              (release.json) is of exactly the checkout's
 //                              commits, Markdown aside: exit 0 or 1 with the
@@ -49,6 +53,7 @@
 // from notes/$VERSION.md. Inside a release, the environment names the
 // release's own keychain (SHIP_KEYCHAIN) and the App Store Connect key it
 // wrote for this release (APPSTORE_KEY, APPSTORE_KEY_ID, APPSTORE_ISSUER).
+import AppInstallations
 import CryptoKit
 import Foundation
 import Security
@@ -227,7 +232,9 @@ let layout = """
 
 // MARK: - the arguments
 
-let verbs = ["release", "release-run", "identity", "check", "build", "publish", "released"]
+let verbs = [
+    "release", "release-run", "identity", "check", "build", "publish", "released", "installed",
+]
 guard let verb = CommandLine.arguments.dropFirst().first, verbs.contains(verb) else {
     die(
         """
@@ -237,6 +244,7 @@ guard let verb = CommandLine.arguments.dropFirst().first, verbs.contains(verb) e
                ship build   --team <T> --name <slug> --app <dir/X.app> --assemble <shell> [--sign <path>]… [--signed]
                ship publish --name <slug> --app <dir/X.app> [--tag <name>] [--github] [--after <shell>] [--cask]
                ship released
+               ship installed <X.app>
         """
     )
 }
@@ -250,6 +258,18 @@ func values(_ flag: String) -> [String] {
     args.indices.filter { args[$0] == flag && $0 + 1 < args.count }.map { args[$0 + 1] }
 }
 func has(_ flag: String) -> Bool { args.contains(flag) }
+
+if verb == "installed" {
+    guard args.count == 1, let app = args.first else { die("usage: ship installed <X.app>") }
+    do throws(AppInstallation.RecordsError) {
+        _ = try AppInstallation.onlyRecord(installed: URL(fileURLWithPath: app)) {
+            print("ship: \($0)")
+        }
+        exit(0)
+    } catch {
+        die(error.description)
+    }
+}
 
 if verb == "release" { release(args.isEmpty ? ["release.json"] : args) }
 if verb == "release-run" { releaseRun(args) }

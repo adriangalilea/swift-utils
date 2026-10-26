@@ -81,6 +81,14 @@ A root daemon cannot open apps in the person's session: on a move or a replace i
 
 A process is a job only when one of the bundle's own job plists declares the label launchd gave it (`ownJobLabel`). launchd names every process it starts, an app opened from Finder included, so the name alone proves nothing. The label is read when the watch starts, while the bundle can still vouch for it.
 
+## The installed copy is the only record: `onlyRecord`
+
+LaunchServices and ExtensionKit elect the newest record of a bundle identifier, and records pile up everywhere an app ever sat: Xcode registers every app it builds (archive intermediates under DerivedData, check builds), a release's working clone and its artifact in the repo, the Trash, a mounted dmg. A file-system module, a login item or a URL scheme then resolves to a copy that is not installed (hollow's FSKit mount failed with 72, 2026-10-26). So every installer ends with `AppInstallation.onlyRecord(installed:)`, or `ship installed <X.app>` from a script: every record of every bundle the app carries (the app, each `.app` inside it, each `.appex`), read by identifier from `lsregister -dump`, is removed unless it is the installed copy, each one said; the installed copy is registered in place and each of its extensions added until pluginkit lists it.
+
+- **The installed path is never unregistered**, not even to register it again: an extension's enable switch follows its record, and doing so turned hollow's file-system module off until the person turned it on in System Settings.
+- **An extension is added again until listed**: pluginkit was seen to take nothing from one add for 10 s and land the next in under a second. Never listed after 20 adds is an error.
+- `unregister(appsUnder:)` takes every app under a folder out of LaunchServices: `ship release` runs it on its working folders and on the artifacts it copies back (a build's output is never an install), and marks the working folders never-index for Spotlight.
+
 ## Proof
 
 `swift-utils`' `grant-example` is the testbed: `mise run grant-example` builds a signed app with a launch agent (offering both scopes), a root daemon (everyone only) and a command line linked in the temporary folder (`$TMPDIR/grant-example-cli`). Move it into Applications from its row; `launchctl print gui/$(id -u)/garden.untitled.grant-example.helper` gives the helper's pid, and its executable (`proc_pidpath`) says which copy runs it. Each case, proven:

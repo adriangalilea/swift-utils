@@ -216,7 +216,7 @@ let package = Package(
         ),
         .executableTarget(name: "mediaspec-example", dependencies: ["MediaSpec"]),
         .executableTarget(name: "brandgen"),
-        .executableTarget(name: "ship", exclude: ["RELEASE.md"]),
+        .executableTarget(name: "ship", dependencies: ["AppInstallations"], exclude: ["RELEASE.md"]),
         .executableTarget(name: "mark"),
         .executableTarget(name: "since", dependencies: ["Terminal", "TerminalPrograms"]),
         .executableTarget(name: "grant-cli", dependencies: ["PermissionGrants"]),
