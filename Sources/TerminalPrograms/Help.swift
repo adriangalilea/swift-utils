@@ -295,13 +295,23 @@ enum Fold {
     }
 
     /// Rows in one column whatever group they stand in.
+    /// Rows in one column whatever group they stand in. The words keep at
+    /// least 40 characters a line: the column stops at the measure less
+    /// that, and a left cell wider than it puts its words on the line under
+    /// it, starting at the column.
     static func aligned(_ groups: [(String, [(String, String)])], palette p: Palette, columns: Int)
         -> [String]
     {
-        let column = (groups.flatMap { $0.1.map { width($0.0) } }.max() ?? 0) + 6
+        let widest = (groups.flatMap { $0.1.map { width($0.0) } }.max() ?? 0) + 6
+        let column = min(widest, max(min(80, columns) - 40, 20))
         return groups.flatMap { title, rows in
             ["", "  " + p.accent(title)]
-                + rows.map { hang("    " + $0.0, column: column, text: $0.1, columns: columns) }
+                + rows.map { left, text in
+                    let cell = "    " + left
+                    return width(cell) + 2 <= column
+                        ? hang(cell, column: column, text: text, columns: columns)
+                        : cell + "\n" + wrap(text, indent: column, columns: columns)
+                }
         }
     }
 
