@@ -8,6 +8,23 @@
 /// dropped. `rgb` exists for a consumer known to render truecolor.
 /// Same names and behaviour as ts-utils `universal/ansi` and py-utils `ansi`.
 public enum ANSI {
+    /// What the environment says about colour, before any terminal is asked:
+    /// true forced on, false forced off, nil for the terminal to decide. The
+    /// one rule every library keeps (utils' README, "Rendering"; its harness
+    /// checks it), and the one function `ui` and `Log` both call:
+    /// `FORCE_COLOR` decides when not empty (`0` or `false` off, anything else
+    /// on), then `NO_COLOR` not empty turns it off, as does `TERM=dumb`. An
+    /// empty variable is an unset one. Takes the environment rather than
+    /// reading it, as everything here.
+    public static func colorAsked(_ environment: [String: String]) -> Bool? {
+        if let force = environment["FORCE_COLOR"], !force.isEmpty {
+            return force != "0" && force != "false"
+        }
+        if let no = environment["NO_COLOR"], !no.isEmpty { return false }
+        if environment["TERM"] == "dumb" { return false }
+        return nil
+    }
+
     public static let reset = "\u{1B}[0m"
     public static let bold = "\u{1B}[1m"
     public static let dim = "\u{1B}[2m"

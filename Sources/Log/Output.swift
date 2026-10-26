@@ -1,5 +1,6 @@
 import Foundation
 import Synchronization
+import Terminal
 import os
 
 // The program's own defaults, set by the setters. For every one of them the
@@ -194,10 +195,11 @@ func service() -> String {
     return name
 }
 
+/// The one colour rule (`ANSI.colorAsked`, `ui`'s too), with the terminal of
+/// the descriptor the line is written to.
 private func color(_ fd: Int32) -> Bool {
-    if env("NO_COLOR") != nil { return false }
-    if env("FORCE_COLOR") != nil { return true }
-    return fd == STDERR_FILENO ? stderrTTY : isatty(fd) == 1
+    ANSI.colorAsked(ProcessInfo.processInfo.environment)
+        ?? (fd == STDERR_FILENO ? stderrTTY : isatty(fd) == 1)
 }
 
 // MARK: - Writing

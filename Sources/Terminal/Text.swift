@@ -14,17 +14,14 @@ public struct Palette: Sendable {
 
     public init(enabled: Bool) { self.enabled = enabled }
 
-    /// The decision `ui` makes: FORCE_COLOR paints, NO_COLOR or TERM=dumb
-    /// does not, else only when stdout AND stderr are terminals. A command
-    /// line writes to both, so any redirection means some styled string may
-    /// land in a file, and a file never gets escapes.
+    /// The decision `ui` makes: the one rule (`ANSI.colorAsked`), and when the
+    /// environment leaves it to the terminal, only when stdout AND stderr are
+    /// terminals. A command line writes to both, so any redirection means some
+    /// styled string may land in a file, and a file never gets escapes.
     public static func detected(
         _ environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
-        if let force = environment["FORCE_COLOR"], !force.isEmpty { return true }
-        if let no = environment["NO_COLOR"], !no.isEmpty { return false }
-        if environment["TERM"] == "dumb" { return false }
-        return isatty(STDOUT_FILENO) == 1 && isatty(STDERR_FILENO) == 1
+        ANSI.colorAsked(environment) ?? (isatty(STDOUT_FILENO) == 1 && isatty(STDERR_FILENO) == 1)
     }
 
     public func paint(_ open: String, _ s: String) -> String { enabled ? open + s + ANSI.reset : s }

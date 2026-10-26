@@ -94,7 +94,7 @@ The raw values are the wire spellings, shared with the React `media-spec` item. 
 
 ## Terminal
 
-Command-line output, by the same names as ts-utils `cli` and py-utils `cli`, so a tool reads the same in every language. `ui` is the semantic palette (`head`, `accent`, `muted`, `ok`, `warn`, `bad`, `ref`), decided once per process: FORCE_COLOR paints, NO_COLOR or TERM=dumb does not, else only when stdout and stderr are both terminals. `ANSI` is the always-on vocabulary underneath. `width` counts terminal cells (escapes free, wide and emoji clusters two), `clip` truncates without breaking styles or wide characters, `padEnd`/`padStart` align on visible width, and `table`, `kv`, `indent`, `tree` lay out blocks that stay aligned whether colored or plain.
+Command-line output, by the same names as ts-utils `cli` and py-utils `cli`, so a tool reads the same in every language. `ui` is the semantic palette (`head`, `accent`, `muted`, `ok`, `warn`, `bad`, `ref`), decided once per process by the one colour rule every library keeps, `ANSI.colorAsked` (utils' README, "Rendering": FORCE_COLOR not empty decides, `0` or `false` off; then NO_COLOR not empty or TERM=dumb is off), and when the environment leaves it to the terminals, only when stdout and stderr are both terminals. `Log` calls the same function for its human lines. `ANSI` is the always-on vocabulary underneath. `width` counts terminal cells (escapes free, wide and emoji clusters two), `clip` truncates without breaking styles or wide characters, `padEnd`/`padStart` align on visible width, and `table`, `kv`, `indent`, `tree` lay out blocks that stay aligned whether colored or plain.
 
 ## Syntax
 

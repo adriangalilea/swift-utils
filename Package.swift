@@ -219,7 +219,8 @@ let package = Package(
         .testTarget(name: "PermissionGrantsTests", dependencies: ["PermissionGrants"]),
         .target(name: "Terminal"),
         .testTarget(name: "TerminalTests", dependencies: ["Terminal"]),
-        .target(name: "Log"),
+        // Terminal's `ANSI.colorAsked`: the one colour rule its `ui` keeps too.
+        .target(name: "Log", dependencies: ["Terminal"]),
         .testTarget(name: "LogTests", dependencies: ["Log"]),
     ]
 )

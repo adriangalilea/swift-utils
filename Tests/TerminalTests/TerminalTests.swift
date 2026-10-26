@@ -30,6 +30,19 @@ import Testing
     #expect(Palette.detected(["TERM": "dumb"]) == false)
 }
 
+// The one colour rule (utils' README, "Rendering"), the same in every library.
+@Test func colourIsOneRule() {
+    #expect(ANSI.colorAsked([:]) == nil)
+    #expect(ANSI.colorAsked(["FORCE_COLOR": "1"]) == true)
+    #expect(ANSI.colorAsked(["FORCE_COLOR": ""]) == nil)
+    #expect(ANSI.colorAsked(["FORCE_COLOR": "0"]) == false)
+    #expect(ANSI.colorAsked(["FORCE_COLOR": "false"]) == false)
+    #expect(ANSI.colorAsked(["FORCE_COLOR": "1", "NO_COLOR": "1"]) == true)
+    #expect(ANSI.colorAsked(["NO_COLOR": "1"]) == false)
+    #expect(ANSI.colorAsked(["NO_COLOR": ""]) == nil)
+    #expect(ANSI.colorAsked(["TERM": "dumb"]) == false)
+}
+
 // Columns align on visible width; no line ends in whitespace.
 @Test func tableAligns() {
     #expect(table([["a", "1"], ["bbb", "22"]], align: ["l", "r"]) == "a     1\nbbb  22")
