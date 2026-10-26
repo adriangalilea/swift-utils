@@ -2,7 +2,7 @@ extension TerminalProgram {
     /// A command's argument, declared once and read back by the same value,
     /// typed by its declaration: a needed one is a `String`, an optional one
     /// a `String?`, the rest a `[String]`, one of the domain's words its enum.
-    /// The usage grammar (`<ref> [title] <words...>`) is rendered from them.
+    /// The usage grammar (`<ref> [title] <words>…`) is rendered from them.
     public struct Arg<Value: Sendable>: Sendable, ArgDescribing {
         public let spec: ArgSpec
         /// The value from the words the argument covers (none, one, or the
@@ -20,10 +20,10 @@ extension TerminalProgram {
         /// The only words it takes.
         public let choices: [String]?
 
-        /// As the usage shows it: `<ref>`, `[title]`, `<words...>`, `[paths...]`.
+        /// As the usage shows it: `<ref>`, `[title]`, `<words>…`, `[paths]…`
+        /// (the ellipsis outside, as a list flag's `--to <pane>…`).
         var text: String {
-            let inner = rest ? "\(name)..." : name
-            return needed ? "<\(inner)>" : "[\(inner)]"
+            (needed ? "<\(name)>" : "[\(name)]") + (rest ? "…" : "")
         }
     }
 }

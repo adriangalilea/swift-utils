@@ -74,9 +74,7 @@ extension TerminalProgram.Program {
             guides: guides.map {
                 .init(name: $0.name, title: $0.title, says: $0.says, body: $0.body)
             },
-            global: table.common.filter { $0.name != "help" }.map {
-                .init(flag: $0.text, says: $0.says)
-            },
+            global: programFlags.map { .init(flag: $0.0, says: $0.1) },
             environment: environment.map { .init(flag: $0.name, says: $0.says) },
             exits: allExits.map { .init(code: $0.code, says: $0.says) })
     }

@@ -196,7 +196,7 @@ func page(_ argv: [String]) throws -> TerminalProgram.Page? {
     #expect(eid.detail("hook", .plain).contains("run by hooks"))
     #expect(
         skill.hasPrefix(
-            "---\nname: eid\ndescription: \"your e-ID from a terminal. Use it for: sending files; asking a person. Never ask in the terminal.\"\n"
+            "---\nname: eid\ndescription: \"Your e-ID from a terminal. Use it for: sending files; asking a person. Never ask in the terminal.\"\n"
         ))
     #expect(eid.detail("ask", .plain).contains("eid ask [title] -- command [args…]"))
     #expect(eid.detail("ask", .plain).contains("(with --pay)"))

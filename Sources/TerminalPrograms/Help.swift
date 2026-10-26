@@ -59,10 +59,7 @@ extension TerminalProgram.Program {
                     }
                 ))
         }
-        let always = (table.common.filter { $0.name != "help" }).map { spec in
-            (spec.text, spec.name == "version" ? "this \(name)'s version" : spec.says)
-        }
-        if !always.isEmpty { groups.append(("on every command", always)) }
+        if !programFlags.isEmpty { groups.append(("flags", programFlags)) }
         if !environment.isEmpty {
             groups.append(("environment", environment.map { ($0.name, $0.says) }))
         }
@@ -74,12 +71,12 @@ extension TerminalProgram.Program {
             lines += [""]
             lines.append(
                 Fold.hang(
-                    "  " + p.muted("for"), column: 9, text: skill.useWhen.joined(separator: "; "),
-                    columns: r.columns))
+                    "  " + p.muted("use it for"), column: 14,
+                    text: skill.useWhen.joined(separator: "; "), columns: r.columns))
             if !skill.never.isEmpty {
                 lines.append(
                     Fold.hang(
-                        "  " + p.muted("never"), column: 9,
+                        "  " + p.muted("never"), column: 14,
                         text: skill.never.joined(separator: "; "), columns: r.columns))
             }
         }
@@ -89,6 +86,19 @@ extension TerminalProgram.Program {
             + (guides.isEmpty ? [] : ["\(name) help <guide> to read one"])
         lines += ["", "  " + p.muted(foot.joined(separator: " · ")), ""]
         return lines.joined(separator: "\n")
+    }
+
+    /// The flags that are the program's, not one command's: `--version`
+    /// (about the program), `--json` and the program's globals (taken by any
+    /// command, which is said only where there is more than one). The
+    /// overview, the skill and `help --json` list these rows.
+    var programFlags: [(String, String)] {
+        let several = table.entries.filter { !$0.command.hidden }.count > 1
+        return table.common.filter { $0.name != "help" }.map { spec in
+            spec.name == "version"
+                ? (spec.text, "\(name)'s version")
+                : (spec.text, spec.says + (several ? ", on any command" : ""))
+        }
     }
 
     // MARK: One command

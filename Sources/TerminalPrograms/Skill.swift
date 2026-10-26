@@ -6,7 +6,8 @@ extension TerminalProgram.Program {
     /// for, what never to do with it. The overview shows the same two lists.
     var skillDescription: String {
         guard let skill else { preconditionFailure("cli: \(name) has no skill") }
-        let sentence = says.last.map { ".!?".contains($0) } == true ? says : says + "."
+        let capital = says.prefix(1).uppercased() + says.dropFirst()
+        let sentence = capital.last.map { ".!?".contains($0) } == true ? capital : capital + "."
         var text = "\(sentence) Use it for: \(skill.useWhen.joined(separator: "; "))."
         if !skill.never.isEmpty { text += " Never \(skill.never.joined(separator: "; "))." }
         return text
@@ -68,13 +69,8 @@ extension TerminalProgram.Program {
                 ]
             }
         }
-        let common = table.common.filter { $0.name != "help" }
-        if !common.isEmpty {
-            out +=
-                ["", "## On every command", ""]
-                + common.map {
-                    "- `\($0.text)`: \($0.name == "version" ? "this \(name)'s version" : $0.says)"
-                }
+        if !programFlags.isEmpty {
+            out += ["", "## Flags", ""] + programFlags.map { "- `\($0.0)`: \($0.1)" }
         }
         if !environment.isEmpty {
             out += ["", "## Environment", ""] + environment.map { "- `\($0.name)`: \($0.says)" }
