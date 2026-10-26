@@ -131,6 +131,9 @@ let package = Package(
         // An app's permissions from outside it, for development: what it last
         // read (its own log) and a reset of its records (`grant help`).
         .executable(name: "grant", targets: ["grant-cli"]),
+        // OnePassword by hand: `op --version` through the runner, and with
+        // `--interactive` `op account list` through the person's 1Password app.
+        .executable(name: "onepassword-example", targets: ["onepassword-example"]),
         // MediaSpec's gate + demo: `--check` pins the vocabulary, the label
         // rules and the lenient-decode law; without the flag, every chip
         // variant in a window on black.
@@ -208,6 +211,7 @@ let package = Package(
             name: "AppInstallations", dependencies: ["Log"], exclude: ["README.md", "CLAUDE.md"]),
         .target(name: "OnePassword", dependencies: ["Log"]),
         .testTarget(name: "OnePasswordTests", dependencies: ["OnePassword"]),
+        .executableTarget(name: "onepassword-example", dependencies: ["OnePassword"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         // Every shape live over real permissions: `mise run grant-example`.
         .executableTarget(name: "grant-example", dependencies: ["PermissionGrants", "Ink"]),
