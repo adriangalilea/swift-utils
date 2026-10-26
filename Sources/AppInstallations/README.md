@@ -21,7 +21,7 @@ AppInstallation.Job.chilld.state                 // .running, .off, .awaitingApp
 
 - An install is for a `Scope`, macOS Installer's own question: `.everyone` (/Applications) or `.me` (~/Applications). Which to offer is the app's call, the choice the person's. Data never follows the bundle: settings, records, caches and XDG dirs are per account wherever the app lives, so an install for everyone still keeps each account's data apart. What does follow it is any path into the bundle: a CLI symlinked onto PATH dangles once the app moves between scopes, until the install it moved to opens and re-points it (`ImageWatch`, below).
 - `AppInstallation.home` is `.installed(scope)`, `.elsewhere(url, origin)` (a disk image, a translocated download, a folder) or `.noBundle` (a `swift build` binary). `home.words` names the place for a person.
-- `moveHome(to: scope)` opens an install already in that scope's folder, or copies the bundle there and opens the copy; this one quits. `installedCopy(in:)` finds an existing install. `reopen(why)` opens a fresh instance of this bundle and quits.
+- `moveHome(to: scope)` opens an install already in that scope's folder when it is the same build or newer (`CFBundleVersion`, compared as numbers), replaces it when it is older (the old one to the Trash, this bundle copied in its place through a fresh path, logged "replaced an older install" with both builds; an older copy still running follows its replaced bundle through its `ImageWatch`, as on any upgrade), or copies the bundle there and opens the copy; this one quits. `installedCopy(in:)` finds an existing install. `reopen(why)` opens a fresh instance of this bundle and quits.
 
 ## Jobs
 

@@ -213,9 +213,25 @@
             }
         }
 
+        /// A bundle's build (`CFBundleVersion`), nil when it has none.
+        static func build(of bundle: URL) -> String? {
+            Bundle(url: bundle)?.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        }
+
+        /// Whether `installed` is an older build than `running` (builds
+        /// compared as numbers, `2.9` before `2.13`). An install with no
+        /// build to compare is not older: it stays.
+        static func isOlder(_ installed: URL, than running: URL) -> Bool {
+            guard let old = build(of: installed), let new = build(of: running) else { return false }
+            return old.compare(new, options: .numeric) == .orderedAscending
+        }
+
         /// Puts the app where it belongs and moves the person there: an
-        /// install already in `scope`'s folder is THE app and is opened;
-        /// otherwise this bundle is copied there (a copy: a disk image is
+        /// install already in `scope`'s folder of the same build or newer is
+        /// THE app and is opened; an OLDER one is replaced by this bundle (to
+        /// the Trash, this bundle copied in its place: opening a newer
+        /// download must never land on the old install); otherwise this
+        /// bundle is copied there (a copy: a disk image is
         /// read-only and a translocated bundle's origin is hidden from it),
         /// that copy is opened, and this process quits. A new instance,
         /// since it shares this process's bundle id. Which scopes to offer is
@@ -245,7 +261,31 @@
                     }
                 : asked
             let target: URL
-            if let existing = installedCopy(in: [scope]) {
+            if let existing = installedCopy(in: [scope]), isOlder(existing, than: bundle) {
+                // Through a fresh path, never over the old bundle in place: a
+                // running older copy keeps its image until ImageWatch sees
+                // its bundle replaced and follows it, as on any upgrade.
+                target = existing
+                let staged = scope.folder.appending(path: ".\(bundle.lastPathComponent).new")
+                do {
+                    try? FileManager.default.removeItem(at: staged)
+                    try FileManager.default.copyItem(at: bundle, to: staged)
+                    var landed: NSURL?
+                    try FileManager.default.trashItem(at: existing, resultingItemURL: &landed)
+                    try FileManager.default.moveItem(at: staged, to: existing)
+                    installLog.info(
+                        "replaced an older install",
+                        [
+                            "path": existing.path,
+                            "old build": build(of: landed as URL? ?? existing) ?? "?",
+                            "new build": build(of: bundle) ?? "?", "old copy": landed?.path ?? "?",
+                        ])
+                } catch {
+                    try? FileManager.default.removeItem(at: staged)
+                    throw MoveError.copy(
+                        "replacing the older install: \(error.localizedDescription)")
+                }
+            } else if let existing = installedCopy(in: [scope]) {
                 target = existing
             } else {
                 target = scope.folder.appending(path: bundle.lastPathComponent)
@@ -260,8 +300,10 @@
                 }
             }
             // THE app already running there is brought forward, never joined
-            // by a second instance; launch arguments only reach a launch, so
-            // the jobs asked for stay that copy's to turn on, said in the log.
+            // by a second instance (an older copy just replaced follows its
+            // bundle by itself, ImageWatch); launch arguments only reach a
+            // launch, so the jobs asked for stay that copy's to turn on, said
+            // in the log.
             if isRunning(target) {
                 activate(target)
                 installLog.info(
