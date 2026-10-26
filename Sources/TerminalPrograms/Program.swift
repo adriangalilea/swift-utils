@@ -4,13 +4,11 @@ extension TerminalProgram {
     /// that would not do what it says traps with a `cli:` message on the
     /// first run, never when a person types the one command that trips it.
     ///
-    ///     let authz = TerminalProgram.Program<Authz>(
-    ///       name: "authz", says: "Reach the human: ask them something, or tell them something.",
-    ///       json: true, exits: [.denied, .unanswered], guides: Guides.all,
-    ///       skill: .init(useWhen: ["a yes before something irreversible"], never: ["ask in the terminal"]))
-    ///     await authz.main { call in
-    ///       switch call.command { case .ask: … }
-    ///     }
+    ///     let program = TerminalProgram.Program<Command>(
+    ///       name: "listen", says: "on-device speech-to-text with grounding and language probing",
+    ///       json: true)
+    ///     let call = program.read()
+    ///     switch call.command { case .transcribe: … }
     public struct Program<Verb: Commands>: Sendable {
         public let name: String
         public let says: String
@@ -27,8 +25,10 @@ extension TerminalProgram {
         public let defaultCommand: Default?
         /// Flags every command takes.
         public let global: [FlagSpec]
-        /// Every command takes `--json`: refusals and the help answer as JSON
-        /// on stdout then, and handlers read `call.json`.
+        /// The program takes `--json`: the help and refusals answer as JSON on
+        /// stdout then, and so does each command that says what it prints
+        /// (`Command.json`), whose handler reads `call.json`; any other
+        /// command refuses it.
         public let json: Bool
         public let environment: [Variable]
         /// Exit codes beyond 0, 1 and 64 its commands end with.
@@ -267,6 +267,10 @@ extension TerminalProgram.Program {
         }
         for verb in Verb.allCases {
             let command = verb.command
+            precondition(
+                json || command.json == nil,
+                "cli: \(name) \(command.name) says what --json prints, and \(name) is not json: true"
+            )
             for spec in command.flags {
                 precondition(
                     !["help", "version", "json"].contains(spec.name),

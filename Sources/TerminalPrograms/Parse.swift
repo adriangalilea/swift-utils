@@ -368,6 +368,12 @@ extension TerminalProgram.Program {
         switch entry {
         case .verb(let verb):
             let json = self.json && values["json"] as? Bool == true
+            if json, command.json == nil {
+                let takers = jsonCommands.map { "\(name) \($0)" }.joined(separator: ", ")
+                throw .usage(
+                    "\(name) \(command.name) prints no JSON; "
+                        + (takers.isEmpty ? "--json is for \(name) help" : "--json is \(takers)'s"))
+            }
             values["json"] = nil
             return .run(
                 .init(

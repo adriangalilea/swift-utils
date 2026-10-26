@@ -89,16 +89,36 @@ extension TerminalProgram.Program {
     }
 
     /// The flags that are the program's, not one command's: `--version`
-    /// (about the program), `--json` and the program's globals (taken by any
-    /// command, which is said only where there is more than one). The
-    /// overview, the skill and `help --json` list these rows.
+    /// (about the program), `--json` (on the commands that say what it
+    /// prints) and the program's globals (taken by any command, which is said
+    /// only where there is more than one). The overview, the skill and
+    /// `help --json` list these rows.
     var programFlags: [(String, String)] {
-        let several = table.entries.filter { !$0.command.hidden }.count > 1
+        let visible = Verb.allCases.filter { !$0.command.hidden }
+        let anyCommand = visible.count > 1 ? ", on any command" : ""
         return table.common.filter { $0.name != "help" }.map { spec in
-            spec.name == "version"
-                ? (spec.text, "\(name)'s version")
-                : (spec.text, spec.says + (several ? ", on any command" : ""))
+            switch spec.name {
+            case "version": (spec.text, "\(name)'s version")
+            case "json":
+                (
+                    spec.text,
+                    jsonCommands.isEmpty
+                        ? "the help as JSON on stdout"
+                        : spec.says
+                            + (jsonCommands.count == visible.count
+                                ? anyCommand
+                                : ", on "
+                                    + jsonCommands.map { "\(name) \($0)" }.joined(separator: ", "))
+                )
+            default: (spec.text, spec.says + anyCommand)
+            }
         }
+    }
+
+    /// The visible commands that say what `--json` prints, the only ones
+    /// that take it.
+    var jsonCommands: [String] {
+        Verb.allCases.map(\.command).filter { !$0.hidden && $0.json != nil }.map(\.name)
     }
 
     // MARK: One command
