@@ -685,41 +685,74 @@
             run("/bin/launchctl", arguments).status
         }
 
-        /// A system tool (launchctl, open) through `posix_spawn` + `waitpid`, never
-        /// Foundation's `Process`: `waitUntilExit` spins the calling thread's
-        /// run loop, and a job's state is read while SwiftUI draws (a grant's
-        /// standing), where a turn of the run loop re-enters a layout half
-        /// done (a page dot row once drew a phantom slot). This blocks for
-        /// launchctl's few milliseconds and runs nothing else meanwhile.
+        /// A system tool (launchctl, open) or the app's own copy (a job's
+        /// hand-over), through `AppInstallation.spawn`.
         @discardableResult
         static func run(_ path: String, _ arguments: [String]) -> (
             status: Int32, output: String
         ) {
+            switch AppInstallation.spawn(path, arguments) {
+            case .ran(let status, let output): return (status, output)
+            case .notStarted(let errno):
+                installLog.error(
+                    "did not start", ["tool": path, "args": arguments, "errno": errno])
+                return (-1, "")
+            }
+        }
+    }
+
+    extension AppInstallation {
+        package enum Spawned {
+            /// Its exit status (-1: killed by a signal) and what it wrote on stdout.
+            case ran(status: Int32, output: String)
+            case notStarted(errno: Int32)
+        }
+
+        /// Runs `path` and waits: stdin and stderr `/dev/null`, stdout read
+        /// back, and NO other descriptor of this process
+        /// (`POSIX_SPAWN_CLOEXEC_DEFAULT`). A child keeps whatever it
+        /// inherits for its whole life: a job's hand-over child once held
+        /// authzd's startup lock, so the new authzd could not start until
+        /// that child gave up waiting for it (2026-10-26, a 20 s gap after
+        /// every install). `attributes` adds to the spawn's (the grant
+        /// probe's responsibility disclaim); false refuses the spawn.
+        ///
+        /// `posix_spawn` + `waitpid`, never Foundation's `Process`:
+        /// `waitUntilExit` spins the calling thread's run loop, and a job's
+        /// state is read while SwiftUI draws (a grant's standing), where a
+        /// turn of the run loop re-enters a layout half done (a page dot row
+        /// once drew a phantom slot). This blocks for the child's life and
+        /// runs nothing else meanwhile.
+        package static func spawn(
+            _ path: String, _ arguments: [String],
+            attributes: (inout posix_spawnattr_t?) -> Bool = { _ in true }
+        ) -> Spawned {
+            var attr: posix_spawnattr_t?
+            posix_spawnattr_init(&attr)
+            defer { posix_spawnattr_destroy(&attr) }
+            posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
+            guard attributes(&attr) else { return .notStarted(errno: EPERM) }
             var actions: posix_spawn_file_actions_t?
             posix_spawn_file_actions_init(&actions)
             defer { posix_spawn_file_actions_destroy(&actions) }
             var pipe: [Int32] = [0, 0]
-            guard Darwin.pipe(&pipe) == 0 else { return (-1, "") }
+            guard Darwin.pipe(&pipe) == 0 else { return .notStarted(errno: errno) }
+            posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0)
             posix_spawn_file_actions_adddup2(&actions, pipe[1], STDOUT_FILENO)
-            posix_spawn_file_actions_addclose(&actions, pipe[0])
             posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0)
             let words: [String] = [path] + arguments
             let argv: [UnsafeMutablePointer<CChar>?] = words.map { strdup($0) } + [nil]
             defer { argv.forEach { free($0) } }
             var pid: pid_t = 0
-            let spawned = posix_spawn(&pid, path, &actions, nil, argv, environ)
+            let spawned = posix_spawn(&pid, path, &actions, &attr, argv, environ)
             close(pipe[1])
             defer { close(pipe[0]) }
-            guard spawned == 0 else {
-                installLog.error(
-                    "did not start", ["tool": path, "args": arguments, "errno": spawned])
-                return (-1, "")
-            }
+            guard spawned == 0 else { return .notStarted(errno: spawned) }
             let output = FileHandle(fileDescriptor: pipe[0]).readDataToEndOfFile()
             var status: Int32 = 0
             waitpid(pid, &status, 0)
             let exit = (status & 0x7f) == 0 ? (status >> 8) & 0xff : -1
-            return (exit, String(decoding: output, as: UTF8.self))
+            return .ran(status: exit, output: String(decoding: output, as: UTF8.self))
         }
     }
 #endif

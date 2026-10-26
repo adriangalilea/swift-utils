@@ -529,34 +529,17 @@
             guard probes.withLock({ $0 }), let disclaim,
                 let executable = Bundle.main.executableURL?.path
             else { return nil }
-            var attr: posix_spawnattr_t?
-            posix_spawnattr_init(&attr)
-            defer { posix_spawnattr_destroy(&attr) }
-            guard disclaim(&attr, 1) == 0 else { return nil }
-            var actions: posix_spawn_file_actions_t?
-            posix_spawn_file_actions_init(&actions)
-            defer { posix_spawn_file_actions_destroy(&actions) }
-            var pipe: [Int32] = [0, 0]
-            guard Darwin.pipe(&pipe) == 0 else { return nil }
-            posix_spawn_file_actions_adddup2(&actions, pipe[1], STDOUT_FILENO)
-            posix_spawn_file_actions_addclose(&actions, pipe[0])
-            // Typed: Xcode 26's solver reads the literal as strdup's pointers.
-            let words: [String] = [executable, probeFlag]
-            let argv: [UnsafeMutablePointer<CChar>?] = words.map { strdup($0) } + [nil]
-            defer { argv.forEach { free($0) } }
-            var pid: pid_t = 0
-            let spawned = posix_spawn(&pid, executable, &actions, &attr, argv, environ)
-            close(pipe[1])
-            defer { close(pipe[0]) }
-            guard spawned == 0 else {
-                grantLog.warn("fresh probe did not start", ["errno": spawned])
+            let output: String
+            switch AppInstallation.spawn(
+                executable, [probeFlag], attributes: { disclaim(&$0, 1) == 0 })
+            {
+            case .ran(_, let said): output = said
+            case .notStarted(let errno):
+                grantLog.warn("fresh probe did not start", ["errno": errno])
                 return nil
             }
-            let output = FileHandle(fileDescriptor: pipe[0]).readDataToEndOfFile()
-            var status: Int32 = 0
-            waitpid(pid, &status, 0)
             var codes: [Privacy: Int] = [:]
-            for line in String(decoding: output, as: UTF8.self).split(separator: "\n") {
+            for line in output.split(separator: "\n") {
                 let parts = line.split(separator: " ")
                 guard parts.count == 2, let privacy = Privacy(rawValue: String(parts[0])),
                     let code = Int(parts[1])
