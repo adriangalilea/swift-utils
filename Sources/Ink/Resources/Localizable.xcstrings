@@ -81,6 +81,16 @@
         }
       }
     },
+    "reveals until pressed again": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "se muestra hasta pulsar de nuevo"
+          }
+        }
+      }
+    },
     "show": {
       "localizations": {
         "es": {

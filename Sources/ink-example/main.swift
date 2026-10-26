@@ -204,6 +204,12 @@ struct DemoView: View {
                         Copy("C02XK1ABJG5H", tip: "Copy without showing it")
                     }
                     .font(.callout)
+                    // Copied by hand: shown until pressed again.
+                    HStack(spacing: .inkGap) {
+                        Text("recovery key").foregroundStyle(.secondary)
+                        Veiled("RK4F-7Q2M-XW9P-3HTD-K8ZN-6BCV", reveal: .toggle)
+                    }
+                    .font(.callout)
                 }
 
                 // The one keycap: a key alone, a combo, beside a label, on a
