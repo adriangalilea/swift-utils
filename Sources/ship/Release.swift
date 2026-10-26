@@ -477,35 +477,61 @@ func release(_ manifests: [String]) -> Never {
             contents: Data((result.toolchain.joined(separator: "\n") + "\n").utf8))
         for artifact in app.artifacts {
             let built = app.root + "/" + artifact
-            let destination = app.repo + "/" + artifact
+            // An app comes back as `<name>.app.zip`, never as a runnable copy:
+            // an app at rest beside its installed copy, of the very same build,
+            // ties with it in LaunchServices and can win (an extension, a login
+            // item, a URL scheme resolving to it: hollow's FSKit mount,
+            // 2026-10-26), and Finder registers any app it shows. Installers
+            // unpack the zip straight into place. Packed as the kit packs: no
+            // extended attributes, no resource forks.
+            let isApp = artifact.hasSuffix(".app")
+            let destination = app.repo + "/" + artifact + (isApp ? ".zip" : "")
             try? FileManager.default.removeItem(atPath: destination)
+            if isApp { try? FileManager.default.removeItem(atPath: app.repo + "/" + artifact) }
             try? FileManager.default.createDirectory(
                 atPath: (destination as NSString).deletingLastPathComponent,
                 withIntermediateDirectories: true)
-            do { try FileManager.default.copyItem(atPath: built, toPath: destination) } catch {
-                die("cannot copy \(built) to \(destination): \(error.localizedDescription)")
+            if isApp {
+                let zip = Process()
+                zip.executableURL = URL(filePath: "/usr/bin/ditto")
+                zip.arguments = [
+                    "-c", "-k", "--norsrc", "--noextattr", "--keepParent", built, destination,
+                ]
+                do { try zip.run() } catch {
+                    die("cannot zip \(built): \(error.localizedDescription)")
+                }
+                zip.waitUntilExit()
+                guard zip.terminationStatus == 0 else {
+                    die(
+                        "cannot zip \(built) to \(destination): ditto exited \(zip.terminationStatus)"
+                    )
+                }
+            } else {
+                do { try FileManager.default.copyItem(atPath: built, toPath: destination) } catch {
+                    die("cannot copy \(built) to \(destination): \(error.localizedDescription)")
+                }
             }
             print(
                 "ship: released \(app.app): \(destination) (\(result.artifacts[app.app]?[artifact]?.prefix(16) ?? "?"))"
             )
         }
-        // A build's output and a release artifact are never an install: their
-        // apps out of LaunchServices, or the newest copy of an identifier (this
-        // one) is what an extension, a login item or a URL scheme resolves to
-        // (hollow's FSKit mount, 2026-10-26). Installers make the installed copy
-        // the only record (`ship installed`).
-        // Spotlight never indexes the working folders, so never registers
-        // what it would find there.
+        // What the release built leaves no record behind: the working folder's
+        // apps, and every copy of the built identifiers outside an Applications
+        // folder (Xcode's archive registers its own). The installed app claims
+        // its records at launch (AppInstallation.claimRecords). Spotlight never
+        // indexes the working folders.
         FileManager.default.createFile(
             atPath: releases.appending(path: ".metadata_never_index").path, contents: nil)
-        AppInstallation.unregister(appsUnder: releases.appending(path: "\(app.app)/work")) { _ in }
         for artifact in app.artifacts where artifact.hasSuffix(".app") {
-            AppInstallation.unregister(
-                appsUnder: URL(filePath: app.repo + "/" + artifact).deletingLastPathComponent()
-            ) {
-                print("ship: \($0)")
+            do throws(AppInstallation.RecordsError) {
+                try AppInstallation.removeStrays(of: URL(filePath: app.root + "/" + artifact)) {
+                    print("ship: \($0)")
+                }
+            } catch {
+                print("ship: \(app.app): records not cleaned: \(error.description)")
             }
         }
+        AppInstallation.unregister(appsUnder: releases.appending(path: "\(app.app)/work")) { _ in }
         let record = Record(
             sources: app.trees.mapValues(\.head), at: Date().timeIntervalSince1970,
             artifacts: result.artifacts[app.app], plan: planSHA, certificate: result.certificate,

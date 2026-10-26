@@ -125,6 +125,37 @@
             }
         }
 
+        /// Every record of the bundles `app` carries that is not in an
+        /// Applications folder (nor the Trash, which LaunchServices never
+        /// offers): what a build leaves behind (Xcode registers every app it
+        /// builds, Finder every app it shows), each a copy of the very build a
+        /// release just made, which ties with the installed copy and can win.
+        /// Returns what it removed.
+        @discardableResult
+        public static func removeStrays(of app: URL, said: (String) -> Void = { _ in })
+            throws(RecordsError) -> [URL]
+        {
+            let identifiers = Set(carried(by: app).map(\.identifier))
+            let kept =
+                Scope.allCases.map { $0.folder.standardizedFileURL.path + "/" }
+                + [
+                    FileManager.default.homeDirectoryForCurrentUser.appending(path: ".Trash").path
+                        + "/"
+                ]
+            var removed: [URL] = []
+            for record in try dump() where identifiers.contains(record.identifier) {
+                let path = record.url.standardizedFileURL.path
+                guard !kept.contains(where: path.hasPrefix) else { continue }
+                if record.url.pathExtension == "appex" {
+                    _ = tool(pluginkit, ["-r", record.url.path])
+                }
+                _ = tool(lsregister, ["-u", record.url.path])
+                said("unregistered \(record.identifier) at \(record.url.path)")
+                removed.append(record.url)
+            }
+            return removed
+        }
+
         /// Every app under `folder` (and the extensions inside each) taken out
         /// of LaunchServices: a build's output or a release artifact, never an
         /// install. Returns the apps it unregistered.
