@@ -14,9 +14,11 @@ import SwiftUI
 ///
 /// Every read is async and each panel says it is reading on its own, so a slow source
 /// on another machine never blocks the screen. Nothing is presented inside it: a quote
-/// reaches the host through `.onQuote`, and the host decides what it does. A new
-/// `reloadToken` reads the repository again; a different source is a different browser
-/// (`.id(…)` it).
+/// reaches the host through `.onQuote`, and the host decides what it does. It reads the
+/// repository again each time its source says it changed (`Git.Source.changes()`), every
+/// open panel and page with it, keeping what is selected and showing the last reading
+/// until the new one arrives; a new `reloadToken` reads it again for a source that cannot
+/// tell. A different source is a different browser (`.id(…)` it).
 public struct GitBrowser: View {
     /// An agent's session: the commit it started from, the paths it touched (nil: every
     /// path since), and what to call it.
@@ -105,9 +107,21 @@ public struct GitBrowser: View {
                 BrowserColumns(model: model, panels: panels, extras: extras, opening: opening)
             }
         }
+        .environment(\.gitReading, model.reading)
         .onChange(of: agent) { model.agent = agent }
         .task(id: reloadToken) { await model.reload() }
+        .task {
+            // A source may read the repository before it watches: off the main thread.
+            let changes = await Task.detached { [source] in source.changes() }.value
+            for await _ in changes { await model.reload() }
+        }
     }
+}
+
+extension EnvironmentValues {
+    /// Which reading of the repository a browser's pages show: each page reads its
+    /// value again when it moves.
+    @Entry var gitReading = 0
 }
 
 // MARK: - the model
@@ -118,6 +132,8 @@ public struct GitBrowser: View {
     var agent: GitBrowser.Agent?
     private(set) var snapshot: Git.Snapshot?
     private(set) var failure: Error?
+    /// Moves after every reading after the first: the pages read again.
+    private(set) var reading = 0
     var onlyTouched = true
     private var diffs: [Git.ChangeScope: Git.Diff] = [:]
 
@@ -127,10 +143,13 @@ public struct GitBrowser: View {
     }
 
     func reload() async {
-        diffs = [:]
+        let first = snapshot == nil
         do {
-            snapshot = try await source.snapshot()
+            let read = try await source.snapshot()
+            diffs = [:]
+            snapshot = read
             failure = nil
+            if !first { reading += 1 }
         } catch {
             failure = error
         }
@@ -299,8 +318,9 @@ struct BrowserTabs: View {
         #if os(iOS)
             .tabBarMinimizeBehavior(.onScrollDown)
         #endif
-        // A phone opens on its list; only an opening that names a row pushes it.
-        .task(id: model.snapshot?.status) {
+        // A phone opens on its list; only an opening that names a row pushes it, once
+        // the first reading is there.
+        .task(id: model.snapshot != nil) {
             guard let opening, let row = opening.row, paths[opening.panel, default: []].isEmpty,
                 let target = await model.target(opening.panel, row)
             else { return }
@@ -330,9 +350,12 @@ struct BrowserColumns: View {
         _panel = State(initialValue: opening?.panel ?? panels[0])
     }
 
+    /// The reading pane opens a row when the panel changes or the first reading
+    /// arrives, never at a later one: a repository changing under the reader keeps
+    /// what is open.
     struct Key: Hashable {
         let panel: GitBrowser.Panel?
-        let status: Git.Status?
+        let read: Bool
     }
 
     var body: some View {
@@ -368,7 +391,7 @@ struct BrowserColumns: View {
                 }
                 .id(selection)
             }
-            .task(id: Key(panel: panel, status: model.snapshot?.status)) {
+            .task(id: Key(panel: panel, read: model.snapshot != nil)) {
                 selection = nil
                 guard let panel else { return }
                 let row = opening?.panel == panel ? opening?.row ?? .index(0) : .index(0)

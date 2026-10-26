@@ -159,7 +159,7 @@ let package = Package(
         .target(name: "GitKit"),
         // Real output of real repositories (git's own bytes, NULs included).
         .testTarget(
-            name: "GitKitTests", dependencies: ["GitKit"], resources: [.copy("Fixtures")]),
+            name: "GitKitTests", dependencies: ["GitKit", "GitLocal"], resources: [.copy("Fixtures")]),
         .target(name: "GitLocal", dependencies: ["GitKit"]),
         .executableTarget(name: "gitkit-capture", dependencies: ["GitLocal"]),
         .target(name: "GitViews", dependencies: ["GitKit", "Ink", "Syntax"]),

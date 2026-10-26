@@ -38,6 +38,11 @@ extension Git {
         /// A file's text as `target` has it (the side a diff of that target shows as
         /// new): the lines a diff folded away between its hunks come from here.
         func contents(_ path: String, in target: ChangeScope.Target) async throws -> String
+        /// One element each time what the source reads may have changed (a file in the
+        /// working tree written, a commit, a branch moved), for as long as the reader
+        /// iterates; the reader reads again. A source that cannot tell finishes at once
+        /// (the default): its reader reads when it is asked to.
+        func changes() -> AsyncStream<Void>
     }
 
     /// A read a source could not answer.
@@ -61,6 +66,8 @@ extension Git {
 }
 
 extension Git.Source {
+    public func changes() -> AsyncStream<Void> { AsyncStream { $0.finish() } }
+
     /// One commit against its first parent.
     public func show(_ hash: String) async throws -> Git.Diff {
         try await diff(.commit(hash))

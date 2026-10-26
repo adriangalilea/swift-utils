@@ -10,6 +10,9 @@ struct BrowserLoading<Value, Content: View>: View {
     @State private var value: Value?
     @State private var failure: Error?
     @State private var attempt = 0
+    /// A new reading of the repository reads the page again, the last value shown
+    /// until it arrives.
+    @Environment(\.gitReading) private var reading
 
     var body: some View {
         Group {
@@ -22,12 +25,14 @@ struct BrowserLoading<Value, Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: Key(id: id, attempt: attempt)) {
-            failure = nil
+        .task(id: Key(id: id, attempt: attempt, reading: reading)) {
             do {
                 value = try await load()
+                failure = nil
             } catch {
-                failure = error
+                // A page already shown keeps it: a re-read that failed is no reason
+                // to take away what was read.
+                if value == nil { failure = error }
             }
         }
     }
@@ -35,6 +40,7 @@ struct BrowserLoading<Value, Content: View>: View {
     struct Key: Hashable {
         let id: AnyHashable
         let attempt: Int
+        let reading: Int
     }
 }
 
@@ -193,7 +199,7 @@ struct BrowserSubmoduleRow: View {
                 GitSubmoduleRow(submodule, pointer: pointer)
             }
         }
-        .task {
+        .task(id: model.reading) {
             let diff = try? await model.diff(.uncommitted)
             pointer = diff?.files.first { $0.path == submodule.path }?.submodule
         }
