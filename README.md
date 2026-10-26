@@ -375,6 +375,48 @@ new image or leave launchd, the app reopens or quits). A background service's
 grant is a job's state. The rules and how to prove them:
 [Sources/AppInstallations/README.md](Sources/AppInstallations/README.md).
 
+## OnePassword
+
+1Password's command line, `op`, run one way by every app that needs it (Authz's secrets helper and command line, hollow). One top-level name, `OnePasswordCLI`; macOS only.
+
+```swift
+import OnePassword
+
+let home = URL.applicationSupportDirectory.appending(path: "MyApp/op-home")  // the app's own, never ~
+
+// A service account: a token, no app, no person.
+let value = try await OnePasswordCLI.run(
+    ["read", "op://vault/item/field"], as: .serviceAccount(token: token, home: home), timeout: .seconds(120))
+
+// The person's own 1Password app, which asks them: an item from a template on stdin.
+let made = try await OnePasswordCLI.run(
+    ["item", "create", "-", "--format", "json"], as: .app(home: home), input: template, timeout: .seconds(120))
+
+// stdin and stdout on someone else's pipe ends: what op reads and prints never passes here.
+let op = try OnePasswordCLI.start(["item", "create", "-"], as: .app(home: home), stdin: fd0, stdout: fd1)
+try await op.wait(timeout: .seconds(330))
+
+try OnePasswordCLI.locate()  // the op a run would start, or Failure.notInstalled
+```
+
+Two modes, each a `Mode` value whose environment is built whole:
+
+- **`.serviceAccount(token:home:)`**: the token goes to `op` in `OP_SERVICE_ACCOUNT_TOKEN` for that run and nowhere else, with `OP_CACHE=false` (no cache daemon forked per call). No 1Password app, no unlock, no macOS consent: what a background agent uses.
+- **`.app(home:)`**: through the person's own 1Password app over XPC, which asks them (Touch ID, or its password). Needs 1Password › Settings › Developer › Integrate with 1Password CLI. `op` gets `OP_BIOMETRIC_UNLOCK_ENABLED=true`.
+
+**A GUI app's `op` finds no account unless told (measured 2026-10-26, macOS 27, by hollow).** Run normally, `op` reads 1Password's settings in its group container to learn whether the app integration is on. macOS charges that read to the app that started `op` as data from other apps: tccd denies `kTCCServiceSystemPolicyAppDataDetailed` and never shows a prompt, so `op` says "No accounts configured for use with 1Password CLI". With `OP_BIOMETRIC_UNLOCK_ENABLED=true` and a HOME of the app's own (an empty folder), `op` skips that file and reaches the 1Password app over XPC, which is not gated; 1Password still asks the person. Authz met the same read as a service account (2026-10-17): under the real HOME every read waited on a consent dialog nobody saw, and a HOME of its own needs no permission at all. So both modes take a `home`, and a `home` that is the person's real one is a precondition failure.
+
+The guarantees:
+
+- **Only AgileBits' `op` runs.** It is looked for at `/opt/homebrew/bin/op`, `/usr/local/bin/op`, then each folder of this process's PATH, first executable wins. Those are folders any program of the user can write, so the file is never trusted: `op` is spawned with `POSIX_SPAWN_START_SUSPENDED`, holding its environment and stdin but having run nothing, its running code is checked through its audit token against `anchor apple generic and identifier "com.1password.op" and certificate leaf[subject.OU] = "2BUA8C4S2C"`, and only then resumed. Anything else is killed and reaped before its first instruction (`Failure.notAgileBits`). Checking the file first would leave it swappable between the check and the launch.
+- **Nothing inherited.** The child gets exactly `HOME` and `XDG_CONFIG_HOME` (the app's folder), `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, `USER` and `LOGNAME` (from the password database), `TMPDIR` (the system's per-user folder), `LANG=en_US.UTF-8` (so `op` speaks the English `Failure` reads), and the mode's `OP_*`. Never this process's `OP_*`, proxies or a parent's session. Every descriptor but 0, 1 and 2 is closed, every signal at its default.
+- **Secrets only on stdin or that environment.** Never in argv, the log or a failure: a failure's text drops `op`'s timestamp, the run's token, any `ops_…` token, and any quoted passage found verbatim in the run's stdin. The environment block is zeroed before it is freed. `Mode` prints, dumps and reflects as `serviceAccount(token: <redacted>, …)`.
+- **Bounded.** stdin is written, stdout and stderr read, and the process reaped on threads of their own at once, so a large input or output never stalls (16 MiB each way in the tests). Past the timeout `op` gets SIGTERM, then SIGKILL two seconds later. A write to an `op` that stopped reading is an error, never SIGPIPE.
+- **Typed failures**, each saying what a person does next: `notInstalled`, `notAgileBits`, `couldNotStart`, `noAccount(access)`, `refused` (declined or not answered in 1Password), `rateLimited`, `notFound` (item, vault, field or document), `timedOut`, `failed` with what `op` said. Read from `op` 2.39.0's own phrases.
+- **One log line per run** in the scope `onepassword`: `verb` (the command's words before any flag or reference: "item create", "read"), `mode`, `ms`, `outcome`.
+
+Not covered: what a caller builds on top (Authz's per-ref cooldown, its `op-calls.jsonl` count and its ask for `op service-account ratelimit` after a refusal stay Authz's), choosing among several accounts (`--account` is the caller's argument), task cancellation (a run ends at its timeout), and any platform but macOS. `swift run onepassword-example` runs `op --version` through the runner; `--interactive` adds `op account list` through the person's 1Password app, which may ask for Touch ID.
+
 ## Colophon
 
 The about/support Settings tab, designed once: app identity (name, version, build, icon) derived from the running bundle so it can never drift, the author byline, external links, the support ask, and an optional check-for-updates hook (Sparkle stays app-side, pass a closure).
