@@ -26,6 +26,7 @@ only="${usage_platform:-}"
 case "$only" in ""|iOS|tvOS) ;; *) echo "platforms: iOS or tvOS, not '$only'" >&2; exit 1 ;; esac
 # library  platforms beyond macOS
 #   Keymap      none: AppKit, Carbon, global hotkeys, a Mac's keyboard
+#   OnePassword none: op is a Mac's command line, run as a child process
 #   Biometrics  no tvOS: a TV has no LocalAuthentication, no finger, no face
 while read -r lib platforms; do
   for platform in $platforms; do

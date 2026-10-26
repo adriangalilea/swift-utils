@@ -84,6 +84,12 @@ let package = Package(
         // image), and its removal when the bundle is deleted. One top-level
         // name, `AppInstallation`.
         .library(name: "AppInstallations", targets: ["AppInstallations"]),
+        // 1Password's command line (`op`) run one way: found, proven
+        // AgileBits' on the suspended process before it runs, as a service
+        // account or through the person's 1Password app, with an environment
+        // built whole and secrets only on its stdin or that environment.
+        // Typed failures. macOS only. One top-level name, `OnePasswordCLI`.
+        .library(name: "OnePassword", targets: ["OnePassword"]),
         // The system-wide shortcut overlay: a tiny background agent showing
         // the frontmost app's published keymap on one global chord (⌃⌘/).
         // Dogfood-first: `swift run keymap-overlay`.
@@ -200,6 +206,8 @@ let package = Package(
             exclude: ["README.md", "CLAUDE.md"]),
         .target(
             name: "AppInstallations", dependencies: ["Log"], exclude: ["README.md", "CLAUDE.md"]),
+        .target(name: "OnePassword", dependencies: ["Log"]),
+        .testTarget(name: "OnePasswordTests", dependencies: ["OnePassword"]),
         .executableTarget(name: "biometrics-example", dependencies: ["Biometrics"]),
         // Every shape live over real permissions: `mise run grant-example`.
         .executableTarget(name: "grant-example", dependencies: ["PermissionGrants", "Ink"]),
