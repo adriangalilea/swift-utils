@@ -731,9 +731,17 @@ final class Outcome: @unchecked Sendable {
 /// the Developer ID identity in a keychain of the release's own (a random
 /// password, never written anywhere, first on the search list while the
 /// release runs), the App Store Connect key in a file only this user can
-/// read. `close` removes both and puts the search list back as it was.
+/// read. `close` removes both and takes its keychain off the search list.
+///
+/// One release's keychain at a time, across every app and session: the
+/// search list is the person's one list, and a release that finished during
+/// another (trash's at 18:05 inside vigil's at 18:07, 2026-10-27) put back the
+/// list it had saved, without the other's keychain, so that release's export
+/// found no Developer ID. A second release waits for the first, saying so.
 final class ReleaseKeychain: @unchecked Sendable {
     let appStoreKeyPath: String
+    /// The lock held from `init` to `close` (flock on `releases/keychain.lock`).
+    private let lock: Int32
     /// The keychain's file: a script that signs with codesign names it
     /// (`--keychain`), so a second copy of the identity elsewhere is never
     /// chosen. Its password is never shared.
@@ -742,7 +750,6 @@ final class ReleaseKeychain: @unchecked Sendable {
     let identity: String
     private let directory: URL
     private let keychain: SecKeychain
-    private let searched: [SecKeychain]
 
     struct Failure: Error, CustomStringConvertible {
         let description: String
@@ -750,6 +757,17 @@ final class ReleaseKeychain: @unchecked Sendable {
     }
 
     init(identity base64: String, password: String, appStoreKey: String) throws {
+        try? FileManager.default.createDirectory(at: releases, withIntermediateDirectories: true)
+        let lock = open(
+            releases.appending(path: "keychain.lock").path, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+        guard lock >= 0 else { throw Failure("the release lock could not be opened") }
+        if flock(lock, LOCK_EX | LOCK_NB) != 0 {
+            say("ship: another release holds the keys; waiting for it to finish")
+            guard flock(lock, LOCK_EX) == 0 else {
+                Darwin.close(lock)
+                throw Failure("the release lock could not be taken")
+            }
+        }
         let directory = FileManager.default.temporaryDirectory.appending(
             path: "ship-release-\(UUID().uuidString)")
         try FileManager.default.createDirectory(
@@ -757,13 +775,15 @@ final class ReleaseKeychain: @unchecked Sendable {
             attributes: [.posixPermissions: 0o700])
         // A step that fails takes everything before it with it, as `close` does.
         var made: SecKeychain?
-        var previous: [SecKeychain]?
         var opened = false
         defer {
             if !opened {
-                if let previous { SecKeychainSetSearchList(previous as CFArray) }
-                if let made { SecKeychainDelete(made) }
+                if let made {
+                    Self.leaveSearchList(made)
+                    SecKeychainDelete(made)
+                }
                 try? FileManager.default.removeItem(at: directory)
+                Darwin.close(lock)
             }
         }
         let path = directory.appending(path: "release.keychain-db").path
@@ -861,7 +881,6 @@ final class ReleaseKeychain: @unchecked Sendable {
         var list: CFArray?
         SecKeychainCopySearchList(&list)
         let searched = (list as? [SecKeychain]) ?? []
-        previous = searched
         guard SecKeychainSetSearchList(([keychain] + searched) as CFArray) == errSecSuccess else {
             throw Failure("the release keychain could not join the search list")
         }
@@ -876,7 +895,7 @@ final class ReleaseKeychain: @unchecked Sendable {
         else { throw Failure("the App Store Connect key could not be written") }
         self.directory = directory
         self.keychain = keychain
-        self.searched = searched
+        self.lock = lock
         self.path = path
         identity = "\(sha1) \(names[0])"
         appStoreKeyPath = keyPath
@@ -894,11 +913,21 @@ final class ReleaseKeychain: @unchecked Sendable {
         return file
     }
 
-    /// Everything gone: the search list as it was, the keychain deleted, the
-    /// keys' files removed.
+    /// Everything gone: the keychain off the search list and deleted, the
+    /// keys' files removed, the lock let go for the next release.
     func close() {
-        SecKeychainSetSearchList(searched as CFArray)
+        Self.leaveSearchList(keychain)
         SecKeychainDelete(keychain)
         try? FileManager.default.removeItem(at: directory)
+        Darwin.close(lock)
+    }
+
+    /// The search list as it is now, without `keychain`: never a list saved
+    /// earlier, which would drop whatever joined it since.
+    private static func leaveSearchList(_ keychain: SecKeychain) {
+        var list: CFArray?
+        SecKeychainCopySearchList(&list)
+        let now = (list as? [SecKeychain]) ?? []
+        SecKeychainSetSearchList(now.filter { !CFEqual($0, keychain) } as CFArray)
     }
 }
