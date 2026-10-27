@@ -20,6 +20,12 @@
 //                              behind it; changes nothing
 //   ship build                 inside a release only: assemble, sign,
 //                              notarize, the dmg (signed, notarized, stapled)
+//   ship appcast               inside a release only, after build: the
+//                              Sparkle feed it extends (dist/appcast.xml, else
+//                              --feed, else the app's SUFeedURL) with the dmg,
+//                              signed with the update key at $SPARKLE_ED_KEY,
+//                              the notes of every version it carries
+//                              (notes/<version>.md) as the dialog's HTML
 //   ship publish               from the checkout, once a release made the
 //                              dmg of exactly its commits: the tag pushed
 //                              with its branch, then the channels
@@ -46,6 +52,14 @@
 //   --signed             --assemble leaves the bundle signed already (an Xcode
 //                        export, which embeds the provisioning profiles
 //                        restricted entitlements need): verified, never re-signed
+//   --download-url-prefix <url>
+//                        where the feed says the dmg is (appcast; default
+//                        https://<name>.untitled.garden/releases/)
+//   --feed <url>         the live feed to extend when dist/appcast.xml is
+//                        absent (appcast; default the app's SUFeedURL)
+//   --maximum-versions <n>
+//                        the versions the feed and its notes keep (appcast;
+//                        default 3)
 //   --tag <name>         the tag publish pushes (default: VERSION), for a
 //                        repo that releases more than one app
 //   --github             a GitHub release with the notes and the dmg (gh)
@@ -67,7 +81,8 @@
 // VERSION comes from the environment (the app's mise.toml), the release body
 // from notes/$VERSION.md. Inside a release, the environment names the
 // release's own keychain (SHIP_KEYCHAIN) and the App Store Connect key it
-// wrote for this release (APPSTORE_KEY, APPSTORE_KEY_ID, APPSTORE_ISSUER).
+// wrote for this release (APPSTORE_KEY, APPSTORE_KEY_ID, APPSTORE_ISSUER),
+// and the Sparkle update key's file when the manifest names it (SPARKLE_ED_KEY).
 import AppInstallations
 import CryptoKit
 import Foundation
@@ -248,8 +263,8 @@ let layout = """
 // MARK: - the arguments
 
 let verbs = [
-    "release", "release-run", "identity", "check", "build", "publish", "cask", "released",
-    "installed",
+    "release", "release-run", "identity", "check", "build", "appcast", "publish", "cask",
+    "released", "installed",
 ]
 guard let verb = CommandLine.arguments.dropFirst().first, verbs.contains(verb) else {
     die(
@@ -258,6 +273,7 @@ guard let verb = CommandLine.arguments.dropFirst().first, verbs.contains(verb) e
                ship identity --team <T>
                ship check   --name <slug> --app <dir/X.app> [--github] [--cask]
                ship build   --team <T> --name <slug> --app <dir/X.app> --assemble <shell> [--sign <path>]… [--signed]
+               ship appcast --name <slug> --app <dir/X.app> [--download-url-prefix <url>] [--feed <url>] [--maximum-versions <n>]
                ship publish --name <slug> --app <dir/X.app> [--tag <name>] [--github] [--after <shell>] [--cask]
                ship cask    --name <slug> --app <dir/X.app> --desc <text> [--homepage <url>] [--cask-url <url>] [--binary <path>[:<name>]]…
                ship released
@@ -495,6 +511,15 @@ if verb == "build" {
     must(["xcrun", "stapler", "staple", dmg])
     print("\nbuilt \(name) \(version): \(dmg)")
     exit(0)
+}
+
+if verb == "appcast" {
+    let maximum = value("--maximum-versions").map { Int($0) ?? 0 } ?? 3
+    appcast(
+        name: name, app: app, version: version, dist: dist, dmg: dmg,
+        downloadPrefix: value("--download-url-prefix")
+            ?? "https://\(name.lowercased()).untitled.garden/releases/",
+        feed: value("--feed"), maximum: maximum)
 }
 
 // MARK: - the gates (check, publish)

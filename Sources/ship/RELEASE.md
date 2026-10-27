@@ -51,6 +51,12 @@ Without `SHIP_APPROVE`, `ship release` refuses. The keys are named by the releas
 
 A manifest names further secrets a build signs with (a Sparkle update key): `"secrets": {"SPARKLE_ED_KEY": "<reference>"}`. They are on the same request, released by the same yes, written beside the App Store Connect key, their path in that variable.
 
+## The Sparkle feed
+
+`ship appcast --name <slug> --app <dir/X.app>`, run by the build script after `ship build`, makes `dist/appcast.xml` with the update key at `$SPARKLE_ED_KEY` (the manifest's secret of that name), and refuses anywhere else. It extends the feed the app already has: `dist/appcast.xml` when the script put one there, else the feed at `--feed <url>`, else the app's `SUFeedURL` (a 404 there is the first release). The new item's build is the app's `CFBundleVersion`; a feed that already carries that build or a later one is refused, since no installed copy would take the update. The app must carry `SUPublicEDKey`: without it generate_appcast writes the item unsigned and says nothing.
+
+The update dialog's notes are one HTML document, `dist/<slug>-<version>.html` beside the dmg, embedded as the new item's description. It holds a block for each version the feed keeps (`--maximum-versions`, 3 by default, the same number the feed keeps), newest first, each rendered from `notes/<version>.md` and tagged with its build as the feed records it. Sparkle marks the block of the installed build and the document hides it and every older one, so each person reads only what is new to them. The released version's notes are required; an older version without a notes file is left out, and said. Request citations (`<slug>#42`) link to `https://<slug>.untitled.garden/requests/42`. The enclosure's URL is `--download-url-prefix` (default `https://<slug>.untitled.garden/releases/`) followed by the dmg's name. Sparkle's `generate_appcast` must be on `PATH`.
+
 ## What a release keeps
 
 Every release has a folder per app, `~/.local/state/ship/releases/<app>/<date>T<time>/`, kept for good (a few hundred KB):
@@ -75,3 +81,4 @@ What is never kept: a key or its value, anything read from the approver's stdin.
 | An app's manifest (its trees, its build script, its artifacts, further secrets) | `release.json` at the app's repo root |
 | Every release of each app | `~/.local/state/ship/releases/<app>/<date>T<time>/`; the last record at `<app>.json`, which `ship released` compares a checkout with |
 | The mechanics after signing (dmg, zip, GitHub release, cask) | `ship build` and `ship publish`, in `main.swift` |
+| The Sparkle feed and the update dialog's notes | `ship appcast`, in `Appcast.swift` |
