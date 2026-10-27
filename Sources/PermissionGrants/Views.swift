@@ -247,8 +247,9 @@
         }
 
         /// One grant, large: the page of `Steps`, usable alone. Its symbol,
-        /// its title and one line, and right under them its own action, large
-        /// (⏎ presses it), or the status mark once it is good.
+        /// its title, why the app needs it and where it stands, and right
+        /// under them its own action, large (⏎ presses it), or the status mark
+        /// once it is good.
         public struct Page: View {
             let grant: PermissionGrant
             @Environment(\.permissionGrantCase) private var letterCase
@@ -261,10 +262,19 @@
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
                     Text(grant.title).font(.title2.bold())
-                    // Two texts, as a row: the note when there is one, else why.
-                    Text(standing.note ?? grant.why)
-                        .multilineTextAlignment(.center).foregroundStyle(.secondary).frame(
-                            maxWidth: 360)
+                    // The page asks, so it always says why; where the grant
+                    // stands (the note) follows, smaller. A row has room for
+                    // one of them; here the why was hidden behind "Off in
+                    // Privacy & Security › …" exactly while it was needed
+                    // (trash.app's Full Disk Access, 2026-10-27).
+                    VStack(spacing: 6) {
+                        Text(grant.why).foregroundStyle(.secondary)
+                        if let note = standing.note {
+                            Text(note).font(.callout).foregroundStyle(.tertiary)
+                        }
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 360)
                     Group {
                         if standing.grade.needsUser {
                             GrantAction(hue: PermissionGrant.hue(standing.grade), fill: false) {
