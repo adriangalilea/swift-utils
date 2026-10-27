@@ -492,23 +492,20 @@ func release(_ manifests: [String]) -> Never {
                 atPath: (destination as NSString).deletingLastPathComponent,
                 withIntermediateDirectories: true)
             if isApp {
-                let zip = Process()
-                zip.executableURL = URL(filePath: "/usr/bin/ditto")
-                zip.arguments = [
-                    "-c", "-k", "--norsrc", "--noextattr", "--keepParent", built, destination,
-                ]
-                do { try zip.run() } catch {
-                    die("cannot zip \(built): \(error.localizedDescription)")
-                }
-                zip.waitUntilExit()
-                guard zip.terminationStatus == 0 else {
-                    die(
-                        "cannot zip \(built) to \(destination): ditto exited \(zip.terminationStatus)"
-                    )
-                }
+                zipApp(built, to: destination)
             } else {
                 do { try FileManager.default.copyItem(atPath: built, toPath: destination) } catch {
                     die("cannot copy \(built) to \(destination): \(error.localizedDescription)")
+                }
+                // A folder artifact's apps come back zipped the same way
+                // (hollow's `dist`, 2026-10-27: its app came back runnable).
+                for inside in appsInside(destination) {
+                    zipApp(inside, to: inside + ".zip")
+                    do { try FileManager.default.removeItem(atPath: inside) } catch {
+                        die(
+                            "cannot remove \(inside) after zipping it: \(error.localizedDescription)"
+                        )
+                    }
                 }
             }
             print(
@@ -522,9 +519,13 @@ func release(_ manifests: [String]) -> Never {
         // indexes the working folders.
         FileManager.default.createFile(
             atPath: releases.appending(path: ".metadata_never_index").path, contents: nil)
-        for artifact in app.artifacts where artifact.hasSuffix(".app") {
+        let builtApps = app.artifacts.flatMap { artifact in
+            artifact.hasSuffix(".app")
+                ? [app.root + "/" + artifact] : appsInside(app.root + "/" + artifact)
+        }
+        for built in builtApps {
             do throws(AppInstallation.RecordsError) {
-                try AppInstallation.removeStrays(of: URL(filePath: app.root + "/" + artifact)) {
+                try AppInstallation.removeStrays(of: URL(filePath: built)) {
                     print("ship: \($0)")
                 }
             } catch {
@@ -551,6 +552,34 @@ func release(_ manifests: [String]) -> Never {
         "ship: released \(names.joined(separator: ", ")) in \(Int(Date().timeIntervalSince(began))) s"
     )
     exit(0)
+}
+
+/// `app` packed into `destination` as the kit packs: no extended attributes,
+/// no resource forks, the bundle as the archive's one top folder.
+func zipApp(_ app: String, to destination: String) {
+    let zip = Process()
+    zip.executableURL = URL(filePath: "/usr/bin/ditto")
+    zip.arguments = ["-c", "-k", "--norsrc", "--noextattr", "--keepParent", app, destination]
+    do { try zip.run() } catch {
+        die("cannot zip \(app): \(error.localizedDescription)")
+    }
+    zip.waitUntilExit()
+    guard zip.terminationStatus == 0 else {
+        die("cannot zip \(app) to \(destination): ditto exited \(zip.terminationStatus)")
+    }
+}
+
+/// Every app under `folder`, never looking inside one (its nested helpers
+/// are its own).
+func appsInside(_ folder: String) -> [String] {
+    var found: [String] = []
+    let walk = FileManager.default.enumerator(atPath: folder)
+    while let relative = walk?.nextObject() as? String {
+        guard relative.hasSuffix(".app") else { continue }
+        walk?.skipDescendants()
+        found.append(folder + "/" + relative)
+    }
+    return found
 }
 
 /// The deepest directory containing every path.
