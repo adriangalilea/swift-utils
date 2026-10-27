@@ -1,8 +1,9 @@
 // `ship appcast`: the Sparkle feed of a release, made inside it after `ship
-// build`: the feed the app already has, extended with this release's dmg and
-// signed with the update key the release wrote at $SPARKLE_ED_KEY
-// (`release.json` secrets). The update dialog shows one HTML document of the
-// notes (Notes.swift) of every version the feed keeps.
+// build`: the app's published feed, as `ship release` read it before the yes
+// (release.json's "feed"), extended with this release's dmg and signed with
+// the update key the release wrote at $SPARKLE_ED_KEY (`release.json`
+// secrets). The update dialog shows one HTML document of the pinned notes
+// (Notes.swift) of every version the feed keeps.
 //
 // The notes document is personalised on the user's Mac: each version is a
 // block tagged `data-sparkle-version=<build>`, Sparkle marks the block of the
@@ -157,10 +158,11 @@ func releaseNotesHTML(_ entries: [(item: FeedItem, groups: [NotesGroup])], reque
 
 /// `ship appcast`: `dist/appcast.xml` for the dmg `ship build` made, with
 /// the notes of every version it carries. `downloads`: the folder URL the
-/// dmg is downloaded from, ending in "/".
+/// dmg is downloaded from, ending in "/". `notes` and `feed` (a file, empty
+/// when nothing is published yet) are what `ship release` read before the yes.
 func appcast(
     name: String, app: String, version: String, dist: String, dmg: String,
-    downloads: String, requests: String?, notes: Notes, maximum: Int
+    downloads: String, requests: String?, notes: Notes, feed: String, maximum: Int
 ) -> Never {
     let env = ProcessInfo.processInfo.environment
     guard let key = env["SPARKLE_ED_KEY"], !key.isEmpty, FileManager.default.fileExists(atPath: key)
@@ -204,29 +206,18 @@ func appcast(
 
     step("the feed it extends")
     let existing = "\(dist)/appcast.xml"
+    guard let published = FileManager.default.contents(atPath: feed) else {
+        die("no feed at \(feed)")
+    }
     var past: [FeedItem] = []
-    if FileManager.default.fileExists(atPath: existing) {
-        do { try FileManager.default.copyItem(atPath: existing, toPath: staged) } catch {
-            die("copy \(existing): \(error.localizedDescription)")
-        }
-        past = feedItems(FileManager.default.contents(atPath: staged) ?? Data(), from: existing)
-        print("  \(existing): \(past.count) item(s)")
+    if published.isEmpty {
+        print("  none yet: the first item")
     } else {
-        guard let url = read("SUFeedURL") else {
-            die("no feed to extend: no \(existing), and \(plist) names no SUFeedURL")
+        guard FileManager.default.createFile(atPath: staged, contents: published) else {
+            die("cannot stage the feed at \(staged)")
         }
-        let fetched = run(
-            ["curl", "-sSL", "-o", staged, "-w", "%{http_code}", url], quiet: true)
-        let status = fetched.out.split(separator: "\n").last.map(String.init) ?? ""
-        if status == "404" {
-            try? FileManager.default.removeItem(atPath: staged)
-            print("  \(url): none yet (404), the first item")
-        } else if fetched.code == 0, status == "200" {
-            past = feedItems(FileManager.default.contents(atPath: staged) ?? Data(), from: url)
-            print("  \(url): \(past.count) item(s)")
-        } else {
-            die("cannot read the feed at \(url): \(fetched.out)")
-        }
+        past = feedItems(published, from: feed)
+        print("  \(past.count) item(s), as read before the yes")
     }
     if let newest = past.max(by: { $0.build < $1.build }), newest.build >= build {
         die(
@@ -242,20 +233,19 @@ func appcast(
         + past.sorted { $0.build > $1.build }.prefix(maximum - 1)
     var entries: [(item: FeedItem, groups: [NotesGroup])] = []
     for item in kept {
-        let origin = notes.origin(of: item.version)
         guard let body = notes.of(item.version) else {
             if item.build == build {
-                die("\(origin) has no notes: the version released needs them")
+                die("\(version) has no notes: the version released needs them")
             }
-            print("  \(item.version) (build \(item.build)): none from \(origin), left out")
+            print("  \(item.version) (build \(item.build)): no notes, left out")
             continue
         }
         let groups = parseNotes(body, slug: slug)
         guard groups.contains(where: { !$0.items.isEmpty }) else {
-            die("\(origin) keeps no '### <Group>' with '- ' items")
+            die("\(item.version)'s notes keep no '### <Group>' with '- ' items")
         }
         entries.append((item, groups))
-        print("  \(item.version) (build \(item.build)): \(origin)")
+        print("  \(item.version) (build \(item.build))")
     }
     let stem = ((dmg as NSString).lastPathComponent as NSString).deletingPathExtension
     let html = "\(dist)/\(stem).html"

@@ -21,8 +21,8 @@
 //   ship build                 inside a release only: assemble, sign,
 //                              notarize, the dmg (signed, notarized, stapled)
 //   ship appcast               inside a release only, after build: the app's
-//                              Sparkle feed (dist/appcast.xml, else the one
-//                              at its SUFeedURL) extended with the dmg, signed
+//                              published Sparkle feed, as the release read it
+//                              before the yes, extended with the dmg, signed
 //                              with the update key at $SPARKLE_ED_KEY, the
 //                              notes of every version it keeps as the update
 //                              dialog's HTML (Appcast.swift)
@@ -504,10 +504,15 @@ if verb == "build" {
 
 if verb == "appcast" {
     let (manifest, _) = appManifest()
+    guard let notes = env["SHIP_NOTES"], let feed = env["SHIP_FEED"] else {
+        die(
+            "ship appcast runs inside `ship release`, for an app whose release.json names its \"feed\""
+        )
+    }
     appcast(
         name: name, app: app, version: version, dist: dist, dmg: dmg,
         downloads: manifest.downloadsFolder, requests: manifest.requests,
-        notes: Notes.ofApp(),
+        notes: Notes.pinned(notes), feed: feed,
         maximum: value("--maximum-versions").map { Int($0) ?? 0 } ?? 3)
 }
 
@@ -574,14 +579,25 @@ let tag = value("--tag") ?? version
 let tagged =
     run(["git", "rev-parse", "-q", "--verify", "refs/tags/\(tag)"], quiet: true).code == 0
 gate("no tag \(tag) yet", !tagged, hint: "bump VERSION in mise.toml")
-let notes = Notes.ofApp()
+// check reads the notes as the next release will; publish, the ones the last
+// release pinned, which the person approved.
+let notes: Notes = {
+    let (manifest, folder) = appManifest()
+    guard verb == "publish" else { return Notes.read(manifest, in: folder) }
+    guard
+        let record = try? JSONDecoder().decode(
+            Record.self, from: Data(contentsOf: recordFile(manifest.app))),
+        let released = record.folder
+    else { return Notes(versions: [:]) }
+    return Notes.pinned(released + "/notes.md")
+}()
 let body = notes.of(version) ?? ""
-gate("\(notes.origin(of: version)) has the notes (the words gate)", !body.isEmpty)
+gate("\(version) has notes (the words gate)", !body.isEmpty)
 // Notes render as designed releases (a glyph per group): a body without
 // groups and items is a dated heading with nothing under it.
 let lines = body.split(separator: "\n")
 gate(
-    "\(notes.origin(of: version)) keeps the grammar",
+    "\(version)'s notes keep the grammar",
     lines.contains { $0.hasPrefix("### ") } && lines.contains { $0.hasPrefix("- ") },
     hint: "'### Added|Fixed|Changed|Performance|Polish' sections with '- ' items")
 if has("--github") {

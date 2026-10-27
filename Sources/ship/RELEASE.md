@@ -44,10 +44,11 @@ Without `SHIP_APPROVE`, `ship release` refuses. The keys are named by the releas
 
 1. **Committed, or nothing.** Every tree each app is built from (its manifest names them) has no uncommitted or untracked change.
 2. **The working folders.** Each app's trees are cloned once into `~/.local/state/ship/releases/<app>/work`, laid out as the originals are, and moved to the commits being released (`checkout --force`, `clean`, submodules from the local ones). Ignored files stay: they are the build caches, so an unchanged dependency is never compiled twice. A build script keeps its tools' caches inside the clone, in ignored folders.
-3. **The plan, pinned.** What will be built (each app's clones, commits, build script and its SHA-256, artifacts) is written to `plan.json` in the release's folder; its SHA-256 is in the command the person approves.
-4. **One request for every app.** Per tree, the commits since the app's last release; the build script's hash; the keys by reference. One yes covers the apps released together.
-5. **`ship release-run`, after the yes.** It refuses unless the plan matches its approved hash, every clone is at its approved commit and clean, and every script matches its hash. It reads the keys from its standard input, makes a keychain of the release's own (a random password, Apple's import API, exactly one Developer ID identity or it refuses), puts it first on the search list, writes the App Store Connect key and any further secret to private files, and runs every app's script at once (`script <clone>`) with `SHIP_KEYCHAIN`, `APPSTORE_KEY` (the key's path), `APPSTORE_KEY_ID`, `APPSTORE_ISSUER`, `SHIP_RELEASE_SOURCES`, `SHIP_RELEASE_HEADS`, `SHIP_MANIFEST` (the manifest in the clone) and each further secret's path. Notarizations of different apps overlap. However it ends, the keychain, the files and the search-list entry are removed.
-6. **Recorded.** Each app's artifacts are copied back into its repo (an `.app` as `<name>.app.zip`, and so is every app inside a folder artifact: a runnable copy of the very build, at rest beside its installed copy, ties with it in LaunchServices and can win, and Finder registers any app it shows; installers unpack the zip straight into place), every record of what it built outside an Applications folder is removed (Xcode registers its archive), and the release's folder keeps everything.
+3. **What comes from outside the trees, read once.** Each app's release notes and, when its manifest names one, its published feed are read in the checkout, with the person's own tools and credentials (the clone has neither), into the release's folder (`notes.md`, `feed.xml`). The request lists the versions they carry notes for and the feed's items.
+4. **The plan, pinned.** What will be built (each app's clones, commits, build script, notes and feed, each with its SHA-256, artifacts) is written to `plan.json` in the release's folder; its SHA-256 is in the command the person approves.
+5. **One request for every app.** Per tree, the commits since the app's last release; the build script's hash; the keys by reference. One yes covers the apps released together.
+6. **`ship release-run`, after the yes.** It refuses unless the plan matches its approved hash, every clone is at its approved commit and clean, and every script, the notes and the feed match their hashes. It reads the keys from its standard input, makes a keychain of the release's own (a random password, Apple's import API, exactly one Developer ID identity or it refuses), puts it first on the search list, writes the App Store Connect key and any further secret to private files, and runs every app's script at once (`script <clone>`) with `SHIP_KEYCHAIN`, `APPSTORE_KEY` (the key's path), `APPSTORE_KEY_ID`, `APPSTORE_ISSUER`, `SHIP_RELEASE_SOURCES`, `SHIP_RELEASE_HEADS`, `SHIP_MANIFEST` (the manifest in the clone), `SHIP_NOTES` and `SHIP_FEED` (the pinned notes and feed) and each further secret's path. Notarizations of different apps overlap. However it ends, the keychain, the files and the search-list entry are removed.
+7. **Recorded.** Each app's artifacts are copied back into its repo (an `.app` as `<name>.app.zip`, and so is every app inside a folder artifact: a runnable copy of the very build, at rest beside its installed copy, ties with it in LaunchServices and can win, and Finder registers any app it shows; installers unpack the zip straight into place), every record of what it built outside an Applications folder is removed (Xcode registers its archive), and the release's folder keeps everything.
 
 ## The manifest
 
@@ -61,6 +62,7 @@ What is the app's, not one command's, is said once, in its `release.json`; every
   "artifacts": ["dist"],
   "secrets": {"SPARKLE_ED_KEY": "<reference>"},
   "notes": ["scripts/notes"],
+  "feed": ["curl", "-fsS", "https://example.com/myapp/appcast.xml"],
   "downloads": "https://example.com/releases/",
   "homepage": "https://example.com/myapp",
   "requests": "https://github.com/me/myapp/issues/{number}"
@@ -74,16 +76,21 @@ What is the app's, not one command's, is said once, in its `release.json`; every
 | `script` | the build, run as `script <clone of the first tree>` |
 | `artifacts` | what the build makes, copied back into the repo |
 | `secrets` | further keys the build signs with (a Sparkle update key): the variable that will name the key's file → the reference the approver resolves. On the same request, released by the same yes, written beside the App Store Connect key |
-| `notes` | where the release notes are. Absent: `notes/<version>.md` beside this file. Present: a program (argv, from this file's folder) that prints a version's notes given the version as its last argument, for notes kept anywhere else (a database, a CMS). It runs without the release's keys in its environment; printing nothing means that version has none, and a failing program stops ship. `check`, `publish` and `appcast` all read the notes this one way |
+| `notes` | where the release notes are. Absent: `notes/<version>.md` beside this file. Present: a program (argv, run from this file's folder) that prints every version's notes, each under a `## <version>` heading, for notes kept anywhere else (a database, a CMS) |
+| `feed` | a program that prints the app's published Sparkle feed, nothing when none is published yet (`appcast` needs it): a `curl` of a public feed, a read of a private one with the person's credentials |
 | `downloads` | the folder URL the dmgs are downloaded from (`appcast`'s enclosure, `cask`'s url: it plus the dmg's name) |
 | `homepage` | the app's web page (`cask`) |
 | `requests` | the URL of the app's request N, `{number}` in it: a notes item citing `<app>#N` links there. Absent, the citation stays text |
 
 Notes keep one grammar wherever they come from: `### <Group>` headings over `- ` items, `**bold**` for an item's headline, `` `code` `` for literals.
 
+### What a release reads from outside its trees
+
+A build runs in a clean clone with no credentials and no network it may count on, so what it needs from elsewhere, the notes and the published feed, is read before the yes: by `ship release`, in the checkout, with the person's tools and credentials, into the release's folder, each file pinned in the plan by its SHA-256 and listed on the request. A program that fails stops the release. Inside the release, `appcast` reads those copies (`SHIP_NOTES`, `SHIP_FEED`); afterwards `publish` reads the notes the last release pinned. The words checked, approved and published are the same words. `check` reads the notes live, as the next release will.
+
 ## The Sparkle feed
 
-`ship appcast --name <slug> --app <dir/X.app>`, run by the build script after `ship build`, makes `dist/appcast.xml` with the update key at `$SPARKLE_ED_KEY` (the manifest's secret of that name), and refuses anywhere else. It extends the feed the app already has: `dist/appcast.xml` when the script put one there, else the one at the app's `SUFeedURL` (a 404 there is the first release). The new item's build is the app's `CFBundleVersion`; a feed that already carries that build or a later one is refused, since no installed copy would take the update. The app must carry `SUPublicEDKey`: without it generate_appcast writes the item unsigned and says nothing.
+`ship appcast --name <slug> --app <dir/X.app>`, run by the build script after `ship build`, makes `dist/appcast.xml` with the update key at `$SPARKLE_ED_KEY` (the manifest's secret of that name), and refuses anywhere else. It extends the published feed the release read before the yes (the manifest's `feed`; empty, the first release). The new item's build is the app's `CFBundleVersion`; a feed that already carries that build or a later one is refused, since no installed copy would take the update. The app must carry `SUPublicEDKey`: without it generate_appcast writes the item unsigned and says nothing.
 
 The update dialog's notes are one HTML document, `dist/<slug>-<version>.html` beside the dmg, embedded as the new item's description. It holds a block for each version the feed keeps (`--maximum-versions`, 3 by default, the same number the feed keeps), newest first, each tagged with its build as the feed records it. Sparkle marks the block of the installed build and the document hides it and every older one, so each person reads only what is new to them. The released version's notes are required; an older version without notes is left out, and said. The enclosure's URL is the manifest's `downloads` followed by the dmg's name. Sparkle's `generate_appcast` must be on `PATH`.
 
@@ -96,6 +103,7 @@ Every release has a folder per app, `~/.local/state/ship/releases/<app>/<date>T<
 | `plan.json` | the plan approved, byte for byte (its SHA-256 is in `record.json` and in the approver's own record) |
 | `approval.txt` | what the approver said: its receipt of the yes |
 | `release.log` | the build's whole output, every step's time, Apple's notarization verdicts |
+| `notes.md`, `feed.xml` | the notes and the feed read before the yes, as pinned (`publish` reads the notes from here) |
 | `toolchain.txt` | macOS, Xcode, Swift, Rust, Zig, Node, as each says its version, and the `ship` that ran |
 | `record.json` | the commits per tree, every artifact's digest (every file under it by path and content), the certificate that signed (SHA-1 and name), Apple's notarization submission ids (`xcrun notarytool log <id>` reads Apple's own account), the plan's SHA-256 |
 

@@ -54,10 +54,13 @@ struct Manifest: Decodable {
     /// Further secrets the build reads: the variable naming the file the
     /// script reads → the reference the approver resolves.
     let secrets: [String: String]?
-    /// The program that prints a version's release notes, given the version
-    /// as its last argument; absent, they are notes/<version>.md beside
-    /// this file (Notes.swift).
+    /// The program that prints every version's release notes, each under
+    /// `## <version>`; absent, they are notes/<version>.md beside this file
+    /// (Notes.swift).
     let notes: [String]?
+    /// The program that prints the app's published Sparkle feed (nothing:
+    /// none yet), read with the notes before the yes (`ship appcast`).
+    let feed: [String]?
     /// The folder URL the dmgs are downloaded from: the feed's enclosure and
     /// the cask's url are it plus the dmg's name.
     let downloads: String?
@@ -123,7 +126,7 @@ let releaseValues = ["APPSTORE_KEY_ID", "APPSTORE_ISSUER"]
 let reserved: Set<String> =
     Set(releaseKeys + releaseValues).union([
         "APPSTORE_KEY", "SHIP_KEYCHAIN", "SHIP_RELEASE_SOURCES", "SHIP_RELEASE_HEADS",
-        "SHIP_MANIFEST",
+        "SHIP_MANIFEST", "SHIP_NOTES", "SHIP_FEED",
     ])
 
 // MARK: - the approval contract
@@ -178,6 +181,11 @@ struct Plan: Codable {
         let scriptSHA256: String
         /// The app's release.json in the clone (SHIP_MANIFEST to the build).
         let manifest: String
+        /// What the release read from outside its trees before the yes, in
+        /// `folder`: notes.md (SHIP_NOTES) and, when the manifest names a
+        /// feed, feed.xml (SHIP_FEED), each pinned by its SHA-256.
+        let notesSHA256: String
+        let feedSHA256: String?
         /// Tree name → its clone and the approved commit.
         let trees: [String: Tree]
         let artifacts: [String]
@@ -188,6 +196,8 @@ struct Plan: Codable {
         /// This release's folder for the app; the build's log is in it.
         let folder: String
         var log: String { folder + "/release.log" }
+        var notes: String { folder + "/notes.md" }
+        var feed: String { folder + "/feed.xml" }
     }
     struct Tree: Codable {
         let clone: String
@@ -438,11 +448,42 @@ func release(_ manifests: [String]) -> Never {
             try FileManager.default.createDirectory(
                 atPath: folder, withIntermediateDirectories: true)
         } catch { die("cannot make \(folder): \(error.localizedDescription)") }
+
+        // What the build reads from outside its trees, read here, in the
+        // checkout with the person's tools and credentials, and pinned by
+        // the plan: the clone has neither, and the yes covers these words.
+        let notes = Notes.read(manifest, in: root)
+        let notesPath = folder + "/notes.md"
+        guard FileManager.default.createFile(atPath: notesPath, contents: Data(notes.document.utf8))
+        else { die("cannot write \(notesPath)") }
+        if !notes.versions.isEmpty {
+            let said = notes.versions.keys.sorted {
+                $0.compare($1, options: .numeric) == .orderedDescending
+            }
+            lines.append(
+                "  notes of \(said.prefix(5).joined(separator: ", "))\(said.count > 5 ? ", …" : "")"
+            )
+        }
+        var feedSHA: String?
+        if let program = manifest.feed {
+            guard !program.isEmpty else { die("\(path): \"feed\" names no program") }
+            let feed = capture(program, in: root)
+            let feedPath = folder + "/feed.xml"
+            guard FileManager.default.createFile(atPath: feedPath, contents: Data(feed.utf8)) else {
+                die("cannot write \(feedPath)")
+            }
+            let items =
+                feed.isEmpty
+                ? 0 : feedItems(Data(feed.utf8), from: program.joined(separator: " ")).count
+            lines.append("  extends a feed of \(items) item\(items == 1 ? "" : "s")")
+            feedSHA = sha256(file: feedPath)
+        }
         apps.append(
             Plan.App(
                 app: manifest.app, repo: sources[own.name]!, root: appRoot, script: script,
                 scriptSHA256: scriptSHA,
                 manifest: appRoot + manifestPath.dropFirst(sources[own.name]!.count),
+                notesSHA256: sha256(file: notesPath), feedSHA256: feedSHA,
                 trees: trees,
                 artifacts: manifest.artifacts, secrets: (manifest.secrets ?? [:]).keys.sorted(),
                 sources: sourcesSaid,
@@ -661,6 +702,9 @@ func releaseRun(_ arguments: [String]) -> Never {
         guard sha256(file: app.script) == app.scriptSHA256 else {
             die("\(app.app): \(app.script) changed since it was approved")
         }
+        guard sha256(file: app.notes) == app.notesSHA256,
+            app.feedSHA256.map({ sha256(file: app.feed) == $0 }) ?? true
+        else { die("\(app.app): the notes or the feed changed since they were approved") }
     }
     // The keys: one JSON object on stdin, read whole, never in the
     // environment (which any process of this user can read).
@@ -685,8 +729,9 @@ func releaseRun(_ arguments: [String]) -> Never {
         var built: [String: String] = [
             "APPSTORE_KEY": keychain.appStoreKeyPath, "SHIP_KEYCHAIN": keychain.path,
             "SHIP_RELEASE_SOURCES": app.sources, "SHIP_RELEASE_HEADS": app.heads,
-            "SHIP_MANIFEST": app.manifest,
+            "SHIP_MANIFEST": app.manifest, "SHIP_NOTES": app.notes,
         ]
+        if app.feedSHA256 != nil { built["SHIP_FEED"] = app.feed }
         for name in releaseValues { built[name] = environment[name]! }
         for name in app.secrets {
             guard let value = secrets[name], !value.isEmpty else {
