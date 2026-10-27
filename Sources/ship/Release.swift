@@ -54,6 +54,42 @@ struct Manifest: Decodable {
     /// Further secrets the build reads: the variable naming the file the
     /// script reads → the reference the approver resolves.
     let secrets: [String: String]?
+    /// The program that prints a version's release notes, given the version
+    /// as its last argument; absent, they are notes/<version>.md beside
+    /// this file (Notes.swift).
+    let notes: [String]?
+    /// The folder URL the dmgs are downloaded from: the feed's enclosure and
+    /// the cask's url are it plus the dmg's name.
+    let downloads: String?
+    /// The app's web page (the cask's homepage).
+    let homepage: String?
+    /// The URL of request N, `{number}` in it: a notes item citing
+    /// `<app>#N` links there; absent, the citation stays text.
+    let requests: String?
+}
+
+/// The app's manifest and its folder: the clone's inside a release
+/// ($SHIP_MANIFEST), else release.json in the current folder.
+func appManifest() -> (manifest: Manifest, folder: String) {
+    let path = ProcessInfo.processInfo.environment["SHIP_MANIFEST"] ?? "release.json"
+    guard let data = FileManager.default.contents(atPath: path) else {
+        die("no \(path): the app's release manifest")
+    }
+    let manifest: Manifest
+    do { manifest = try JSONDecoder().decode(Manifest.self, from: data) } catch {
+        die("\(path) is not a release manifest: \(error)")
+    }
+    return (manifest, (realPath(path) as NSString).deletingLastPathComponent)
+}
+
+extension Manifest {
+    /// `downloads`, ending in "/" so a dmg's name follows it.
+    var downloadsFolder: String {
+        guard let downloads, !downloads.isEmpty else {
+            die("release.json names no \"downloads\": the folder URL the dmgs are downloaded from")
+        }
+        return downloads.hasSuffix("/") ? downloads : downloads + "/"
+    }
 }
 
 /// One release of an app: the commits (what the next one is compared
@@ -87,6 +123,7 @@ let releaseValues = ["APPSTORE_KEY_ID", "APPSTORE_ISSUER"]
 let reserved: Set<String> =
     Set(releaseKeys + releaseValues).union([
         "APPSTORE_KEY", "SHIP_KEYCHAIN", "SHIP_RELEASE_SOURCES", "SHIP_RELEASE_HEADS",
+        "SHIP_MANIFEST",
     ])
 
 // MARK: - the approval contract
@@ -139,6 +176,8 @@ struct Plan: Codable {
         let root: String
         let script: String
         let scriptSHA256: String
+        /// The app's release.json in the clone (SHIP_MANIFEST to the build).
+        let manifest: String
         /// Tree name → its clone and the approved commit.
         let trees: [String: Tree]
         let artifacts: [String]
@@ -386,6 +425,9 @@ func release(_ manifests: [String]) -> Never {
             trees[tree.name] = Plan.Tree(clone: clone, head: heads[tree.name]!)
         }
         let appRoot = trees[own.name]!.clone
+        guard manifestPath.hasPrefix(sources[own.name]! + "/") else {
+            die("\(path): the manifest must sit inside its first tree, \(sources[own.name]!)")
+        }
         let script = appRoot + "/" + manifest.script
         let sourcesSaid = manifest.trees.map { "\($0.name)@\(heads[$0.name]!.prefix(12))" }.joined(
             separator: " ")
@@ -399,7 +441,9 @@ func release(_ manifests: [String]) -> Never {
         apps.append(
             Plan.App(
                 app: manifest.app, repo: sources[own.name]!, root: appRoot, script: script,
-                scriptSHA256: scriptSHA, trees: trees,
+                scriptSHA256: scriptSHA,
+                manifest: appRoot + manifestPath.dropFirst(sources[own.name]!.count),
+                trees: trees,
                 artifacts: manifest.artifacts, secrets: (manifest.secrets ?? [:]).keys.sorted(),
                 sources: sourcesSaid,
                 heads: manifest.trees.map { "\($0.name)=\(heads[$0.name]!)" }.joined(
@@ -480,8 +524,8 @@ func release(_ manifests: [String]) -> Never {
             // An app comes back as `<name>.app.zip`, never as a runnable copy:
             // an app at rest beside its installed copy, of the very same build,
             // ties with it in LaunchServices and can win (an extension, a login
-            // item, a URL scheme resolving to it: hollow's FSKit mount,
-            // 2026-10-26), and Finder registers any app it shows. Installers
+            // item, a URL scheme or a file system extension resolving to
+            // it), and Finder registers any app it shows. Installers
             // unpack the zip straight into place. Packed as the kit packs: no
             // extended attributes, no resource forks.
             let isApp = artifact.hasSuffix(".app")
@@ -497,8 +541,7 @@ func release(_ manifests: [String]) -> Never {
                 do { try FileManager.default.copyItem(atPath: built, toPath: destination) } catch {
                     die("cannot copy \(built) to \(destination): \(error.localizedDescription)")
                 }
-                // A folder artifact's apps come back zipped the same way
-                // (hollow's `dist`, 2026-10-27: its app came back runnable).
+                // A folder artifact's apps come back zipped the same way.
                 for inside in appsInside(destination) {
                     zipApp(inside, to: inside + ".zip")
                     do { try FileManager.default.removeItem(atPath: inside) } catch {
@@ -642,6 +685,7 @@ func releaseRun(_ arguments: [String]) -> Never {
         var built: [String: String] = [
             "APPSTORE_KEY": keychain.appStoreKeyPath, "SHIP_KEYCHAIN": keychain.path,
             "SHIP_RELEASE_SOURCES": app.sources, "SHIP_RELEASE_HEADS": app.heads,
+            "SHIP_MANIFEST": app.manifest,
         ]
         for name in releaseValues { built[name] = environment[name]! }
         for name in app.secrets {

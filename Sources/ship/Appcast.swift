@@ -1,8 +1,8 @@
 // `ship appcast`: the Sparkle feed of a release, made inside it after `ship
-// build`. The update dialog's notes are the app's own `notes/<version>.md`,
-// one HTML document for every version the feed carries, and the feed is the
-// one it extends with this release's dmg, signed with the update key the
-// release wrote at $SPARKLE_ED_KEY (`release.json` secrets).
+// build`: the feed the app already has, extended with this release's dmg and
+// signed with the update key the release wrote at $SPARKLE_ED_KEY
+// (`release.json` secrets). The update dialog shows one HTML document of the
+// notes (Notes.swift) of every version the feed keeps.
 //
 // The notes document is personalised on the user's Mac: each version is a
 // block tagged `data-sparkle-version=<build>`, Sparkle marks the block of the
@@ -49,8 +49,8 @@ func feedItems(_ xml: Data, from source: String) -> [FeedItem] {
 
 /// One span of a notes item: the grammar `ship check` gates (`### <Group>`
 /// over `- ` items) with its inline vocabulary: **bold** for the headline,
-/// `code` for literals, `<slug>#42` (optionally "fixes"/"closes" before it)
-/// citing the request the item delivers.
+/// `code` for literals, `<app>#42` (optionally "fixes"/"closes" before it)
+/// citing the app's request 42, linked where release.json's `requests` says.
 indirect enum Span {
     case text(String)
     case code(String)
@@ -107,14 +107,20 @@ func escapeHTML(_ text: String) -> String {
         .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
 }
 
-func spansHTML(_ spans: [Span], slug: String) -> String {
+/// `requests`: the manifest's URL of request N (`{number}` in it); without
+/// one a citation stays text.
+func spansHTML(_ spans: [Span], requests: String?) -> String {
     spans.map { span in
         switch span {
         case .text(let text): escapeHTML(text)
         case .code(let text): "<code>\(escapeHTML(text))</code>"
-        case .bold(let inner): "<strong>\(spansHTML(inner, slug: slug))</strong>"
+        case .bold(let inner): "<strong>\(spansHTML(inner, requests: requests))</strong>"
         case .ref(let text, let number):
-            "<a href=\"https://\(slug).untitled.garden/requests/\(number)\">\(escapeHTML(text))</a>"
+            if let requests {
+                "<a href=\"\(escapeHTML(requests.replacingOccurrences(of: "{number}", with: String(number))))\">\(escapeHTML(text))</a>"
+            } else {
+                escapeHTML(text)
+            }
         }
     }.joined()
 }
@@ -122,7 +128,9 @@ func spansHTML(_ spans: [Span], slug: String) -> String {
 /// The update dialog's notes: one block per version, newest first, the
 /// offered one first. No DOCTYPE and no body, so generate_appcast embeds the
 /// document as the new item's description.
-func releaseNotesHTML(_ entries: [(item: FeedItem, groups: [NotesGroup])], slug: String) -> String {
+func releaseNotesHTML(_ entries: [(item: FeedItem, groups: [NotesGroup])], requests: String?)
+    -> String
+{
     let style =
         "<style>.sparkle-installed-version,.sparkle-installed-version~.release{display:none}</style>"
     let blocks = entries.enumerated().map { index, entry in
@@ -135,7 +143,7 @@ func releaseNotesHTML(_ entries: [(item: FeedItem, groups: [NotesGroup])], slug:
             "<h3 style=\"font-size:13px; text-transform:lowercase; letter-spacing:0.06em; opacity:0.6; margin:14px 0 4px;\">\(escapeHTML(group.title))</h3>"
                 + "<ul style=\"margin:0; padding-left:18px;\">"
                 + group.items.map {
-                    "<li style=\"margin:4px 0; line-height:1.5;\">\(spansHTML($0, slug: slug))</li>"
+                    "<li style=\"margin:4px 0; line-height:1.5;\">\(spansHTML($0, requests: requests))</li>"
                 }.joined() + "</ul>"
         }.joined()
         return
@@ -148,10 +156,11 @@ func releaseNotesHTML(_ entries: [(item: FeedItem, groups: [NotesGroup])], slug:
 // MARK: - ship appcast
 
 /// `ship appcast`: `dist/appcast.xml` for the dmg `ship build` made, with
-/// the notes of every version it carries.
+/// the notes of every version it carries. `downloads`: the folder URL the
+/// dmg is downloaded from, ending in "/".
 func appcast(
     name: String, app: String, version: String, dist: String, dmg: String,
-    downloadPrefix: String, feed: String?, maximum: Int
+    downloads: String, requests: String?, notes: Notes, maximum: Int
 ) -> Never {
     let env = ProcessInfo.processInfo.environment
     guard let key = env["SPARKLE_ED_KEY"], !key.isEmpty, FileManager.default.fileExists(atPath: key)
@@ -203,8 +212,8 @@ func appcast(
         past = feedItems(FileManager.default.contents(atPath: staged) ?? Data(), from: existing)
         print("  \(existing): \(past.count) item(s)")
     } else {
-        guard let url = feed ?? read("SUFeedURL") else {
-            die("no feed to extend: no \(existing), no --feed, and \(plist) names no SUFeedURL")
+        guard let url = read("SUFeedURL") else {
+            die("no feed to extend: no \(existing), and \(plist) names no SUFeedURL")
         }
         let fetched = run(
             ["curl", "-sSL", "-o", staged, "-w", "%{http_code}", url], quiet: true)
@@ -233,23 +242,25 @@ func appcast(
         + past.sorted { $0.build > $1.build }.prefix(maximum - 1)
     var entries: [(item: FeedItem, groups: [NotesGroup])] = []
     for item in kept {
-        let file = "notes/\(item.version).md"
-        guard let body = try? String(contentsOfFile: file, encoding: .utf8) else {
-            if item.build == build { die("no \(file): the notes of the version released") }
-            print("  \(item.version) (build \(item.build)): no \(file), left out")
+        let origin = notes.origin(of: item.version)
+        guard let body = notes.of(item.version) else {
+            if item.build == build {
+                die("\(origin) has no notes: the version released needs them")
+            }
+            print("  \(item.version) (build \(item.build)): none from \(origin), left out")
             continue
         }
         let groups = parseNotes(body, slug: slug)
         guard groups.contains(where: { !$0.items.isEmpty }) else {
-            die("\(file) keeps no '### <Group>' with '- ' items")
+            die("\(origin) keeps no '### <Group>' with '- ' items")
         }
         entries.append((item, groups))
-        print("  \(item.version) (build \(item.build)): \(file)")
+        print("  \(item.version) (build \(item.build)): \(origin)")
     }
     let stem = ((dmg as NSString).lastPathComponent as NSString).deletingPathExtension
     let html = "\(dist)/\(stem).html"
     do {
-        try releaseNotesHTML(entries, slug: slug).write(
+        try releaseNotesHTML(entries, requests: requests).write(
             toFile: html, atomically: true, encoding: .utf8)
         try FileManager.default.linkItem(atPath: html, toPath: "\(stage)/\(stem).html")
         try FileManager.default.linkItem(atPath: dmg, toPath: "\(stage)/\(stem).dmg")
@@ -257,7 +268,7 @@ func appcast(
 
     step("generate_appcast")
     must([
-        "generate_appcast", "--ed-key-file", key, "--download-url-prefix", downloadPrefix,
+        "generate_appcast", "--ed-key-file", key, "--download-url-prefix", downloads,
         "--maximum-versions", String(maximum), stage,
     ])
     guard let made = FileManager.default.contents(atPath: staged),

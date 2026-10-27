@@ -20,12 +20,12 @@
 //                              behind it; changes nothing
 //   ship build                 inside a release only: assemble, sign,
 //                              notarize, the dmg (signed, notarized, stapled)
-//   ship appcast               inside a release only, after build: the
-//                              Sparkle feed it extends (dist/appcast.xml, else
-//                              --feed, else the app's SUFeedURL) with the dmg,
-//                              signed with the update key at $SPARKLE_ED_KEY,
-//                              the notes of every version it carries
-//                              (notes/<version>.md) as the dialog's HTML
+//   ship appcast               inside a release only, after build: the app's
+//                              Sparkle feed (dist/appcast.xml, else the one
+//                              at its SUFeedURL) extended with the dmg, signed
+//                              with the update key at $SPARKLE_ED_KEY, the
+//                              notes of every version it keeps as the update
+//                              dialog's HTML (Appcast.swift)
 //   ship publish               from the checkout, once a release made the
 //                              dmg of exactly its commits: the tag pushed
 //                              with its branch, then the channels
@@ -52,11 +52,6 @@
 //   --signed             --assemble leaves the bundle signed already (an Xcode
 //                        export, which embeds the provisioning profiles
 //                        restricted entitlements need): verified, never re-signed
-//   --download-url-prefix <url>
-//                        where the feed says the dmg is (appcast; default
-//                        https://<name>.untitled.garden/releases/)
-//   --feed <url>         the live feed to extend when dist/appcast.xml is
-//                        absent (appcast; default the app's SUFeedURL)
 //   --maximum-versions <n>
 //                        the versions the feed and its notes keep (appcast;
 //                        default 3)
@@ -68,19 +63,16 @@
 //   --cask               bumps Casks/<name>.rb in the tap checkout at $TAP
 //                        (unset: skipped, as for a fork without the tap)
 //   --desc <text>        the cask's one-line description (cask)
-//   --homepage <url>     (cask; default https://<name>.untitled.garden/)
-//   --cask-url <url>     where the dmg is fetched, #{version} in it (cask;
-//                        default the garden's: https://<name>.untitled.garden/
-//                        releases/<name>-#{version}.dmg, which counts the
-//                        download and redirects to the CDN)
 //   --binary <path>[:<name>]
 //                        a command the cask links, its path inside the bundle
 //                        (Contents/MacOS/x) and its name when not the file's
 //                        (cask, repeatable)
 //
-// VERSION comes from the environment (the app's mise.toml), the release body
-// from notes/$VERSION.md. Inside a release, the environment names the
-// release's own keychain (SHIP_KEYCHAIN) and the App Store Connect key it
+// What is the app's, not one command's, is in its release.json (RELEASE.md,
+// "The manifest"): where its notes are, where its dmgs are downloaded from,
+// its homepage, where a request it cites lives. VERSION comes from the
+// environment (the app's mise.toml). Inside a release, the environment names
+// the manifest in the release's clone (SHIP_MANIFEST), the release's own keychain (SHIP_KEYCHAIN) and the App Store Connect key it
 // wrote for this release (APPSTORE_KEY, APPSTORE_KEY_ID, APPSTORE_ISSUER),
 // and the Sparkle update key's file when the manifest names it (SPARKLE_ED_KEY).
 import AppInstallations
@@ -273,9 +265,9 @@ guard let verb = CommandLine.arguments.dropFirst().first, verbs.contains(verb) e
                ship identity --team <T>
                ship check   --name <slug> --app <dir/X.app> [--github] [--cask]
                ship build   --team <T> --name <slug> --app <dir/X.app> --assemble <shell> [--sign <path>]… [--signed]
-               ship appcast --name <slug> --app <dir/X.app> [--download-url-prefix <url>] [--feed <url>] [--maximum-versions <n>]
+               ship appcast --name <slug> --app <dir/X.app> [--maximum-versions <n>]
                ship publish --name <slug> --app <dir/X.app> [--tag <name>] [--github] [--after <shell>] [--cask]
-               ship cask    --name <slug> --app <dir/X.app> --desc <text> [--homepage <url>] [--cask-url <url>] [--binary <path>[:<name>]]…
+               ship cask    --name <slug> --app <dir/X.app> --desc <text> [--binary <path>[:<name>]]…
                ship released
                ship installed <X.app>
         """
@@ -328,7 +320,6 @@ guard let app = value("--app"), app.hasSuffix(".app") else { die("--app <dir/X.a
 guard let version = env["VERSION"], !version.isEmpty else {
     die("VERSION is not set: it comes from the app's mise.toml [env]")
 }
-let notes = "notes/\(version).md"
 let dist = (app as NSString).deletingLastPathComponent
 let dmg = "\(dist)/\(name)-\(version).dmg"
 // The build clears this directory before assembling: it must be a scratch
@@ -354,9 +345,11 @@ if verb == "cask" {
         die("\(cask) exists: publish bumps it; a first cask is written once")
     }
     let appName = (app as NSString).lastPathComponent
-    let url =
-        value("--cask-url") ?? "https://\(name).untitled.garden/releases/\(name)-#{version}.dmg"
-    let homepage = value("--homepage") ?? "https://\(name).untitled.garden/"
+    let (manifest, _) = appManifest()
+    let url = manifest.downloadsFolder + "\(name)-#{version}.dmg"
+    guard let homepage = manifest.homepage, !homepage.isEmpty else {
+        die("release.json names no \"homepage\": the app's web page")
+    }
     var lines = [
         caskDraftMark,
         "cask \"\(name)\" do",
@@ -364,10 +357,6 @@ if verb == "cask" {
         "  sha256 \"0\"",
         "",
     ]
-    if value("--cask-url") == nil {
-        lines.append(
-            "  # The garden URL, not GitHub: it counts the download, then 302s to the CDN.")
-    }
     lines += [
         "  url \"\(url)\"",
         "  name \"\(name)\"",
@@ -514,12 +503,12 @@ if verb == "build" {
 }
 
 if verb == "appcast" {
-    let maximum = value("--maximum-versions").map { Int($0) ?? 0 } ?? 3
+    let (manifest, _) = appManifest()
     appcast(
         name: name, app: app, version: version, dist: dist, dmg: dmg,
-        downloadPrefix: value("--download-url-prefix")
-            ?? "https://\(name.lowercased()).untitled.garden/releases/",
-        feed: value("--feed"), maximum: maximum)
+        downloads: manifest.downloadsFolder, requests: manifest.requests,
+        notes: Notes.ofApp(),
+        maximum: value("--maximum-versions").map { Int($0) ?? 0 } ?? 3)
 }
 
 // MARK: - the gates (check, publish)
@@ -585,13 +574,14 @@ let tag = value("--tag") ?? version
 let tagged =
     run(["git", "rev-parse", "-q", "--verify", "refs/tags/\(tag)"], quiet: true).code == 0
 gate("no tag \(tag) yet", !tagged, hint: "bump VERSION in mise.toml")
-let body = (try? String(contentsOfFile: notes, encoding: .utf8)) ?? ""
-gate("\(notes) exists (the words gate)", !body.isEmpty)
+let notes = Notes.ofApp()
+let body = notes.of(version) ?? ""
+gate("\(notes.origin(of: version)) has the notes (the words gate)", !body.isEmpty)
 // Notes render as designed releases (a glyph per group): a body without
 // groups and items is a dated heading with nothing under it.
 let lines = body.split(separator: "\n")
 gate(
-    "\(notes) keeps the grammar",
+    "\(notes.origin(of: version)) keeps the grammar",
     lines.contains { $0.hasPrefix("### ") } && lines.contains { $0.hasPrefix("- ") },
     hint: "'### Added|Fixed|Changed|Performance|Polish' sections with '- ' items")
 if has("--github") {
@@ -647,7 +637,7 @@ must(["git", "push", "origin", run(["git", "branch", "--show-current"], quiet: t
 
 if has("--github") {
     step("GitHub release")
-    must(["gh", "release", "create", tag, "--title", version, "--notes-file", notes, dmg])
+    must(["gh", "release", "create", tag, "--title", version, "--notes", body, dmg])
 }
 
 // Before the cask: a cask can point at what this publishes, and brew fetches

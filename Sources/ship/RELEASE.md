@@ -6,7 +6,7 @@
 
 A build signed by the team's Developer ID is made only after a person approved exactly what goes into it. The keys that sign it live in a vault and reach that one release, through its standard input, never its environment or its command line. Every release keeps what a postmortem needs.
 
-That is the whole design, on purpose. It guards against forgetting (a build nobody approved, a key left on a disk, a release nobody can reconstruct), not against a determined attacker already running as the person: such a process can edit a working folder mid-build or use the release's keychain in the minutes it is open. Closing that would take building as another user or the key never leaving the vault (a smart-card token), machinery whose cost in review attention is better spent elsewhere for now. Revisit before an app whose users are a target (hollow) is released publicly.
+That is the whole design, on purpose. It guards against forgetting (a build nobody approved, a key left on a disk, a release nobody can reconstruct), not against a determined attacker already running as the person: such a process can edit a working folder mid-build or use the release's keychain in the minutes it is open. Closing that would take building as another user or the key never leaving the vault (a smart-card token), machinery whose cost in review attention is better spent elsewhere for now. Revisit before releasing an app whose users are a target.
 
 ## The approver
 
@@ -14,15 +14,15 @@ That is the whole design, on purpose. It guards against forgetting (a build nobo
 
 ```json
 {
-  "title": "Release Lore and Mach?",
-  "lines": ["Mach: mach at 9c1d2e3…, no release to compare with"],
+  "title": "Release MyApp and Helper?",
+  "lines": ["Helper: helper at 9c1d2e3…, no release to compare with"],
   "changes": [
-    {"app": "Lore", "tree": "lore", "own": true, "count": 3, "since": "5f4b9e4…", "commits": ["a1b2c3d feat: …", "…"]},
-    {"app": "Lore", "tree": "swift-utils", "own": false, "count": 2, "since": "77ab01…", "commits": ["…"]}
+    {"app": "MyApp", "tree": "myapp", "own": true, "count": 3, "since": "5f4b9e4…", "commits": ["a1b2c3d feat: …", "…"]},
+    {"app": "MyApp", "tree": "swift-utils", "own": false, "count": 2, "since": "77ab01…", "commits": ["…"]}
   ],
   "secrets": {"identity": "<reference>", "identityPassword": "<reference>", "appStoreKey": "<reference>"},
   "run": {
-    "argv": ["/…/ship", "release-run", "/…/Lore/2026-10-21T201500/plan.json", "<the plan's sha256>"],
+    "argv": ["/…/ship", "release-run", "/…/MyApp/2026-10-21T201500/plan.json", "<the plan's sha256>"],
     "env": {"APPSTORE_KEY_ID": "…", "APPSTORE_ISSUER": "…"},
     "stdin": {"identity": "{identity}", "identityPassword": "{identityPassword}", "appStoreKey": "{appStoreKey}"}
   }
@@ -46,16 +46,46 @@ Without `SHIP_APPROVE`, `ship release` refuses. The keys are named by the releas
 2. **The working folders.** Each app's trees are cloned once into `~/.local/state/ship/releases/<app>/work`, laid out as the originals are, and moved to the commits being released (`checkout --force`, `clean`, submodules from the local ones). Ignored files stay: they are the build caches, so an unchanged dependency is never compiled twice. A build script keeps its tools' caches inside the clone, in ignored folders.
 3. **The plan, pinned.** What will be built (each app's clones, commits, build script and its SHA-256, artifacts) is written to `plan.json` in the release's folder; its SHA-256 is in the command the person approves.
 4. **One request for every app.** Per tree, the commits since the app's last release; the build script's hash; the keys by reference. One yes covers the apps released together.
-5. **`ship release-run`, after the yes.** It refuses unless the plan matches its approved hash, every clone is at its approved commit and clean, and every script matches its hash. It reads the keys from its standard input, makes a keychain of the release's own (a random password, Apple's import API, exactly one Developer ID identity or it refuses), puts it first on the search list, writes the App Store Connect key and any further secret to private files, and runs every app's script at once (`script <clone>`) with `SHIP_KEYCHAIN`, `APPSTORE_KEY` (the key's path), `APPSTORE_KEY_ID`, `APPSTORE_ISSUER`, `SHIP_RELEASE_SOURCES`, `SHIP_RELEASE_HEADS` and each further secret's path. Notarizations of different apps overlap. However it ends, the keychain, the files and the search-list entry are removed.
+5. **`ship release-run`, after the yes.** It refuses unless the plan matches its approved hash, every clone is at its approved commit and clean, and every script matches its hash. It reads the keys from its standard input, makes a keychain of the release's own (a random password, Apple's import API, exactly one Developer ID identity or it refuses), puts it first on the search list, writes the App Store Connect key and any further secret to private files, and runs every app's script at once (`script <clone>`) with `SHIP_KEYCHAIN`, `APPSTORE_KEY` (the key's path), `APPSTORE_KEY_ID`, `APPSTORE_ISSUER`, `SHIP_RELEASE_SOURCES`, `SHIP_RELEASE_HEADS`, `SHIP_MANIFEST` (the manifest in the clone) and each further secret's path. Notarizations of different apps overlap. However it ends, the keychain, the files and the search-list entry are removed.
 6. **Recorded.** Each app's artifacts are copied back into its repo (an `.app` as `<name>.app.zip`, and so is every app inside a folder artifact: a runnable copy of the very build, at rest beside its installed copy, ties with it in LaunchServices and can win, and Finder registers any app it shows; installers unpack the zip straight into place), every record of what it built outside an Applications folder is removed (Xcode registers its archive), and the release's folder keeps everything.
 
-A manifest names further secrets a build signs with (a Sparkle update key): `"secrets": {"SPARKLE_ED_KEY": "<reference>"}`. They are on the same request, released by the same yes, written beside the App Store Connect key, their path in that variable.
+## The manifest
+
+What is the app's, not one command's, is said once, in its `release.json`; every verb reads it there (inside a release, the clone's copy, named by `SHIP_MANIFEST`):
+
+```json
+{
+  "app": "MyApp",
+  "trees": [{"name": "myapp", "path": "."}],
+  "script": "scripts/release",
+  "artifacts": ["dist"],
+  "secrets": {"SPARKLE_ED_KEY": "<reference>"},
+  "notes": ["scripts/notes"],
+  "downloads": "https://example.com/releases/",
+  "homepage": "https://example.com/myapp",
+  "requests": "https://github.com/me/myapp/issues/{number}"
+}
+```
+
+| Key | What |
+|---|---|
+| `app` | the app's name: its releases' folder and record |
+| `trees` | the repositories it is built from, the app's own first; `path` from this file's folder, `submodules` the build needs |
+| `script` | the build, run as `script <clone of the first tree>` |
+| `artifacts` | what the build makes, copied back into the repo |
+| `secrets` | further keys the build signs with (a Sparkle update key): the variable that will name the key's file → the reference the approver resolves. On the same request, released by the same yes, written beside the App Store Connect key |
+| `notes` | where the release notes are. Absent: `notes/<version>.md` beside this file. Present: a program (argv, from this file's folder) that prints a version's notes given the version as its last argument, for notes kept anywhere else (a database, a CMS). It runs without the release's keys in its environment; printing nothing means that version has none, and a failing program stops ship. `check`, `publish` and `appcast` all read the notes this one way |
+| `downloads` | the folder URL the dmgs are downloaded from (`appcast`'s enclosure, `cask`'s url: it plus the dmg's name) |
+| `homepage` | the app's web page (`cask`) |
+| `requests` | the URL of the app's request N, `{number}` in it: a notes item citing `<app>#N` links there. Absent, the citation stays text |
+
+Notes keep one grammar wherever they come from: `### <Group>` headings over `- ` items, `**bold**` for an item's headline, `` `code` `` for literals.
 
 ## The Sparkle feed
 
-`ship appcast --name <slug> --app <dir/X.app>`, run by the build script after `ship build`, makes `dist/appcast.xml` with the update key at `$SPARKLE_ED_KEY` (the manifest's secret of that name), and refuses anywhere else. It extends the feed the app already has: `dist/appcast.xml` when the script put one there, else the feed at `--feed <url>`, else the app's `SUFeedURL` (a 404 there is the first release). The new item's build is the app's `CFBundleVersion`; a feed that already carries that build or a later one is refused, since no installed copy would take the update. The app must carry `SUPublicEDKey`: without it generate_appcast writes the item unsigned and says nothing.
+`ship appcast --name <slug> --app <dir/X.app>`, run by the build script after `ship build`, makes `dist/appcast.xml` with the update key at `$SPARKLE_ED_KEY` (the manifest's secret of that name), and refuses anywhere else. It extends the feed the app already has: `dist/appcast.xml` when the script put one there, else the one at the app's `SUFeedURL` (a 404 there is the first release). The new item's build is the app's `CFBundleVersion`; a feed that already carries that build or a later one is refused, since no installed copy would take the update. The app must carry `SUPublicEDKey`: without it generate_appcast writes the item unsigned and says nothing.
 
-The update dialog's notes are one HTML document, `dist/<slug>-<version>.html` beside the dmg, embedded as the new item's description. It holds a block for each version the feed keeps (`--maximum-versions`, 3 by default, the same number the feed keeps), newest first, each rendered from `notes/<version>.md` and tagged with its build as the feed records it. Sparkle marks the block of the installed build and the document hides it and every older one, so each person reads only what is new to them. The released version's notes are required; an older version without a notes file is left out, and said. Request citations (`<slug>#42`) link to `https://<slug>.untitled.garden/requests/42`. The enclosure's URL is `--download-url-prefix` (default `https://<slug>.untitled.garden/releases/`) followed by the dmg's name. Sparkle's `generate_appcast` must be on `PATH`.
+The update dialog's notes are one HTML document, `dist/<slug>-<version>.html` beside the dmg, embedded as the new item's description. It holds a block for each version the feed keeps (`--maximum-versions`, 3 by default, the same number the feed keeps), newest first, each tagged with its build as the feed records it. Sparkle marks the block of the installed build and the document hides it and every older one, so each person reads only what is new to them. The released version's notes are required; an older version without notes is left out, and said. The enclosure's URL is the manifest's `downloads` followed by the dmg's name. Sparkle's `generate_appcast` must be on `PATH`.
 
 ## What a release keeps
 
@@ -78,7 +108,7 @@ What is never kept: a key or its value, anything read from the approver's stdin.
 | What | Where |
 |---|---|
 | `ship release`, `ship release-run`, the keychain | `Release.swift`, beside this file |
-| An app's manifest (its trees, its build script, its artifacts, further secrets) | `release.json` at the app's repo root |
+| An app's manifest ("The manifest") | `release.json` in the app's repo |
 | Every release of each app | `~/.local/state/ship/releases/<app>/<date>T<time>/`; the last record at `<app>.json`, which `ship released` compares a checkout with |
 | The mechanics after signing (dmg, zip, GitHub release, cask) | `ship build` and `ship publish`, in `main.swift` |
 | The Sparkle feed and the update dialog's notes | `ship appcast`, in `Appcast.swift` |
