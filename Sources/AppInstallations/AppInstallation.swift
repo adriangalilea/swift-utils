@@ -345,15 +345,41 @@
         }
 
         /// Opens a new instance of this bundle, then quits this one: an
-        /// upgrade landed on disk, or a change that applies on reopen.
+        /// upgrade landed on disk, or a change that applies on reopen. A
+        /// launchd job (an agent, a nested helper) is restarted by launchd
+        /// instead: a copy opened by LaunchServices would run beside the one
+        /// launchd brings back (vigil drive's helper, 2026-10-27).
         public static func reopen(_ why: String) {
             installLog.info("reopening", ["why": why])
+            if let label = launchdLabel {
+                // Kills this process and starts the job again: nothing after
+                // it runs unless launchctl failed.
+                let status = launchctl([
+                    "kickstart", "-k", launchdTarget(label: label, daemon: getuid() == 0),
+                ])
+                installLog.error("reopen failed", ["why": why, "job": label, "kickstart": status])
+                return
+            }
             let opened = open(bundle ?? Bundle.main.bundleURL)
             guard opened == 0 else {
                 installLog.error("reopen failed", ["why": why, "open": opened])
                 return
             }
             quit()
+        }
+
+        /// The launchd job this process runs as: launchd names it in
+        /// `XPC_SERVICE_NAME`, where an app LaunchServices opened has
+        /// `application.<bundle id>.…` (`UIKitApplication:…` for a Simulator's)
+        /// and a process started by hand nothing or `0` (measured 2026-10-27:
+        /// vigil drive's helper `dev.vigil.drive`, Authz and Vigil
+        /// `application.…`).
+        static var launchdLabel: String? {
+            guard let name = ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"],
+                !name.isEmpty, name != "0", !name.hasPrefix("application."),
+                !name.hasPrefix("UIKitApplication:")
+            else { return nil }
+            return name
         }
     }
 #endif
