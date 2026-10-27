@@ -11,16 +11,17 @@ import SwiftUI
 /// our diff format is ours and its semantics are exact. Coloring never
 /// rewrites a character: the output's characters are the input, exactly,
 /// so what is approved is what was shown.
+extension CodeGround {
+    /// The engine's theme for this ground.
+    var theme: String { self == .dark ? "atom-one-dark" : "atom-one-light" }
+}
+
 public enum Syntax {
-    /// The ground the inks are drawn on, which picks them: a dark theme's
-    /// pale inks vanish on a light ground, and the reverse. Foreground colors
-    /// only (the host owns background and font), so the caller says which
-    /// ground it paints: `SyntaxText` reads its environment's color scheme.
-    public enum Appearance: Sendable {
-        case light, dark
-        public init(_ scheme: ColorScheme) { self = scheme == .dark ? .dark : .light }
-        var theme: String { self == .dark ? "atom-one-dark" : "atom-one-light" }
-    }
+    /// The ground the inks are drawn on (`CodeGround`, the one definition
+    /// every grammar takes). Foreground colors only (the host owns background
+    /// and font), so the caller says which ground it paints: `SyntaxText`
+    /// reads its environment's color scheme.
+    public typealias Appearance = CodeGround
 
     /// Above this the grammar pass is skipped outright: JSC on hundreds of
     /// kilobytes stalls the render for something nobody reads colored.
@@ -33,15 +34,17 @@ public enum Syntax {
         case .diff: return SyntaxLines.diff(text)
         case .plain: return AttributedString(text)
         case .shell:
+            // A single line is a command: argv, read by its own grammar
+            // (`SyntaxLines.command`: program, flags, paths, values), the
+            // same on every surface, an engine or none.
+            guard text.contains("\n") else { return SyntaxLines.command(text, on: appearance) }
             guard text.utf8.count <= ceiling else { return AttributedString(text) }
             let key = "\(appearance.theme)|\(format.rawValue)|\(text.hashValue)"
             if let hit = cached(key) { return hit }
             // A multi-line "shell" body is usually a script riding a heredoc
-            // or a -c string; detection reads the content, the bash grammar
-            // would paint it all as one string. A single line IS shell.
+            // or a -c string; detection reads the content.
             let colored =
-                code(text, language: text.contains("\n") ? nil : "bash", theme: appearance.theme)
-                ?? AttributedString(text)
+                code(text, language: nil, theme: appearance.theme) ?? AttributedString(text)
             remember(key, colored)
             return colored
         }

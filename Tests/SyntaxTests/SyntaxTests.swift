@@ -59,6 +59,26 @@ struct SyntaxTests {
         #expect(!Set(colored.runs.compactMap { $0.foregroundColor }).isEmpty)
     }
 
+    /// A command with no quotes, only argv (a release's run line): the bash
+    /// grammar gave it no token and it read as one flat grey. Its own grammar
+    /// marks the program bold, and the path and the hash each in an ink.
+    @Test(arguments: [Syntax.Appearance.light, .dark])
+    func anArgvCommandIsColoredByItsParts(_ appearance: Syntax.Appearance) {
+        let command = "/usr/local/bin/ship release-run /tmp/plan.json 89b93c9c98e610c9 --keep"
+        let colored = Syntax.highlight(command, as: .shell, on: appearance)
+        #expect(String(colored.characters) == command)
+        let ink = { (part: String) in
+            colored.runs.first { String(colored[$0.range].characters) == part }
+        }
+        let program = ink("/usr/local/bin/ship")
+        #expect(program?.inlinePresentationIntent == .stronglyEmphasized)
+        let inks = ["/usr/local/bin/ship", "/tmp/plan.json", "89b93c9c98e610c9", "--keep"]
+            .compactMap { ink($0)?.foregroundColor }
+        #expect(Set(inks).count == 4, "program, path, value and flag each in its own ink")
+        #expect(
+            ink("release-run")?.foregroundColor == nil, "a plain argument keeps the host's color")
+    }
+
     @Test func diffAndPlainStayExact() {
         let diff = "@@ a.txt\n- old\n+ new"
         #expect(String(Syntax.highlight(diff, as: .diff, on: .light).characters) == diff)
