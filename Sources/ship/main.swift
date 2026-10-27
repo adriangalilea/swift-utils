@@ -23,6 +23,11 @@
 //   ship publish               from the checkout, once a release made the
 //                              dmg of exactly its commits: the tag pushed
 //                              with its branch, then the channels
+//   ship cask                  an app's first cask: Casks/<name>.rb written into
+//                              the tap at $TAP from what ship knows, marked as a
+//                              draft for the person to finish (depends_on, zap,
+//                              caveats); publish refuses it while marked, then
+//                              bumps and commits it as any cask
 //   ship installed <X.app>     after an install: the installed copy is the only
 //                              LaunchServices record of every bundle it carries
 //                              (AppInstallation.onlyRecord), each other copy's
@@ -48,6 +53,16 @@
 //                        DMG and VERSION in its environment (publishing elsewhere)
 //   --cask               bumps Casks/<name>.rb in the tap checkout at $TAP
 //                        (unset: skipped, as for a fork without the tap)
+//   --desc <text>        the cask's one-line description (cask)
+//   --homepage <url>     (cask; default https://<name>.untitled.garden/)
+//   --cask-url <url>     where the dmg is fetched, #{version} in it (cask;
+//                        default the garden's: https://<name>.untitled.garden/
+//                        releases/<name>-#{version}.dmg, which counts the
+//                        download and redirects to the CDN)
+//   --binary <path>[:<name>]
+//                        a command the cask links, its path inside the bundle
+//                        (Contents/MacOS/x) and its name when not the file's
+//                        (cask, repeatable)
 //
 // VERSION comes from the environment (the app's mise.toml), the release body
 // from notes/$VERSION.md. Inside a release, the environment names the
@@ -233,7 +248,8 @@ let layout = """
 // MARK: - the arguments
 
 let verbs = [
-    "release", "release-run", "identity", "check", "build", "publish", "released", "installed",
+    "release", "release-run", "identity", "check", "build", "publish", "cask", "released",
+    "installed",
 ]
 guard let verb = CommandLine.arguments.dropFirst().first, verbs.contains(verb) else {
     die(
@@ -243,6 +259,7 @@ guard let verb = CommandLine.arguments.dropFirst().first, verbs.contains(verb) e
                ship check   --name <slug> --app <dir/X.app> [--github] [--cask]
                ship build   --team <T> --name <slug> --app <dir/X.app> --assemble <shell> [--sign <path>]… [--signed]
                ship publish --name <slug> --app <dir/X.app> [--tag <name>] [--github] [--after <shell>] [--cask]
+               ship cask    --name <slug> --app <dir/X.app> --desc <text> [--homepage <url>] [--cask-url <url>] [--binary <path>[:<name>]]…
                ship released
                ship installed <X.app>
         """
@@ -302,6 +319,65 @@ let dmg = "\(dist)/\(name)-\(version).dmg"
 // subdirectory of the repo, never /Applications or the repo itself.
 guard !dist.isEmpty, dist != ".", !dist.hasPrefix("/"), !dist.contains("..") else {
     die("--app must sit in a subdirectory of the repo (dist/\(name).app), not \(app)")
+}
+
+// MARK: - a first cask
+
+/// The line that marks a cask ship wrote and the person has not finished:
+/// publish refuses it.
+let caskDraftMark =
+    "# ship wrote this first cask: review it (depends_on, zap, caveats), then delete this line"
+
+if verb == "cask" {
+    guard let tap = env["TAP"], !tap.isEmpty else {
+        die("TAP is not set: the tap checkout the cask goes into")
+    }
+    guard let desc = value("--desc") else { die("--desc <text> is required: the cask's one line") }
+    let cask = "\(tap)/Casks/\(name).rb"
+    guard !FileManager.default.fileExists(atPath: cask) else {
+        die("\(cask) exists: publish bumps it; a first cask is written once")
+    }
+    let appName = (app as NSString).lastPathComponent
+    let url =
+        value("--cask-url") ?? "https://\(name).untitled.garden/releases/\(name)-#{version}.dmg"
+    let homepage = value("--homepage") ?? "https://\(name).untitled.garden/"
+    var lines = [
+        caskDraftMark,
+        "cask \"\(name)\" do",
+        "  version \"0\"",
+        "  sha256 \"0\"",
+        "",
+    ]
+    if value("--cask-url") == nil {
+        lines.append(
+            "  # The garden URL, not GitHub: it counts the download, then 302s to the CDN.")
+    }
+    lines += [
+        "  url \"\(url)\"",
+        "  name \"\(name)\"",
+        "  desc \"\(desc)\"",
+        "  homepage \"\(homepage)\"",
+        "",
+        "  depends_on arch: :arm64",
+        "",
+        "  app \"\(appName)\"",
+    ]
+    for binary in values("--binary") {
+        let parts = binary.split(separator: ":", maxSplits: 1).map(String.init)
+        let target = parts.count == 2 ? ", target: \"\(parts[1])\"" : ""
+        lines.append("  binary \"#{appdir}/\(appName)/\(parts[0])\"\(target)")
+    }
+    lines += ["", "  zap trash: \"~/Library/Preferences/<bundle id>.plist\"", "end", ""]
+    do {
+        try FileManager.default.createDirectory(
+            atPath: "\(tap)/Casks", withIntermediateDirectories: true)
+        try lines.joined(separator: "\n").write(toFile: cask, atomically: true, encoding: .utf8)
+    } catch { die("write \(cask): \(error.localizedDescription)") }
+    print(lines.joined(separator: "\n"))
+    print(
+        "wrote \(cask), uncommitted: finish it (the minimum macOS, the zap paths, caveats), delete its first line; `ship publish --cask` fills version and sha256 and commits it"
+    )
+    exit(0)
 }
 
 // MARK: - the build (inside `ship release`)
@@ -499,9 +575,17 @@ if has("--github") {
 }
 if has("--cask") {
     if let tap {
+        let recipe = try? String(contentsOfFile: "\(tap)/Casks/\(name).rb", encoding: .utf8)
         gate(
-            "the tap at $TAP holds Casks/\(name).rb",
-            FileManager.default.fileExists(atPath: "\(tap)/Casks/\(name).rb"))
+            "the tap at $TAP holds Casks/\(name).rb", recipe != nil,
+            hint:
+                "a first cask: ship cask --name \(name) --app \(app) --desc <text> [--binary <path>[:<name>]]…"
+        )
+        if let recipe {
+            gate(
+                "Casks/\(name).rb is finished", !recipe.contains(caskDraftMark),
+                hint: "ship wrote it: review it, then delete its first line")
+        }
     } else {
         print("  skipped  the cask: TAP is not set")
     }
