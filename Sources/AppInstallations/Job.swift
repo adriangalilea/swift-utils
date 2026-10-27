@@ -410,9 +410,6 @@
             /// - On yet not answering here (`.silent`: the record was made for
             ///   a copy that moved, was replaced or was deleted): registered
             ///   afresh, so the person who turned it on need not again.
-            /// - The login item, on: registered again from this copy, which
-            ///   moves macOS's record here (it opens the copy that last
-            ///   registered it, never the installed one by itself).
             ///
             /// A job turned off is never touched, nor one held for approval; a
             /// name this copy does not declare is logged and ignored; one
@@ -455,25 +452,6 @@
                             ["job": job.name, "deleted": deleted.ISO8601Format()])
                         try? job.uninstall()
                         continue
-                    } else if job.kind == .loginItem, state == .running {
-                        // On, and opening whichever copy last registered it
-                        // (BTM keeps that copy's URL: steno's named a dev
-                        // build folder with /Applications/steno.app
-                        // installed). Registering again from this copy moves
-                        // it here, nothing else changes (measured 2026-10-27,
-                        // a throwaway app: build folder, then the installed
-                        // copy's register(), BTM's record moved with no
-                        // unregister). Only an item already on: the person's
-                        // off is never turned on.
-                        do {
-                            try job.service.register()
-                            installLog.info("login item bound to this copy", ["job": job.name])
-                        } catch {
-                            installLog.warn(
-                                "login item not bound to this copy",
-                                ["job": job.name, "err": error])
-                        }
-                        continue
                     } else if state == .silent {
                         why = "on, but not answering from this copy: registering afresh"
                     } else {
@@ -487,6 +465,24 @@
                     }
                 }
                 if let deleted { AppInstallation.Tombstone.applied(bundleID, deleted) }
+            }
+
+            /// The app's login item, when on, opens whichever copy last
+            /// registered it (BTM keeps that copy's URL: steno's named a dev
+            /// build folder with /Applications/steno.app installed).
+            /// Registering again from the installed copy moves it here and
+            /// changes nothing else (measured 2026-10-27, a throwaway app:
+            /// registered from a build folder, then the installed copy's
+            /// register() moved BTM's record, no unregister, no error). An
+            /// item that is off stays off. Run by `claimRecords` at launch.
+            static func bindLoginItem() {
+                guard loginItem.state == .running else { return }
+                do {
+                    try loginItem.service.register()
+                    installLog.info("login item bound to this copy")
+                } catch {
+                    installLog.warn("login item not bound to this copy", ["err": error])
+                }
             }
 
             // MARK: Internals

@@ -91,12 +91,15 @@
         /// background: at every launch, so an install by any means (an
         /// installer, a kit, a Sparkle update, a drag) and the records Spotlight
         /// and Xcode keep adding between launches end with this copy the one that
-        /// extensions, login items and URL schemes resolve to. A build run from
+        /// extensions, login items and URL schemes resolve to; the app's own
+        /// login item, if on, is registered again from here
+        /// (`Job.bindLoginItem`). A build run from
         /// its folder claims nothing. `ImageWatch.start` calls it; an app without
         /// one calls it at launch.
         public static func claimRecords() {
             guard case .installed = home, let bundle else { return }
             claim([bundle])
+            DispatchQueue.global(qos: .utility).async { Job.bindLoginItem() }
         }
 
         /// `apps`, each the installed copy, made the only record of their
