@@ -154,9 +154,9 @@ Not yet here (ts-utils has them): prompts, live regions, the watch contract, arg
 
 ## Syntax
 
-Code colored for a person to read before they say yes to it, by what its sender SAID it is (`CodeFormat`: `shell`, `diff`, `text`; anything else is plain, never an error). `Syntax.highlight(text, as:)` runs real grammars (highlight.js in JavaScriptCore, through Highlightr, the repo's one third-party dependency), with the language detected where the format does not pin one; a diff is colored by line prefix. Coloring never changes a character: what is approved is what was shown. `SyntaxText` draws it; `Syntax.theme` picks the inks; above `Syntax.ceiling` the text stays plain.
+Code colored for a person to read before they say yes to it, by what its sender SAID it is (`CodeFormat`: `shell`, `diff`, `text`; anything else is plain, never an error). `Syntax.highlight(text, as:on:)` colors a single shell line by its own grammar (`SyntaxLines.command`: the program bold, flags, paths, values, variables, strings and operators; argv is ours to read exactly, and highlight.js's bash grammar leaves a plain command one flat grey), a script of several lines by real grammars (highlight.js in JavaScriptCore, through Highlightr, the repo's one third-party dependency) with the language detected, and a diff by line prefix. Every grammar takes the ground it is drawn on (`CodeGround`, light or dark; `Syntax.Appearance` names it) and paints in the atom-one theme's inks for it, so the same text reads the same everywhere. Coloring never changes a character: what is approved is what was shown. `SyntaxText` draws it; above `Syntax.ceiling` the text stays plain.
 
-**SyntaxLines** is the half with no engine, for where JavaScriptCore cannot run (a widget, a Live Activity): `CodeColors` is a coloring as data (a palette and runs, a few hundred bytes), computed by `Syntax.colors` where the engine runs and painted anywhere by `paint`; `CodeExcerpt` draws an excerpt. Syntax re-exports it.
+**SyntaxLines** is the half with no engine, for where JavaScriptCore cannot run (a widget, a Live Activity): `CodeColors` is a coloring as data (a palette and runs, a few hundred bytes), computed by `Syntax.colors` where the engine runs and painted anywhere by `paint`; a command line and a diff color without it; `CodeExcerpt` draws an excerpt. Syntax re-exports it.
 
 ## MarkdownText
 
