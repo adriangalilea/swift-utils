@@ -67,7 +67,7 @@ Every standing is observable, for every kind, so a surface repaints the moment w
 
 ## Asking
 
-`ask()` asks the way each grant asks. A Privacy switch: allowed, nothing; allowed on reopen, the app reopens; denied, its pane opens (macOS never prompts twice); never asked, the app comes forward (macOS asks only an active app) and the request is made by one rule: Apple's public ask where one exists (AVFoundation, `CGRequest…`, `AXIsProcessTrustedWithOptions`, `SFSpeechRecognizer`), TCC.framework's `TCCAccessRequest` where none does (System Audio, Motion), the pane where macOS has no prompt at all (Full Disk Access). Where a prompt answers, `ask` returns that answer; where the answer is a switch in System Settings, it returns at once and `observe` reports the flip.
+`ask()` asks the way each grant asks. A Privacy switch: allowed, nothing; allowed on reopen, the app reopens; denied, its pane opens (macOS never prompts twice); never asked, the app comes forward (macOS asks only an active app) and the request is made by one rule: Apple's public ask where one exists (AVFoundation, `CGRequest…`, `AXIsProcessTrustedWithOptions`, `SFSpeechRecognizer`), TCC.framework's `TCCAccessRequest` where none does (System Audio, Motion), the pane where macOS has no prompt at all (Full Disk Access, after one refused read of the system TCC database: macOS lists an app there, switched off, only once it has been refused such a read, so the person flips a switch instead of adding the app with +). Where a prompt answers, `ask` returns that answer; where the answer is a switch in System Settings, it returns at once and `observe` reports the flip.
 
 ## The Privacy hub: one live answer
 

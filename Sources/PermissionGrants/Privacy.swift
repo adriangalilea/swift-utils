@@ -387,6 +387,7 @@
                 return AppInstallation.reopen("a permission applies on reopen")
             case .denied:
                 grantLog.info("asked again: opening its pane", ["grant": privacy.title])
+                if privacy == .fullDiskAccess { Self.enterList() }
                 Self.openSettings(pane: privacy.pane)
             case .notAsked, .unknown:
                 // A command-line tool has no NSApp, and nothing to bring forward.
@@ -431,6 +432,7 @@
                     }
                 }
             case .fullDiskAccess:
+                enterList()
                 openSettings(pane: privacy.pane)
                 return nil
             case .motion:
@@ -465,6 +467,23 @@
             case .systemAudio:
                 return await privateRequest(privacy)
             }
+        }
+
+        /// Full Disk Access has no prompt and no request: an app is in its
+        /// list, switched off, only once tccd has refused it a read the
+        /// switch guards (measured 2026-10-27: four probe apps, one refused
+        /// open each of ~/Library/Safari, ~/Library/Mail, ~/.Trash and the
+        /// system TCC database, all four listed; an app that only opened the
+        /// pane never was, and the person was left to add it with +). So the
+        /// ask makes that one read, of a file on every Mac that holds no user
+        /// data, and the person only flips the switch. Allowed, it opens and
+        /// closes the file and reads nothing.
+        private static func enterList() {
+            let fd = open("/Library/Application Support/com.apple.TCC/TCC.db", O_RDONLY)
+            if fd >= 0 { close(fd) }
+            grantLog.info(
+                "entered the Full Disk Access list",
+                ["read": fd >= 0 ? "allowed" : "refused (errno \(errno))"])
         }
 
         /// `TCCAccessRequest`: prompts with the app's usage description when
