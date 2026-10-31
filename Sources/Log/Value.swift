@@ -58,7 +58,8 @@ private func unwrap(_ v: Any) -> Any? {
 }
 
 /// Integers JavaScript holds exactly; past them a reader would round.
-private let maxSafeInteger = 9_007_199_254_740_991
+/// UInt64: a watch's Int is 32 bits.
+private let maxSafeInteger: UInt64 = 9_007_199_254_740_991
 
 private func isSafe<I: BinaryInteger>(_ i: I) -> Bool { i.magnitude <= maxSafeInteger }
 
