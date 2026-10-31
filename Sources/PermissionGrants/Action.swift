@@ -1,4 +1,4 @@
-#if os(macOS) || os(iOS)
+#if os(macOS) || os(iOS) || os(watchOS)
     import Ink
     import SwiftUI
 
@@ -7,6 +7,17 @@
         /// the quieter yellow for an offer not answered yet.
         static func hue(_ grade: Standing.Grade) -> Color {
             grade == .broken ? .orange : .yellow
+        }
+    }
+
+    extension View {
+        /// Return presses the surface's one way on; a watch has no keyboard, so there it is the tap alone.
+        func grantDefaultAction(_ on: Bool = true) -> some View {
+            #if os(watchOS)
+                self
+            #else
+                keyboardShortcut(on ? .defaultAction : nil)
+            #endif
         }
     }
 

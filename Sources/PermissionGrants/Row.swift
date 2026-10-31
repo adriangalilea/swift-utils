@@ -1,12 +1,6 @@
-#if os(macOS) || os(iOS)
+#if os(macOS) || os(iOS) || os(watchOS)
     import SwiftUI
-    #if os(macOS)
-        import AppKit
-        private let becameActive = NSApplication.didBecomeActiveNotification
-    #else
-        import UIKit
-        private let becameActive = UIApplication.didBecomeActiveNotification
-    #endif
+    private let becameActive = Platform.becameActive
 
     extension PermissionGrant {
         /// The one row every grant surface wears: icon, title and one line
@@ -62,10 +56,40 @@
             }
 
             @ViewBuilder private func content(_ standing: Standing) -> some View {
-                switch style {
-                case .row: row(standing)
-                case .card: card(standing)
+                #if os(watchOS)
+                    // A watch is too narrow for anything side by side: one column, the action full width.
+                    stacked(standing)
+                #else
+                    switch style {
+                    case .row: row(standing)
+                    case .card: card(standing)
+                    }
+                #endif
+            }
+
+            private func stacked(_ standing: Standing) -> some View {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label {
+                        Text(grant.title).font(.headline)
+                    } icon: {
+                        Image(systemName: grant.symbol).foregroundStyle(tint(standing.grade))
+                    }
+                    Text(standing.note ?? grant.why)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    switch standing.grade {
+                    case .good, .unknown:
+                        GrantMark(grade: standing.grade)
+                    case .askable, .broken:
+                        GrantAction(hue: PermissionGrant.hue(standing.grade), fill: true) {
+                            grant.act()
+                        } label: { _ in
+                            Text(letterCase.apply(standing.actionTitle))
+                        }
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             private func card(_ standing: Standing) -> some View {

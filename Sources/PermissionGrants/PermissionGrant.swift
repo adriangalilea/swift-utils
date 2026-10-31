@@ -6,7 +6,7 @@ import Log
     // one import gives an app both.
     @_exported import AppInstallations
 #endif
-#if os(macOS) || os(iOS)
+#if os(macOS) || os(iOS) || os(watchOS)
     import UserNotifications
 #endif
 
@@ -36,7 +36,11 @@ public struct PermissionGrant: Sendable {
             /// a misplaced app offers to move into.
             case backgroundService(AppInstallation.Job, installFor: [AppInstallation.Scope])
         #endif
-        #if os(macOS) || os(iOS)
+        #if os(iOS) || os(watchOS)
+            /// A Privacy switch on an iPhone or a watch: calendars, reminders, alarms.
+            case privacy(Privacy)
+        #endif
+        #if os(macOS) || os(iOS) || os(watchOS)
             /// Notifications posted from the app's own process.
             case notifications(UNAuthorizationOptions)
         #endif
@@ -114,7 +118,18 @@ public struct PermissionGrant: Sendable {
         }
     #endif
 
-    #if os(macOS) || os(iOS)
+    #if os(iOS) || os(watchOS)
+        public static func privacy(
+            _ privacy: Privacy, title: String, why: String, symbol: String? = nil,
+            required: Bool = true
+        ) -> PermissionGrant {
+            PermissionGrant(
+                kind: .privacy(privacy), title: title, why: why, symbol: symbol ?? privacy.symbol,
+                required: required)
+        }
+    #endif
+
+    #if os(macOS) || os(iOS) || os(watchOS)
         public static func notifications(
             title: String = "Notifications", why: String, symbol: String = "bell.badge",
             required: Bool = false, options: UNAuthorizationOptions = [.alert, .sound]
@@ -143,7 +158,13 @@ public struct PermissionGrant: Sendable {
             case .backgroundService(let job, let offers):
                 Readings.shared.standing("job \(job.kind)") { JobGrant.standing(job, offers) }
         #endif
-        #if os(macOS) || os(iOS)
+        #if os(iOS) || os(watchOS)
+            case .privacy(let privacy):
+                Readings.shared.standing("privacy \(privacy.rawValue)") {
+                    DevicePrivacy.standing(privacy)
+                }
+        #endif
+        #if os(macOS) || os(iOS) || os(watchOS)
             case .notifications:
                 Readings.shared.standing("notifications") {
                     Notifications.standing(Notifications.reach())
@@ -179,7 +200,10 @@ public struct PermissionGrant: Sendable {
             case .automation(let bundleID): await Automation.ask(bundleID)
             case .backgroundService(let job, let offers): await JobGrant.ask(job, offers)
         #endif
-        #if os(macOS) || os(iOS)
+        #if os(iOS) || os(watchOS)
+            case .privacy(let privacy): await DevicePrivacy.ask(privacy)
+        #endif
+        #if os(macOS) || os(iOS) || os(watchOS)
             case .notifications(let options): await Notifications.ask(options: options)
         #endif
         case .custom(_, let act): act()

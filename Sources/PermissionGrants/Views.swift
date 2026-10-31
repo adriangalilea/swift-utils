@@ -1,4 +1,4 @@
-#if os(macOS) || os(iOS)
+#if os(macOS) || os(iOS) || os(watchOS)
     import Ink
     import SwiftUI
     #if os(macOS)
@@ -229,7 +229,7 @@
                         footerLabel(words)
                     }
                     .buttonStyle(.inkProminent)
-                    .keyboardShortcut(waiting ? nil : .defaultAction)
+                    .grantDefaultAction(!waiting)
                     .disabled(waiting)
                 }
             }
@@ -282,7 +282,7 @@
                             } label: { _ in
                                 Text(letterCase.apply(standing.actionTitle))
                             }
-                            .keyboardShortcut(.defaultAction)
+                            .grantDefaultAction()
                         } else {
                             GrantMark(grade: standing.grade)
                         }

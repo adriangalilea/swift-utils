@@ -3,6 +3,7 @@
     import AppKit
     import ApplicationServices
     import CoreMotion
+    import EventKit
     import Log
     import Observation
     import Speech
@@ -35,6 +36,10 @@
             /// Every file, including other apps' data. macOS has no prompt
             /// for it: the person adds the app in the pane.
             case fullDiskAccess = "kTCCServiceSystemPolicyAllFiles"
+            /// Read and change events (EventKit's full access; "add only" is denied here).
+            case calendars = "kTCCServiceCalendar"
+            /// Read and change reminders (EventKit's full access).
+            case reminders = "kTCCServiceReminders"
 
             /// macOS enforces the switch on a running app at once, even while
             /// that app's own check answers as of its launch: grant-example
@@ -46,7 +51,7 @@
                 switch self {
                 case .accessibility, .postEvents: true
                 case .inputMonitoring, .systemAudio, .screenRecording, .microphone, .camera,
-                    .speechRecognition, .motion, .fullDiskAccess:
+                    .speechRecognition, .motion, .fullDiskAccess, .calendars, .reminders:
                     false
                 }
             }
@@ -64,6 +69,8 @@
                 case .speechRecognition: "Speech Recognition"
                 case .motion: "Motion"
                 case .fullDiskAccess: "Full Disk Access"
+                case .calendars: "Calendars"
+                case .reminders: "Reminders"
                 }
             }
 
@@ -78,6 +85,8 @@
                 case .speechRecognition: "Speech Recognition"
                 case .motion: "Motion & Fitness"
                 case .fullDiskAccess: "Full Disk Access"
+                case .calendars: "Calendars"
+                case .reminders: "Reminders"
                 }
             }
 
@@ -93,6 +102,8 @@
                 case .speechRecognition: "Privacy_SpeechRecognition"
                 case .motion: "Privacy_Motion"
                 case .fullDiskAccess: "Privacy_AllFiles"
+                case .calendars: "Privacy_Calendars"
+                case .reminders: "Privacy_Reminders"
                 }
             }
 
@@ -108,6 +119,8 @@
                 case .speechRecognition: "waveform"
                 case .motion: "airpods.pro"
                 case .fullDiskAccess: "externaldrive"
+                case .calendars: "calendar"
+                case .reminders: "checklist"
                 }
             }
         }
@@ -239,8 +252,19 @@
                 case .notDetermined: return 2
                 default: return 1
                 }
+            case .calendars: return events(EKEventStore.authorizationStatus(for: .event))
+            case .reminders: return events(EKEventStore.authorizationStatus(for: .reminder))
             }
             return granted ? 0 : wasAsked ? 1 : 2
+        }
+
+        /// EventKit's status as a code: only full access is allowed (add-only reads nothing).
+        private static func events(_ status: EKAuthorizationStatus) -> Int {
+            switch status {
+            case .fullAccess: 0
+            case .notDetermined: 2
+            default: 1
+            }
         }
 
         private static func capture(_ status: AVAuthorizationStatus) -> Int {
@@ -466,6 +490,10 @@
                 return await AVCaptureDevice.requestAccess(for: .audio)
             case .systemAudio:
                 return await privateRequest(privacy)
+            case .calendars:
+                return (try? await EKEventStore().requestFullAccessToEvents()) ?? false
+            case .reminders:
+                return (try? await EKEventStore().requestFullAccessToReminders()) ?? false
             }
         }
 

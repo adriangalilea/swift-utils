@@ -10,7 +10,7 @@ let package = Package(
     // Which product builds where is `mise run platforms`' table, checked on
     // every push (Keymap is macOS only, Biometrics has no tvOS); SwiftPM
     // builds only the products a consumer requests.
-    platforms: [.macOS(.v26), .tvOS(.v26), .iOS(.v26)],
+    platforms: [.macOS(.v26), .tvOS(.v26), .iOS(.v26), .watchOS(.v26)],
     products: [
         // The styling atoms: the Ink token ladder + the studio's
         // micro-components (keycaps, chips, slots). No dependencies -
@@ -168,11 +168,13 @@ let package = Package(
         .target(name: "GitKit"),
         // Real output of real repositories (git's own bytes, NULs included).
         .testTarget(
-            name: "GitKitTests", dependencies: ["GitKit", "GitLocal"], resources: [.copy("Fixtures")]),
+            name: "GitKitTests", dependencies: ["GitKit", "GitLocal"],
+            resources: [.copy("Fixtures")]),
         .target(name: "GitLocal", dependencies: ["GitKit"]),
         .executableTarget(name: "gitkit-capture", dependencies: ["GitLocal"]),
         .target(name: "GitViews", dependencies: ["GitKit", "Ink", "Syntax"]),
-        .testTarget(name: "GitViewsTests", dependencies: ["GitViews"], resources: [.copy("Fixtures")]),
+        .testTarget(
+            name: "GitViewsTests", dependencies: ["GitViews"], resources: [.copy("Fixtures")]),
         // A fence named `diff` (or `patch`) is drawn by GitViews' DiffView.
         .target(
             name: "MarkdownText",
@@ -228,7 +230,8 @@ let package = Package(
         ),
         .executableTarget(name: "mediaspec-example", dependencies: ["MediaSpec"]),
         .executableTarget(name: "brandgen"),
-        .executableTarget(name: "ship", dependencies: ["AppInstallations"], exclude: ["RELEASE.md"]),
+        .executableTarget(
+            name: "ship", dependencies: ["AppInstallations"], exclude: ["RELEASE.md"]),
         .executableTarget(name: "mark"),
         .executableTarget(name: "since", dependencies: ["Terminal", "TerminalPrograms"]),
         .executableTarget(name: "grant-cli", dependencies: ["PermissionGrants"]),

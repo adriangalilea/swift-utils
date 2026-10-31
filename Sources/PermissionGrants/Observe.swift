@@ -1,14 +1,6 @@
 import Foundation
 import Observation
 
-#if os(macOS)
-    import AppKit
-    private let becameActive = NSApplication.didBecomeActiveNotification
-#elseif os(iOS) || os(tvOS)
-    import UIKit
-    private let becameActive = UIApplication.didBecomeActiveNotification
-#endif
-
 extension PermissionGrant {
     /// The hook: `handler` runs on the main thread with the grant's new
     /// standing each time it changes (never for an unchanged one, never for
@@ -92,7 +84,7 @@ final class Readings: @unchecked Sendable, Observable {
 
     private init() {
         NotificationCenter.default.addObserver(
-            forName: becameActive, object: nil, queue: nil
+            forName: Platform.becameActive, object: nil, queue: nil
         ) { [weak self] _ in self?.readAll() }
     }
 

@@ -1,8 +1,8 @@
-#if os(macOS) || os(iOS)
+#if os(macOS) || os(iOS) || os(watchOS)
     import UserNotifications
     #if os(macOS)
         import AppKit
-    #else
+    #elseif os(iOS)
         import UIKit
     #endif
 
@@ -75,6 +75,8 @@
             private static func seen(_ settings: UNNotificationSettings) -> Bool {
                 #if os(macOS)
                     settings.alertSetting == .enabled && settings.alertStyle != .none
+                #elseif os(watchOS)
+                    settings.alertSetting == .enabled
                 #else
                     settings.alertSetting == .enabled || settings.lockScreenSetting == .enabled
                 #endif
@@ -104,22 +106,32 @@
                             string:
                                 "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(bundleID)"
                         )!)
-                #else
+                #elseif os(iOS)
                     Task { @MainActor in
                         UIApplication.shared.open(
                             URL(string: UIApplication.openNotificationSettingsURLString)!)
                     }
                 #endif
+                // a watch opens no settings page for an app: its standing's note says where
             }
 
             #if os(macOS)
                 static let settingsName = "System Settings"
                 static let system = "macOS"
+                static let fixTitle = "Open System Settings\u{2026}"
                 static let silencedNote =
                     "Allowed, but alerts are off: messages land in Notification Center without appearing."
+            #elseif os(watchOS)
+                static let settingsName = "the Watch app on the iPhone › Notifications"
+                static let system = "watchOS"
+                /// a watch opens no settings page: the button points at the note, which is the fix
+                static let fixTitle = "How\u{2026}"
+                static let silencedNote =
+                    "Allowed, but alerts are off: the Watch app on the iPhone › Notifications › this app."
             #else
                 static let settingsName = "Settings"
                 static let system = "iOS"
+                static let fixTitle = "Open Settings\u{2026}"
                 static let silencedNote =
                     "Allowed, but banners and the Lock Screen are both off: messages land in Notification Centre without appearing."
             #endif
@@ -132,12 +144,12 @@
                 case .notAsked: .askable("Allow\u{2026}")
                 case .denied:
                     .broken(
-                        "Open \(settingsName)\u{2026}",
+                        fixTitle,
                         note:
                             "Notifications are off in \(settingsName). \(system) never asks twice."
                     )
                 case .silenced:
-                    .broken("Open \(settingsName)\u{2026}", note: silencedNote)
+                    .broken(fixTitle, note: silencedNote)
                 case nil:
                     .unknown(note: "Notification settings did not answer.")
                 }

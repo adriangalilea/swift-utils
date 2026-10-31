@@ -18,16 +18,17 @@ description = "swift-format lint, advisory (format-clean is the gate, not lint t
 run = "xcrun swift-format lint --recursive Sources/ Tests/"
 
 [tasks.platforms]
-description = "build each library for every platform it claims beyond macOS (swift build covers macOS), or only [platform]: iOS or tvOS; the table is the one place a library's platforms are stated. CI runs each platform as its own job, in parallel with check"
-usage = 'arg "[platform]" help="iOS or tvOS; both when absent"'
+description = "build each library for every platform it claims beyond macOS (swift build covers macOS), or only [platform]: iOS, tvOS or watchOS; the table is the one place a library's platforms are stated. CI runs each platform as its own job, in parallel with check"
+usage = 'arg "[platform]" help="iOS, tvOS or watchOS; all when absent"'
 run = '''
 set -euo pipefail
 only="${usage_platform:-}"
-case "$only" in ""|iOS|tvOS) ;; *) echo "platforms: iOS or tvOS, not '$only'" >&2; exit 1 ;; esac
+case "$only" in ""|iOS|tvOS|watchOS) ;; *) echo "platforms: iOS, tvOS or watchOS, not '$only'" >&2; exit 1 ;; esac
 # library  platforms beyond macOS
 #   Keymap      none: AppKit, Carbon, global hotkeys, a Mac's keyboard
 #   OnePassword none: op is a Mac's command line, run as a child process
 #   Biometrics  no tvOS: a TV has no LocalAuthentication, no finger, no face
+#   watchOS     the grants and what they stand on (Log, Ink): a watch app asks for its permissions too
 while read -r lib platforms; do
   for platform in $platforms; do
     [ -z "$only" ] || [ "$platform" = "$only" ] || continue
@@ -36,9 +37,9 @@ while read -r lib platforms; do
       -derivedDataPath .build/platforms build -quiet
   done
 done <<'TABLE'
-Ink iOS tvOS
-PermissionGrants iOS tvOS
-Log iOS tvOS
+Ink iOS tvOS watchOS
+PermissionGrants iOS tvOS watchOS
+Log iOS tvOS watchOS
 Terminal iOS tvOS
 Syntax iOS tvOS
 SyntaxLines iOS tvOS
