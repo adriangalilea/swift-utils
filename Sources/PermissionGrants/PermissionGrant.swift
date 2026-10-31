@@ -37,8 +37,14 @@ public struct PermissionGrant: Sendable {
             case backgroundService(AppInstallation.Job, installFor: [AppInstallation.Scope])
         #endif
         #if os(iOS) || os(watchOS)
-            /// A Privacy switch on an iPhone or a watch: calendars, reminders, alarms.
-            case privacy(Privacy)
+            /// A Privacy switch on an iPhone or a watch: calendars, reminders,
+            /// alarms, location, motion. `purposeKey` is Precise Location's
+            /// temporary full accuracy purpose, nil for every other switch.
+            case privacy(Privacy, purposeKey: String?)
+        #endif
+        #if os(iOS)
+            /// Background App Refresh: whether iOS wakes the app while it is closed.
+            case backgroundRefresh
         #endif
         #if os(macOS) || os(iOS) || os(watchOS)
             /// Notifications posted from the app's own process.
@@ -119,12 +125,32 @@ public struct PermissionGrant: Sendable {
     #endif
 
     #if os(iOS) || os(watchOS)
+        /// `purposeKey`, for `.preciseLocation` alone: the entry of
+        /// `NSLocationTemporaryUsageDescriptionDictionary` whose reason the
+        /// temporary full accuracy prompt shows. Without one, a reduced
+        /// accuracy grant's fix is Settings.
         public static func privacy(
             _ privacy: Privacy, title: String, why: String, symbol: String? = nil,
-            required: Bool = true
+            required: Bool = true, purposeKey: String? = nil
+        ) -> PermissionGrant {
+            precondition(
+                purposeKey == nil || privacy == .preciseLocation,
+                "\(title): a purpose key belongs to .preciseLocation alone")
+            return PermissionGrant(
+                kind: .privacy(privacy, purposeKey: purposeKey), title: title, why: why,
+                symbol: symbol ?? privacy.symbol, required: required)
+        }
+    #endif
+
+    #if os(iOS)
+        /// Background App Refresh, which iOS never prompts for: good while
+        /// available, Settings when off, unknown when restricted.
+        public static func backgroundRefresh(
+            title: String = "Background App Refresh", why: String,
+            symbol: String = "arrow.clockwise", required: Bool = false
         ) -> PermissionGrant {
             PermissionGrant(
-                kind: .privacy(privacy), title: title, why: why, symbol: symbol ?? privacy.symbol,
+                kind: .backgroundRefresh, title: title, why: why, symbol: symbol,
                 required: required)
         }
     #endif
@@ -159,10 +185,14 @@ public struct PermissionGrant: Sendable {
                 Readings.shared.standing("job \(job.kind)") { JobGrant.standing(job, offers) }
         #endif
         #if os(iOS) || os(watchOS)
-            case .privacy(let privacy):
-                Readings.shared.standing("privacy \(privacy.rawValue)") {
-                    DevicePrivacy.standing(privacy)
+            case .privacy(let privacy, let purposeKey):
+                Readings.shared.standing("privacy \(privacy.rawValue) \(purposeKey ?? "")") {
+                    DevicePrivacy.standing(privacy, purposeKey: purposeKey)
                 }
+        #endif
+        #if os(iOS)
+            case .backgroundRefresh:
+                Readings.shared.standing("background refresh") { BackgroundRefresh.standing() }
         #endif
         #if os(macOS) || os(iOS) || os(watchOS)
             case .notifications:
@@ -201,7 +231,11 @@ public struct PermissionGrant: Sendable {
             case .backgroundService(let job, let offers): await JobGrant.ask(job, offers)
         #endif
         #if os(iOS) || os(watchOS)
-            case .privacy(let privacy): await DevicePrivacy.ask(privacy)
+            case .privacy(let privacy, let purposeKey):
+                await DevicePrivacy.ask(privacy, purposeKey: purposeKey)
+        #endif
+        #if os(iOS)
+            case .backgroundRefresh: BackgroundRefresh.ask()
         #endif
         #if os(macOS) || os(iOS) || os(watchOS)
             case .notifications(let options): await Notifications.ask(options: options)

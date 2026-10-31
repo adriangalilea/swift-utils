@@ -83,9 +83,11 @@ final class Readings: @unchecked Sendable, Observable {
     private var revision = 0
 
     private init() {
-        NotificationCenter.default.addObserver(
-            forName: Platform.becameActive, object: nil, queue: nil
-        ) { [weak self] _ in self?.readAll() }
+        for name in Platform.rereadOn {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) {
+                [weak self] _ in self?.readAll()
+            }
+        }
     }
 
     /// The current standing under `key`, read with `read` the first time.
