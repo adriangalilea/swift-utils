@@ -99,11 +99,11 @@ extension CGFloat {
 }
 
 extension View {
-    /// The pointer resting on this view, as `hovering`. tvOS has no pointer (its
-    /// focus engine is not a hover), so there nothing ever hovers: the one place
-    /// that says so, instead of a guard at every hover in every component.
+    /// The pointer resting on this view, as `hovering`. tvOS and watchOS have no
+    /// pointer (a focus engine is not a hover), so there nothing ever hovers: the
+    /// one place that says so, instead of a guard at every hover in every component.
     public func inkHover(_ hovering: Binding<Bool>) -> some View {
-        #if os(tvOS)
+        #if os(tvOS) || os(watchOS)
             self
         #else
             onHover { hovering.wrappedValue = $0 }

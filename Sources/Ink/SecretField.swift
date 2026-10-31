@@ -2,6 +2,8 @@ import SwiftUI
 
 #if os(macOS)
     import AppKit
+#elseif os(watchOS)
+    import WatchKit
 #else
     import UIKit
 #endif
@@ -11,6 +13,8 @@ import SwiftUI
 /// strong one (1Password and the like take part as the system's provider).
 #if os(macOS)
     public typealias SecretContentType = NSTextContentType
+#elseif os(watchOS)
+    public typealias SecretContentType = WKTextContentType
 #else
     public typealias SecretContentType = UITextContentType
 #endif

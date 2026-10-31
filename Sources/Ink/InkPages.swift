@@ -90,11 +90,14 @@ public struct InkPages<Content: View, Action: View>: View {
         }
         .focusable()
         .focusEffectDisabled()
-        .onKeyPress(.leftArrow) {
-            back()
-            return .handled
-        }
-        .onKeyPress(.rightArrow) { advance() ? .handled : .ignored }
+        // a watch has no keys: its crown and swipes walk the pages
+        #if !os(watchOS)
+            .onKeyPress(.leftArrow) {
+                back()
+                return .handled
+            }
+            .onKeyPress(.rightArrow) { advance() ? .handled : .ignored }
+        #endif
         .onChange(of: page, initial: true) { _, now in seen = max(seen, now) }
     }
 
